@@ -1,0 +1,73 @@
+# Пары белковых мишеней для dual-target воркшопа.
+# Каждая пара определяет две мишени (A и B) с их PDB-структурами и метаданными.
+#
+# Обоснование выбора: см. docs/selection_criteria.md
+
+pairs:
+  CDK2_ERK2:
+    description: "Селективность киназ - CDK2 vs ERK2 (обе Ser/Thr киназы, схожие ATP-связывающие карманы)"
+    target_a:
+      id: CDK2
+      name: "Циклин-зависимая киназа 2"
+      uniprot: P24941
+      pdb_id: 1HCL
+      organism: "Homo sapiens"
+      binding_site: "ATP-связывающий карман"
+    target_b:
+      id: ERK2
+      name: "Митоген-активируемая протеинкиназа 1 (ERK2)"
+      uniprot: P28482
+      pdb_id: 4QTA
+      organism: "Homo sapiens"
+      binding_site: "ATP-связывающий карман"
+
+  EGFR_HER2:
+    description: "Двойное ингибирование EGFR/HER2 - актуально для НМРЛ и рака молочной железы"
+    target_a:
+      id: EGFR
+      name: "Рецептор эпидермального фактора роста"
+      uniprot: P00533
+      pdb_id: 1M17
+      organism: "Homo sapiens"
+      binding_site: "ATP-связывающий сайт, киназный домен"
+    target_b:
+      id: HER2
+      name: "Рецепторная тирозинкиназа erbB-2"
+      uniprot: P04626
+      pdb_id: 3PP0
+      organism: "Homo sapiens"
+      binding_site: "ATP-связывающий сайт, киназный домен"
+
+  COX1_COX2:
+    description: "Селективность циклооксигеназ - COX-1 vs COX-2, классический dual-target дизайн НПВС"
+    target_a:
+      id: COX1
+      name: "Простагландин G/H синтаза 1 (COX-1)"
+      uniprot: P23219
+      pdb_id: 1EQG
+      organism: "Ovis aries"
+      binding_site: "Активный сайт циклооксигеназы"
+    target_b:
+      id: COX2
+      name: "Простагландин G/H синтаза 2 (COX-2)"
+      uniprot: P35354
+      pdb_id: 3LN1
+      organism: "Homo sapiens"
+      binding_site: "Активный сайт циклооксигеназы"
+
+  AChE_BChE:
+    description: "Двойное ингибирование холинэстераз - multi-target стратегия при болезни Альцгеймера"
+    target_a:
+      id: AChE
+      name: "Ацетилхолинэстераза"
+      uniprot: P22303
+      pdb_id: 4EY7
+      organism: "Homo sapiens"
+      binding_site: "Каталитический активный сайт (ущелье)"
+    target_b:
+      id: BChE
+      name: "Бутирилхолинэстераза"
+      uniprot: P06276
+      pdb_id: 4BDS
+      organism: "Homo sapiens"
+      binding_site: "Каталитический активный сайт (ущелье)"

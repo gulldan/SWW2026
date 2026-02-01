@@ -1,0 +1,60 @@
+# Экспериментальный бюджет и настройки воспроизводимости.
+#
+# Все single-target и double-target запуски используют ОДИНАКОВЫЙ бюджет,
+# чтобы сравнение было честным.
+
+budget:
+  n_molecules: 1000          # молекул на запуск генерации
+  n_scoring_calls: 2000      # макс. вызовов Boltz-2 на запуск (1000 * 2 мишени)
+
+# Фиксированные сиды для воспроизводимости
+seeds: [42, 137, 256, 512, 1024]
+
+# Количество независимых запусков на комбинацию (пара, режим)
+n_runs: 5
+
+# Режимы для сравнения
+modes:
+  - single    # оптимизация только под мишень A, затем оценка по обеим
+  - double    # оптимизация под combined(A, B) одновременно
+
+# Целевые функции для double-target режима
+# Основная (baseline) + альтернативы для анализа чувствительности
+objectives:
+  baseline: "min"               # worst-case - основная гипотеза
+  alternatives:
+    - kind: "geometric"         # геометрическое среднее
+    - kind: "harmonic"          # гармоническое среднее
+    - kind: "weighted_sum"      # линейная скаляризация
+      weight_a: 0.5
+    - kind: "weighted_product"  # мультипликативная скаляризация
+      weight_a: 0.5
+    - kind: "tchebycheff"       # декомпозиция Чебышёва (невыпуклый фронт Парето)
+      weight_a: 0.5
+      utopia_a: -3.0            # идеальная log10(IC50, μM): 1 nM -> -3
+      utopia_b: -3.0            # идеальная log10(IC50, μM)
+
+# Парето-анализ (пост-обработка, не используется как reward)
+pareto_analysis:
+  enabled: true
+  ref_point_a: 1.0              # реферальная точка (хуже): 10 μM -> 1
+  ref_point_b: 1.0
+
+# Настройки генератора (FREED++)
+generator:
+  name: "FREED++"
+  freedpp:
+    epochs: 200
+    num_sub_proc: 24
+    starting_smile: "c1([*:1])c([*:2])ccc([*:3])c1"
+    docker_image: "dualdocking/freedpp:latest"
+    use_model_cache: true
+    training_timeout: 86400  # 24ч
+    box_padding: 10.0        # Å
+    vina_program: unidock    # "qvina02" for CPU fallback
+
+# Настройки скорера (Boltz-2)
+scorer:
+  name: "Boltz-2"
+  cache_enabled: true
+  timeout_seconds: 300

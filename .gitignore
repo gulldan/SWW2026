@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+wheels/
+.eggs/
+
+# Virtual environments
+.venv/
+.python-version
+.ruff_cache
+.pytest_cache
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+cache/
+data/targets/*/A/*.pdb
+data/targets/*/B/*.pdb
+data/*.pdb
+results/*/single/
+results/*/double/
+results/smoke/
+report/data/*.parquet
+report/figures/*.png
+report/molecules/*.png
+report/metrics.json
+report/stats.json
+
+# Secrets / credentials
+.env
+*.key
+data/

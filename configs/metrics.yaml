@@ -1,0 +1,37 @@
+# Конфигурация метрик для dual-target оценки.
+#
+# Определение хита: молекула является "хитом", если её скор <= порога.
+# Конвенция скоров в пайплайне: log10(IC50, μM), меньше = лучше.
+# Примеры: 1 μM -> 0.0, 100 nM -> -1.0, 10 μM -> 1.0
+
+hit_definition:
+  convention: "lower_is_better"
+  rule: "score_A <= threshold_A AND score_B <= threshold_B"
+
+thresholds:
+  CDK2_ERK2:
+    target_a: 0.0    # 1 μM
+    target_b: 0.0
+  EGFR_HER2:
+    target_a: 0.0
+    target_b: 0.0
+  COX1_COX2:
+    target_a: 0.0
+    target_b: 0.0
+  AChE_BChE:
+    target_a: 0.0
+    target_b: 0.0
+
+# Фактор обогащения - top-K молекул для оценки
+enrichment:
+  k_values: [10, 50, 100, 500]
+
+# Метрики, вычисляемые для каждого запуска
+computed_metrics:
+  - dual_hit_rate
+  - hit_rate_a
+  - hit_rate_b
+  - enrichment_at_k
+  - ks_test
+  - mannwhitney_u
+  - rank_biserial_r
