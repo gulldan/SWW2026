@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
@@ -22,15 +23,41 @@ from pathlib import Path
 import click
 import requests
 from loguru import logger
+from tqdm import tqdm
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data" / "targets"
 MSA_CACHE_DIR = PROJECT_ROOT / "cache" / "boltz_msa"
+CHECKPOINT_PATH = PROJECT_ROOT / "cache" / "prepare_checkpoint.json"
 
 MSA_RETRY_ATTEMPTS = 3
 MSA_RETRY_BACKOFF = 30  # секунд
 
 FREEDPP_DOCKER_IMAGE = "dualdocking/freedpp:latest"
+
+
+def _load_checkpoint() -> dict:
+    """Загрузить чекпоинт подготовки мишеней."""
+    if CHECKPOINT_PATH.exists():
+        return json.loads(CHECKPOINT_PATH.read_text())
+    return {}
+
+
+def _save_checkpoint(checkpoint: dict) -> None:
+    """Сохранить чекпоинт подготовки мишеней."""
+    CHECKPOINT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CHECKPOINT_PATH.write_text(json.dumps(checkpoint, indent=2))
+
+
+def _step_done(checkpoint: dict, pair_id: str, role: str, step: str) -> bool:
+    """Проверить, завершён ли конкретный шаг."""
+    return checkpoint.get(f"{pair_id}/{role}/{step}") is True
+
+
+def _mark_step(checkpoint: dict, pair_id: str, role: str, step: str) -> None:
+    """Пометить шаг как завершённый и сохранить."""
+    checkpoint[f"{pair_id}/{role}/{step}"] = True
+    _save_checkpoint(checkpoint)
 
 
 def download_pdb(pdb_id: str, output_path: Path) -> Path:
@@ -230,11 +257,15 @@ def prepare_receptor_pdbqt(pdb_path: Path, target_id: str) -> Path:
     return pdbqt_path
 
 
-def prepare_pair(pair_id: str, pair_cfg: dict, *, prepare_all: bool = False) -> None:
+def prepare_pair(pair_id: str, pair_cfg: dict, *, prepare_all: bool = False, checkpoint: dict | None = None) -> None:
     """Подготовить входные данные для одной пары."""
+    if checkpoint is None:
+        checkpoint = {}
+
     base = PROJECT_ROOT / "data" / "targets" / pair_id
 
-    for role in ("A", "B"):
+    roles = ["A", "B"]
+    for role in roles:
         target = pair_cfg[f"target_{role.lower()}"]
         pdb_id = target["pdb_id"]
         target_id = target["id"]
@@ -243,11 +274,17 @@ def prepare_pair(pair_id: str, pair_cfg: dict, *, prepare_all: bool = False) -> 
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # Шаг 1: PDB
-        pdb_path = out_dir / f"{pdb_id.lower()}.pdb"
-        if pdb_path.exists():
-            logger.info("Уже существует: {}", pdb_path)
+        if _step_done(checkpoint, pair_id, role, "pdb"):
+            logger.debug("Чекпоинт: PDB {} уже готов", target_id)
         else:
-            download_pdb(pdb_id, pdb_path)
+            pdb_path = out_dir / f"{pdb_id.lower()}.pdb"
+            if pdb_path.exists():
+                logger.info("Уже существует: {}", pdb_path)
+            else:
+                download_pdb(pdb_id, pdb_path)
+            _mark_step(checkpoint, pair_id, role, "pdb")
+
+        pdb_path = out_dir / f"{pdb_id.lower()}.pdb"
 
         # Сохранить метаданные
         meta_path = out_dir / "meta.yaml"
@@ -258,14 +295,28 @@ def prepare_pair(pair_id: str, pair_cfg: dict, *, prepare_all: bool = False) -> 
 
         if prepare_all:
             # Шаг 2: FASTA
-            fasta_path = fetch_sequence(uniprot_id, target_id)
+            if _step_done(checkpoint, pair_id, role, "fasta"):
+                logger.debug("Чекпоинт: FASTA {} уже готов", target_id)
+            else:
+                fetch_sequence(uniprot_id, target_id)
+                _mark_step(checkpoint, pair_id, role, "fasta")
+
+            fasta_path = DATA_DIR / f"{target_id}.fasta"
 
             # Шаг 3: MSA pre-compute
-            sequence = _read_sequence(fasta_path)
-            precompute_msa(target_id, sequence)
+            if _step_done(checkpoint, pair_id, role, "msa"):
+                logger.debug("Чекпоинт: MSA {} уже готов", target_id)
+            else:
+                sequence = _read_sequence(fasta_path)
+                precompute_msa(target_id, sequence)
+                _mark_step(checkpoint, pair_id, role, "msa")
 
             # Шаг 4: PDB → PDBQT (для FREED++ / QuickVina2)
-            prepare_receptor_pdbqt(pdb_path, target_id)
+            if _step_done(checkpoint, pair_id, role, "pdbqt"):
+                logger.debug("Чекпоинт: PDBQT {} уже готов", target_id)
+            else:
+                prepare_receptor_pdbqt(pdb_path, target_id)
+                _mark_step(checkpoint, pair_id, role, "pdbqt")
 
 
 @click.command()
@@ -291,9 +342,26 @@ def main(config: str, pair: str | None, prepare_all: bool) -> None:
             sys.exit(1)
         pairs = {pair: pairs[pair]}
 
-    for pair_id, pair_cfg in pairs.items():
-        logger.info("Подготовка пары: {}", pair_id)
-        prepare_pair(pair_id, pair_cfg, prepare_all=prepare_all)
+    checkpoint = _load_checkpoint()
+    n_steps_per_pair = 4 if prepare_all else 1  # pdb, fasta, msa, pdbqt  vs  pdb only
+    total_steps = len(pairs) * 2 * n_steps_per_pair  # 2 targets per pair
+
+    # Подсчёт уже завершённых шагов для корректного initial
+    done_steps = sum(
+        1
+        for pair_id in pairs
+        for role in ("A", "B")
+        for step in (["pdb", "fasta", "msa", "pdbqt"] if prepare_all else ["pdb"])
+        if _step_done(checkpoint, pair_id, role, step)
+    )
+
+    with tqdm(total=total_steps, initial=done_steps, desc="Подготовка мишеней", unit="step") as pbar:
+        for pair_id, pair_cfg in pairs.items():
+            logger.info("Подготовка пары: {}", pair_id)
+            steps_before = sum(1 for k, v in checkpoint.items() if v is True)
+            prepare_pair(pair_id, pair_cfg, prepare_all=prepare_all, checkpoint=checkpoint)
+            steps_after = sum(1 for k, v in checkpoint.items() if v is True)
+            pbar.update(steps_after - steps_before)
 
     if prepare_all:
         logger.info("Полная подготовка завершена. Пайплайн скоринга готов к работе OFFLINE.")

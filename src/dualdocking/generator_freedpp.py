@@ -17,11 +17,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from loguru import logger
+from tqdm import tqdm
 
 from dualdocking.binding_box import extract_binding_box
 
@@ -280,7 +282,10 @@ def _run_freedpp(
     size_b: str | None = None,
     commands: str = "train,sample",
 ) -> subprocess.CompletedProcess[str]:
-    """Запустить FREED++ внутри Docker контейнера."""
+    """Запустить FREED++ внутри Docker контейнера.
+
+    Вывод Docker стримится в реальном времени для наблюдения за прогрессом.
+    """
     args = _build_freedpp_args(config, workspace, pdbqt_a, center_a, size_a, commands)
 
     docker_cmd: list[str] = [
@@ -316,19 +321,50 @@ def _run_freedpp(
     docker_cmd.extend(args)
 
     logger.info("Запуск FREED++: {}", " ".join(docker_cmd))
-    result = subprocess.run(
-        docker_cmd,
-        capture_output=True,
-        text=True,
-        timeout=config.training_timeout,
-    )
 
-    if result.returncode != 0:
-        logger.error("FREED++ завершился с ошибкой (rc={})", result.returncode)
-        logger.error("stderr: {}", (result.stderr or "")[-2000:])
-        result.check_returncode()
+    # Стриминг вывода в реальном времени для видимости прогресса
+    epoch_bar = None
+    try:
+        process = subprocess.Popen(
+            docker_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
 
-    return result
+        if "train" in commands:
+            epoch_bar = tqdm(total=config.epochs, desc="FREED++ обучение", unit="epoch")
+
+        stderr_lines: list[str] = []
+        for line in process.stdout:  # type: ignore[union-attr]
+            stripped = line.rstrip()
+            # Парсинг прогресса эпох из вывода FREED++
+            if epoch_bar is not None and ("epoch" in stripped.lower() or "Epoch" in stripped):
+                # Пытаемся извлечь номер эпохи
+                match = re.search(r"[Ee]poch\s*[:\[]?\s*(\d+)", stripped)
+                if match:
+                    epoch_num = int(match.group(1))
+                    epoch_bar.n = min(epoch_num, config.epochs)
+                    epoch_bar.refresh()
+            # Показываем ключевые строки в логе
+            if any(kw in stripped.lower() for kw in ("error", "epoch", "sample", "train", "reward", "saving")):
+                logger.info("[FREED++] {}", stripped)
+            stderr_lines.append(line)
+
+        process.wait(timeout=config.training_timeout)
+    finally:
+        if epoch_bar is not None:
+            epoch_bar.close()
+
+    stdout_text = "".join(stderr_lines)
+
+    if process.returncode != 0:
+        logger.error("FREED++ завершился с ошибкой (rc={})", process.returncode)
+        logger.error("output: {}", stdout_text[-2000:])
+        raise subprocess.CalledProcessError(process.returncode, docker_cmd, output=stdout_text)
+
+    return subprocess.CompletedProcess(docker_cmd, process.returncode, stdout=stdout_text, stderr="")
 
 
 # ---------------------------------------------------------------------------
@@ -403,18 +439,28 @@ def generate(config: GenerationConfig) -> list[str]:
     list[str]
         Список сгенерированных SMILES.
     """
+    n_steps = 8 if config.reward_mode != "double" else 9
+    pbar = tqdm(total=n_steps, desc=f"Генерация [{config.target_id}]", unit="step", bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}] {postfix}")
+
     # 1. Docker image
+    pbar.set_postfix_str("Docker-образ")
     _ensure_docker_image(config.docker_image)
+    pbar.update(1)
 
     # 2. Cache check
+    pbar.set_postfix_str("Проверка кеша")
     key = _cache_key(config)
     cached_model = _find_cached_model(key) if config.use_cache else None
+    pbar.update(1)
 
     # 3. Workspace
+    pbar.set_postfix_str("Подготовка workspace")
     workspace = config.output_dir / "freedpp_workspace"
     workspace.mkdir(parents=True, exist_ok=True)
+    pbar.update(1)
 
     # 4. Prepare receptor A
+    pbar.set_postfix_str(f"Receptor A → PDBQT ({config.target_id})")
     pdb_a = _resolve_pdb_path(config.target_id)
     pdbqt_a, center_a, size_a = _prepare_receptor(
         pdb_a,
@@ -422,10 +468,12 @@ def generate(config: GenerationConfig) -> list[str]:
         config.docker_image,
         config.box_padding,
     )
+    pbar.update(1)
 
     # 5. Prepare receptor B (double mode)
     pdbqt_b = center_b = size_b = None
     if config.reward_mode == "double" and config.second_target_id:
+        pbar.set_postfix_str(f"Receptor B → PDBQT ({config.second_target_id})")
         pdb_b = _resolve_pdb_path(config.second_target_id)
         pdbqt_b, center_b, size_b = _prepare_receptor(
             pdb_b,
@@ -433,6 +481,7 @@ def generate(config: GenerationConfig) -> list[str]:
             config.docker_image,
             config.box_padding,
         )
+        pbar.update(1)
 
     # 6. Determine commands
     if cached_model is not None:
@@ -446,8 +495,28 @@ def generate(config: GenerationConfig) -> list[str]:
         logger.info("Используется кешированная модель ({}) → только sampling", key)
     else:
         commands = "train,sample"
+        # Очистить stale output от предыдущего прерванного запуска
+        stale_output = workspace / "output" / "run"
+        if stale_output.exists():
+            logger.warning("Обнаружен stale output от прерванного запуска: {}", stale_output)
+            import shutil
+
+            shutil.rmtree(stale_output, ignore_errors=True)
+            # Fallback: Docker (root-owned файлы)
+            if stale_output.exists():
+                logger.info("Удаление root-owned файлов через Docker...")
+                subprocess.run(
+                    [
+                        "docker", "run", "--rm",
+                        "-v", f"{workspace}:/ws",
+                        "alpine", "rm", "-rf", "/ws/output/run",
+                    ],
+                    timeout=30,
+                )
+            logger.info("Stale output удалён")
 
     # 7. Run FREED++
+    pbar.set_postfix_str(f"FREED++ ({commands})")
     _run_freedpp(
         config,
         workspace,
@@ -459,11 +528,15 @@ def generate(config: GenerationConfig) -> list[str]:
         size_b,
         commands=commands,
     )
+    pbar.update(1)
 
     # 8. Parse output
+    pbar.set_postfix_str("Парсинг SMILES")
     smiles = _parse_output_smiles(workspace)
+    pbar.update(1)
 
     # 9. Cache trained model
+    pbar.set_postfix_str("Кеширование модели")
     if config.use_cache and commands == "train,sample":
         model_dir = workspace / "output" / "run"
         if model_dir.exists():
@@ -473,11 +546,14 @@ def generate(config: GenerationConfig) -> list[str]:
 
             shutil.copytree(model_dir, cache_dest, dirs_exist_ok=True)
             logger.info("Модель сохранена в кеш: {}", cache_dest)
+    pbar.update(1)
 
     # 10. Write output CSV
+    pbar.set_postfix_str("Запись CSV")
     config.output_dir.mkdir(parents=True, exist_ok=True)
     out_path = config.output_dir / "generated.csv"
     out_path.write_text("smiles\n" + "\n".join(smiles) + "\n")
     logger.info("Сгенерировано {} молекул -> {}", len(smiles), out_path)
+    pbar.close()
 
     return smiles
