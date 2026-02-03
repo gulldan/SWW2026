@@ -39,7 +39,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -48,7 +48,9 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
-class ObjectiveKind(str, Enum):
+class ObjectiveKind(StrEnum):
+    """Допустимые типы целевых функций."""
+
     MIN = "min"
     HARMONIC = "harmonic"
     WEIGHTED_SUM = "weighted_sum"
@@ -117,11 +119,10 @@ def combined_geometric(
     """
     util_a = _to_utility(scores_a, lower_is_better)
     util_b = _to_utility(scores_b, lower_is_better)
-    util = np.where(
-        (util_a > 0) & (util_b > 0),
-        np.sqrt(util_a * util_b),
-        0.0,
-    )
+    util = np.zeros_like(util_a)
+    mask = (util_a > 0) & (util_b > 0)
+    if np.any(mask):
+        util[mask] = np.sqrt(util_a[mask] * util_b[mask])
     return _from_utility(util, lower_is_better)
 
 
@@ -179,7 +180,10 @@ def combined_weighted_sum(
     только на выпуклых участках фронта Парето.
     """
     w = float(weight_a)
-    return w * scores_a + (1.0 - w) * scores_b
+    util_a = _to_utility(scores_a, lower_is_better)
+    util_b = _to_utility(scores_b, lower_is_better)
+    util = w * util_a + (1.0 - w) * util_b
+    return _from_utility(util, lower_is_better)
 
 
 def combined_weighted_product(
@@ -219,8 +223,12 @@ def combined_tchebycheff(
     (utopia_a, utopia_b) - идеальные значения по каждой мишени.
     """
     w = float(weight_a)
-    dev_a = w * np.abs(scores_a - utopia_a)
-    dev_b = (1.0 - w) * np.abs(scores_b - utopia_b)
+    util_a = _to_utility(scores_a, lower_is_better)
+    util_b = _to_utility(scores_b, lower_is_better)
+    utopia_u_a = float(_to_utility(np.array([utopia_a], dtype=np.float64), lower_is_better)[0])
+    utopia_u_b = float(_to_utility(np.array([utopia_b], dtype=np.float64), lower_is_better)[0])
+    dev_a = w * np.abs(util_a - utopia_u_a)
+    dev_b = (1.0 - w) * np.abs(util_b - utopia_u_b)
     return np.maximum(dev_a, dev_b)
 
 
@@ -286,7 +294,7 @@ def hypervolume_contributions(
         right_a = fa[k + 1] if k + 1 < m else ref_u_a
         # Высота по b: от ref_b до текущей
         lower_b = fb[k - 1] if k > 0 else ref_u_b
-    contributions[front_indices[k]] = (fa[k] - right_a) * (fb[k] - lower_b)
+        contributions[front_indices[k]] = (fa[k] - right_a) * (fb[k] - lower_b)
 
     return contributions
 

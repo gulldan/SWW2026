@@ -1,0 +1,624 @@
+"""Dock calibration SMILES set against all targets with Uni-Dock GPU."""
+
+from __future__ import annotations
+
+import csv
+import json
+import random
+import re
+import shutil
+import subprocess
+import sys
+from contextlib import nullcontext
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from types import TracebackType
+from typing import Self
+
+import click
+from loguru import logger
+from tqdm import tqdm
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+DOCKER_BIN = shutil.which("docker") or "docker"
+
+
+_PROGRAM_ALIASES: dict[str, str] = {
+    "unidock_gpu": "unidock",
+}
+
+
+@dataclass
+class DockingParams:
+    """Docking parameters shared across calibration targets."""
+
+    exhaustiveness: int
+    num_modes: int
+    energy_range: float
+    timeout_seconds: int
+    box_padding: float
+
+
+class DockerRunner:
+    """Lightweight Docker exec helper for persistent containers."""
+
+    def __init__(self, image: str, workdir: Path, gpus: str | None = "all") -> None:
+        self.image = image
+        self.workdir = workdir
+        self.gpus = gpus
+        self.container_id: str | None = None
+
+    def start(self) -> None:
+        """Start a long-lived container for repeated exec calls."""
+        cmd = [DOCKER_BIN, "run", "-d", "--rm", "--entrypoint", "sleep"]
+        if self.gpus:
+            cmd += ["--gpus", self.gpus]
+        cmd += ["-v", f"{self.workdir}:/workspace", "-w", "/workspace", self.image, "infinity"]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)  # noqa: S603
+        self.container_id = result.stdout.strip()
+        if not self.container_id:
+            raise RuntimeError("Failed to start docker container")
+
+    def exec(self, args: list[str], timeout: int | None = None) -> subprocess.CompletedProcess[str]:
+        """Run a command inside the running container."""
+        if not self.container_id:
+            raise RuntimeError("Docker container is not running")
+        cmd = [DOCKER_BIN, "exec", self.container_id, *args]
+        return subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=timeout)  # noqa: S603
+
+    def stop(self) -> None:
+        """Stop the running container."""
+        if self.container_id:
+            subprocess.run([DOCKER_BIN, "stop", self.container_id], check=False)  # noqa: S603
+            self.container_id = None
+
+    def __enter__(self) -> Self:
+        """Context manager entry."""
+        self.start()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        """Context manager exit."""
+        self.stop()
+
+
+def _load_calibration_smiles(path: Path) -> list[str]:
+    smiles: list[str] = []
+    with path.open() as f:
+        for raw_line in f:
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            smiles.append(stripped.split()[0])
+    return smiles
+
+
+def _sample_smiles(smiles: list[str], n: int, seed: int) -> list[str]:
+    if n >= len(smiles):
+        return smiles
+    rng = random.Random(seed)  # noqa: S311
+    return rng.sample(smiles, n)
+
+
+def _resolve_program(program: str, override: str | None = None) -> str:
+    if override:
+        return override
+    return _PROGRAM_ALIASES.get(program, program)
+
+
+def _parse_score(text: str) -> float:
+    for line in text.splitlines():
+        match = re.match(r"^\s*1\s+(-?\d+(?:\.\d+)?)", line)
+        if match:
+            return float(match.group(1))
+    match = re.search(r"Affinity:\s*(-?\d+(?:\.\d+)?)", text)
+    if match:
+        return float(match.group(1))
+    raise ValueError("Could not parse docking score")
+
+
+def _docker_image_digest(image: str) -> str:
+    result = subprocess.run(  # noqa: S603
+        [DOCKER_BIN, "image", "inspect", image, "--format", "{{index .RepoDigests 0}}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    out = (result.stdout or result.stderr or "").strip()
+    if "@" in out:
+        return out.split("@")[-1]
+    return out or "unknown"
+
+
+def _container_path(path: Path) -> str:
+    return f"/workspace/{path.relative_to(PROJECT_ROOT)}"
+
+
+def _safe_unlink(path: Path, runner: DockerRunner | None) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return
+    except PermissionError:
+        if not runner:
+            raise
+        runner.exec(["rm", "-f", _container_path(path)])
+
+
+def _ensure_receptor_pdbqt(
+    runner: DockerRunner | None,
+    pdb_path: Path,
+    pdbqt_path: Path,
+    timeout: int,
+    overwrite: bool = False,
+) -> None:
+    if pdbqt_path.exists() and not overwrite:
+        return
+    if pdbqt_path.exists() and overwrite:
+        _safe_unlink(pdbqt_path, runner)
+    pdbqt_path.parent.mkdir(parents=True, exist_ok=True)
+    fixed_pdb = pdbqt_path.with_suffix(".fixed.pdb")
+    if fixed_pdb.exists() and overwrite:
+        _safe_unlink(fixed_pdb, runner)
+
+    if not fixed_pdb.exists():
+        fixer_script = PROJECT_ROOT / "docker" / "freedpp" / "pdbfixer_add_h.py"
+        fixer_cmd = [
+            "/opt/micromamba/envs/unidock/bin/python" if runner else sys.executable,
+            _container_path(fixer_script) if runner else str(fixer_script),
+            "--pdb",
+            _container_path(pdb_path) if runner else str(pdb_path),
+            "--out",
+            _container_path(fixed_pdb) if runner else str(fixed_pdb),
+        ]
+        if runner:
+            result = runner.exec(fixer_cmd, timeout=timeout)
+        else:
+            result = subprocess.run(  # noqa: S603
+                fixer_cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout,
+            )
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout or "").strip()
+            raise RuntimeError(f"Failed to add hydrogens: {err}")
+    output_basename = pdbqt_path.with_suffix("")
+    cmd = [
+        "mk_prepare_receptor.py",
+        "--pdb",
+        _container_path(fixed_pdb) if runner else str(fixed_pdb),
+        "-o",
+        _container_path(output_basename) if runner else str(output_basename),
+        "--skip_gpf",
+    ]
+    if runner:
+        result = runner.exec(cmd, timeout=timeout)
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=timeout)  # noqa: S603
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(f"Failed to prepare receptor: {err}")
+
+
+def _write_sdf_from_smiles(
+    runner: DockerRunner | None,
+    smiles: str,
+    sdf_path: Path,
+    seed: int,
+    timeout: int,
+) -> tuple[bool, str]:
+    if runner:
+        cmd = [
+            "python",
+            "/workspace/scripts/rdkit_embed.py",
+            "--smiles",
+            smiles,
+            "--sdf",
+            _container_path(sdf_path),
+            "--seed",
+            str(seed),
+        ]
+        result = runner.exec(cmd, timeout=timeout)
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout or "").strip()
+            return False, err or "RDKit embed failed in container"
+        return True, ""
+
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+    except Exception as exc:  # pragma: no cover - import error is fatal
+        return False, f"RDKit import failed: {exc}"
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return False, "RDKit failed to parse SMILES"
+    mol = Chem.AddHs(mol)
+    params = AllChem.ETKDGv3()
+    params.randomSeed = seed
+    if AllChem.EmbedMolecule(mol, params) != 0:
+        return False, "RDKit 3D embedding failed"
+    AllChem.UFFOptimizeMolecule(mol, maxIters=200)
+    sdf_path.parent.mkdir(parents=True, exist_ok=True)
+    writer = Chem.SDWriter(str(sdf_path))
+    writer.write(mol)
+    writer.close()
+    return True, ""
+
+
+def _ensure_ligand_pdbqt(
+    runner: DockerRunner | None,
+    smiles: str,
+    sdf_path: Path,
+    out_path: Path,
+    timeout: int,
+    seed: int,
+    overwrite: bool = False,
+) -> tuple[bool, str]:
+    if out_path.exists() and not overwrite:
+        return True, ""
+    if out_path.exists() and overwrite:
+        _safe_unlink(out_path, runner)
+    if sdf_path.exists() and overwrite:
+        _safe_unlink(sdf_path, runner)
+
+    ok, err = _write_sdf_from_smiles(runner, smiles, sdf_path, seed=seed, timeout=timeout)
+    if not ok:
+        return False, err
+
+    cmd = [
+        "mk_prepare_ligand.py",
+        "-i",
+        _container_path(sdf_path) if runner else str(sdf_path),
+        "-o",
+        _container_path(out_path) if runner else str(out_path),
+    ]
+    if runner:
+        result = runner.exec(cmd, timeout=timeout)
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=timeout)  # noqa: S603
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        return False, err
+    return True, ""
+
+
+def _dock_ligand(
+    runner: DockerRunner | None,
+    binary: str,
+    receptor: Path,
+    ligand: Path,
+    center: tuple[float, float, float],
+    size: tuple[float, float, float],
+    params: DockingParams,
+    log_path: Path,
+    out_path: Path,
+) -> float:
+    center_x, center_y, center_z = center
+    size_x, size_y, size_z = size
+    binary_name = Path(binary).name.lower()
+    supports_log = "unidock" not in binary_name
+    cmd = [
+        binary,
+        "--receptor",
+        _container_path(receptor) if runner else str(receptor),
+        "--ligand",
+        _container_path(ligand) if runner else str(ligand),
+        "--center_x",
+        f"{center_x:.3f}",
+        "--center_y",
+        f"{center_y:.3f}",
+        "--center_z",
+        f"{center_z:.3f}",
+        "--size_x",
+        f"{size_x:.3f}",
+        "--size_y",
+        f"{size_y:.3f}",
+        "--size_z",
+        f"{size_z:.3f}",
+        "--exhaustiveness",
+        str(params.exhaustiveness),
+        "--num_modes",
+        str(params.num_modes),
+        "--energy_range",
+        str(params.energy_range),
+        "--out",
+        _container_path(out_path) if runner else str(out_path),
+    ]
+    if supports_log:
+        cmd += [
+            "--log",
+            _container_path(log_path) if runner else str(log_path),
+        ]
+
+    if runner:
+        result = runner.exec(cmd, timeout=params.timeout_seconds)
+        if supports_log and log_path.exists():
+            log_text = runner.exec(["cat", _container_path(log_path)]).stdout or ""
+        else:
+            log_text = result.stdout or result.stderr or ""
+    else:
+        result = subprocess.run(  # noqa: S603
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=params.timeout_seconds,
+        )
+        log_text = log_path.read_text() if supports_log and log_path.exists() else (result.stdout or result.stderr or "")
+
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr or result.stdout)
+
+    if not supports_log:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(log_text)
+
+    return _parse_score(log_text)
+
+
+def _parse_vec(vec_str: str) -> tuple[float, float, float]:
+    parts = [float(x) for x in vec_str.split(",")]
+    if len(parts) != 3:
+        raise ValueError(f"Expected 3 values, got: {vec_str}")
+    return parts[0], parts[1], parts[2]
+
+
+def _docking_version(runner: DockerRunner | None, binary: str) -> str:
+    if runner:
+        result = runner.exec([binary, "--version"])
+    else:
+        result = subprocess.run([binary, "--version"], capture_output=True, text=True, check=False)  # noqa: S603
+    output = (result.stdout or result.stderr or "").strip()
+    return output.splitlines()[0] if output else "unknown"
+
+
+@click.command()
+@click.option("--calibration-config", default="configs/calibration.yaml")
+@click.option("--calibration-set", default=None)
+@click.option("--scores-dir", default="data/calibration/scores")
+@click.option("--n", default=None, type=int, help="Number of ligands to dock")
+@click.option("--seed", default=None, type=int, help="Sampling seed")
+@click.option("--target-id", multiple=True, help="Target ID to dock (repeatable)")
+@click.option("--docker-image", default="dualdocking/freedpp:latest")
+@click.option("--use-docker/--no-docker", default=True)
+@click.option("--gpus", default="all", help="Docker --gpus value")
+@click.option("--docking-program", default="unidock_gpu")
+@click.option("--docking-binary", default=None, help="Override docking binary")
+@click.option("--overwrite/--skip-existing", default=False)
+@click.option("--dry-run", is_flag=True)
+def main(  # noqa: PLR0913
+    calibration_config: str,
+    calibration_set: str | None,
+    scores_dir: str,
+    n: int | None,
+    seed: int | None,
+    target_id: tuple[str, ...],
+    docker_image: str,
+    use_docker: bool,
+    gpus: str,
+    docking_program: str,
+    docking_binary: str | None,
+    overwrite: bool,
+    dry_run: bool,
+) -> None:
+    """Dock calibration SMILES set against targets to build score distributions."""
+    import yaml
+
+    from dualdocking.binding_box import extract_binding_box
+    from dualdocking.config import load_pairs
+    from dualdocking.generator_freedpp import _ensure_docker_image, _resolve_pdb_path
+
+    cfg = yaml.safe_load((PROJECT_ROOT / calibration_config).read_text())
+    calibration_path = PROJECT_ROOT / (calibration_set or cfg.get("output_path"))
+    if not calibration_path.exists():
+        raise FileNotFoundError(f"Calibration set not found: {calibration_path}")
+
+    sample_cfg = cfg.get("sample", {})
+    n = n or int(sample_cfg.get("n", 1000))
+    seed = seed or int(sample_cfg.get("seed", 137))
+
+    docking_cfg = cfg.get("docking", {})
+    params = DockingParams(
+        exhaustiveness=int(docking_cfg.get("exhaustiveness", 8)),
+        num_modes=int(docking_cfg.get("num_modes", 9)),
+        energy_range=float(docking_cfg.get("energy_range", 3.0)),
+        timeout_seconds=int(docking_cfg.get("timeout_seconds", 120)),
+        box_padding=float(docking_cfg.get("box_padding", 10.0)),
+    )
+
+    scores_root = PROJECT_ROOT / scores_dir
+    scores_root.mkdir(parents=True, exist_ok=True)
+    receptors_dir = PROJECT_ROOT / "data" / "calibration" / "receptors"
+    ligands_dir = PROJECT_ROOT / "data" / "calibration" / "ligands"
+    work_dir = PROJECT_ROOT / "data" / "calibration" / "work"
+    receptors_dir.mkdir(parents=True, exist_ok=True)
+    ligands_dir.mkdir(parents=True, exist_ok=True)
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    smiles_all = _load_calibration_smiles(calibration_path)
+    logger.info("Calibration set: {} ({} total, target n={})", calibration_path, len(smiles_all), n)
+
+    ligands_manifest = ligands_dir / "ligands.smi"
+    use_existing_manifest = ligands_manifest.exists() and not overwrite
+    if use_existing_manifest:
+        existing = [line.strip().split()[0] for line in ligands_manifest.read_text().splitlines() if line.strip()]
+        if n is not None and len(existing) != n:
+            logger.warning(
+                "Ligands manifest has {} entries, requested n={}; reusing manifest",
+                len(existing),
+                n,
+            )
+        smiles = existing
+        n = len(smiles)
+        candidates = smiles
+    else:
+        rng = random.Random(seed)  # noqa: S311
+        candidates = smiles_all.copy()
+        rng.shuffle(candidates)
+        smiles = []
+
+    pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
+    target_ids: list[str] = []
+    for pair in pairs.values():
+        target_ids.append(pair["target_a"]["id"])
+        target_ids.append(pair["target_b"]["id"])
+    target_ids = sorted(set(target_ids))
+
+    if target_id:
+        target_ids = [t for t in target_ids if t in set(target_id)]
+        if not target_ids:
+            raise ValueError("No target IDs matched the provided --target-id values")
+
+    binary = _resolve_program(docking_program, docking_binary)
+
+    if dry_run:
+        logger.info("Dry run enabled; no docking will be executed")
+    elif use_docker:
+        _ensure_docker_image(docker_image)
+
+    runner: DockerRunner | None
+    runner_ctx = DockerRunner(docker_image, PROJECT_ROOT, gpus=gpus) if use_docker else nullcontext(None)
+    with runner_ctx as runner:
+        if runner:
+            logger.info("Using docker image: {}", docker_image)
+
+        # Prepare ligands once
+        ligand_paths: list[Path] = []
+        failed_smiles: list[str] = []
+        for smi in tqdm(candidates, desc="Ligands", unit="ligand"):
+            if len(smiles) >= n:
+                break
+            ligand_path = ligands_dir / f"ligand_{len(smiles):05d}.pdbqt"
+            sdf_path = ligands_dir / f"ligand_{len(smiles):05d}.sdf"
+            if dry_run:
+                smiles.append(smi)
+                ligand_paths.append(ligand_path)
+                continue
+            ok, err = _ensure_ligand_pdbqt(
+                runner,
+                smi,
+                sdf_path,
+                ligand_path,
+                timeout=params.timeout_seconds,
+                seed=seed + len(smiles),
+                overwrite=overwrite,
+            )
+            if not ok:
+                failed_smiles.append(smi)
+                logger.warning("Ligand prep failed: {} ({})", smi, err or "no error text")
+                if use_existing_manifest:
+                    raise RuntimeError("Ligand prep failed for existing manifest; rerun with --overwrite")
+                continue
+            smiles.append(smi)
+            ligand_paths.append(ligand_path)
+
+        if len(smiles) < n:
+            raise RuntimeError(f"Only {len(smiles)} ligands prepared, expected {n}")
+
+        if failed_smiles and not use_existing_manifest:
+            (ligands_dir / "ligands_failed.smi").write_text("\n".join(failed_smiles) + "\n")
+
+        ligands_manifest.write_text("\n".join(smiles) + "\n")
+
+        docking_version = _docking_version(runner, binary) if not dry_run else "unknown"
+        manifest = {
+            "docking_program": docking_program,
+            "docking_binary": binary,
+            "docking_version": docking_version,
+            "docker_image": docker_image,
+            "docker_image_digest": _docker_image_digest(docker_image),
+            "calibration_set": str(calibration_path),
+            "n": len(smiles),
+            "seed": seed,
+            "params": {
+                "exhaustiveness": params.exhaustiveness,
+                "num_modes": params.num_modes,
+                "energy_range": params.energy_range,
+                "timeout_seconds": params.timeout_seconds,
+                "box_padding": params.box_padding,
+            },
+            "targets": target_ids,
+            "date": datetime.now(UTC).date().isoformat(),
+        }
+        (scores_root / "manifest.json").write_text(json.dumps(manifest, indent=2))
+
+        for target in target_ids:
+            scores_path = scores_root / f"{target}.csv"
+            if scores_path.exists() and not overwrite:
+                logger.info("Skip existing scores: {}", scores_path)
+                continue
+
+            pdb_path = _resolve_pdb_path(target)
+            receptor_path = receptors_dir / f"{target}.pdbqt"
+            if not dry_run:
+                _ensure_receptor_pdbqt(
+                    runner,
+                    pdb_path,
+                    receptor_path,
+                    timeout=params.timeout_seconds,
+                    overwrite=overwrite,
+                )
+
+            center_str, size_str = extract_binding_box(pdb_path, padding=params.box_padding)
+            center = _parse_vec(center_str)
+            size = _parse_vec(size_str)
+
+            scores: list[float] = []
+            failures = 0
+            target_work = work_dir / target
+            target_work.mkdir(parents=True, exist_ok=True)
+
+            for idx, ligand_path in enumerate(tqdm(ligand_paths, desc=f"Dock {target}", unit="ligand")):
+                if dry_run:
+                    scores.append(0.0)
+                    continue
+                log_path = target_work / f"{target}_{idx:05d}.log"
+                out_path = target_work / f"{target}_{idx:05d}.pdbqt"
+                try:
+                    score = _dock_ligand(
+                        runner,
+                        binary,
+                        receptor_path,
+                        ligand_path,
+                        center,
+                        size,
+                        params,
+                        log_path,
+                        out_path,
+                    )
+                    scores.append(score)
+                except Exception as exc:
+                    failures += 1
+                    logger.error("Docking failed for {} #{}: {}", target, idx, exc)
+                    continue
+                finally:
+                    if log_path.exists():
+                        log_path.unlink(missing_ok=True)
+                    if out_path.exists():
+                        out_path.unlink(missing_ok=True)
+
+            if failures:
+                logger.warning("{} docking failures for target {}", failures, target)
+
+            scores_path.parent.mkdir(parents=True, exist_ok=True)
+            with scores_path.open("w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["score"])
+                for score in scores:
+                    writer.writerow([f"{score:.6f}"])
+
+            logger.info("Scores -> {} (n={})", scores_path, len(scores))
+
+
+if __name__ == "__main__":
+    main()

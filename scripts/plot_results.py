@@ -1,4 +1,4 @@
-"""Генерация графиков сравнения single vs double.
+"""Генерация графиков сравнения режимов.
 
 Читает report/data/all_results.parquet и строит графики для каждой пары.
 """
@@ -12,21 +12,23 @@ import click
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from loguru import logger
+from matplotlib.patches import Patch
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def plot_score_comparison(df_pair: pd.DataFrame, pair_id: str, fig_dir: Path) -> None:
+def plot_score_comparison(df_pair: pd.DataFrame, pair_id: str, fig_dir: Path, modes: list[str]) -> None:
     """Построить графики сравнения распределений скоров для пары."""
     fig_dir.mkdir(parents=True, exist_ok=True)
 
-    for col, label in [("score_a", "Скор A"), ("score_b", "Скор B"), ("combined_min", "Комбинированный (worst-case)")]:
+    col_a = "affinity_a" if "affinity_a" in df_pair.columns else "score_a"
+    col_b = "affinity_b" if "affinity_b" in df_pair.columns else "score_b"
+    for col, label in [(col_a, "Скор A"), (col_b, "Скор B"), ("combined_min", "Комбинированный (worst-case)")]:
         fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
         # Гистограмма
-        for mode in ("single", "double"):
+        for mode in modes:
             subset = df_pair[df_pair["mode"] == mode][col].dropna()
             axes[0].hist(subset, bins=40, alpha=0.6, label=mode, density=True)
         axes[0].set_xlabel(label)
@@ -35,7 +37,7 @@ def plot_score_comparison(df_pair: pd.DataFrame, pair_id: str, fig_dir: Path) ->
         axes[0].set_title(f"{pair_id} - распределение {label}")
 
         # ECDF
-        for mode in ("single", "double"):
+        for mode in modes:
             subset = np.sort(df_pair[df_pair["mode"] == mode][col].dropna())
             ecdf = np.arange(1, len(subset) + 1) / len(subset)
             axes[1].step(subset, ecdf, label=mode)
@@ -46,20 +48,48 @@ def plot_score_comparison(df_pair: pd.DataFrame, pair_id: str, fig_dir: Path) ->
 
         fig.tight_layout()
         safe_col = col.replace("_", "")
-        fig.savefig(fig_dir / f"{pair_id}_{safe_col}_single_vs_double.png", dpi=150)
+        fig.savefig(fig_dir / f"{pair_id}_{safe_col}_modes.png", dpi=150)
         plt.close(fig)
-        logger.info("Сохранено: {}", fig_dir / f"{pair_id}_{safe_col}_single_vs_double.png")
+        logger.info("Сохранено: {}", fig_dir / f"{pair_id}_{safe_col}_modes.png")
 
-    # Боксплот
-    fig, ax = plt.subplots(figsize=(8, 5))
-    plot_df = df_pair.melt(
-        id_vars=["mode"],
-        value_vars=["score_a", "score_b", "combined_min"],
-        var_name="metric",
-        value_name="score",
+    # Боксплот (matplotlib, чтобы избежать deprecation warning seaborn)
+    fig, ax = plt.subplots(figsize=(9, 5))
+    metrics = [col_a, col_b, "combined_min"]
+    data: list[np.ndarray] = []
+    positions: list[float] = []
+    group_width = len(modes) + 1
+    tick_positions: list[float] = []
+    tick_labels: list[str] = []
+
+    for i, metric in enumerate(metrics):
+        base = i * group_width
+        tick_positions.append(base + (len(modes) - 1) / 2)
+        tick_labels.append(metric)
+        for j, mode in enumerate(modes):
+            vals = df_pair[df_pair["mode"] == mode][metric].dropna().to_numpy()
+            data.append(vals)
+            positions.append(base + j)
+
+    box = ax.boxplot(
+        data,
+        positions=positions,
+        widths=0.6,
+        patch_artist=True,
+        showfliers=False,
     )
-    sns.boxplot(data=plot_df, x="metric", y="score", hue="mode", ax=ax)
+    palette = plt.cm.tab10.colors
+    for idx, patch in enumerate(box["boxes"]):
+        mode_idx = idx % len(modes)
+        patch.set_facecolor(palette[mode_idx])
+        patch.set_alpha(0.6)
+
+    ax.set_xticks(tick_positions, tick_labels)
     ax.set_title(f"{pair_id} - сравнение скоров")
+    ax.set_ylabel("score")
+
+    legend_handles = [Patch(facecolor=palette[i], label=modes[i], alpha=0.6) for i in range(len(modes))]
+    ax.legend(handles=legend_handles, title="mode")
+
     fig.tight_layout()
     fig.savefig(fig_dir / f"{pair_id}_boxplot.png", dpi=150)
     plt.close(fig)
@@ -78,10 +108,18 @@ def main(input_path: str, output_dir: str) -> None:
     df = pd.read_parquet(in_path)
     fig_dir = PROJECT_ROOT / output_dir
 
+    from dualdocking.config import load_experiment
+
+    try:
+        modes = load_experiment(PROJECT_ROOT / "configs").get("modes", ["single_a", "single_b", "double"])
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Не удалось загрузить experiment.yaml: {}. Использую дефолтные режимы.", exc)
+        modes = ["single_a", "single_b", "double"]
+
     for pair_id in df["pair"].unique():
         logger.info("Построение графиков для пары: {}", pair_id)
         df_pair = df[df["pair"] == pair_id]
-        plot_score_comparison(df_pair, pair_id, fig_dir)
+        plot_score_comparison(df_pair, pair_id, fig_dir, modes)
 
     logger.info("Все графики сохранены в {}", fig_dir)
 

@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class SanitizeStats:
+    """Сводка санитарной проверки SMILES."""
+
     total: int
     valid: int
     unique: int
@@ -26,10 +28,12 @@ class SanitizeStats:
 
     @property
     def validity_rate(self) -> float:
+        """Доля валидных молекул среди всех входных."""
         return self.valid / self.total if self.total > 0 else 0.0
 
     @property
     def uniqueness_rate(self) -> float:
+        """Доля уникальных молекул среди валидных."""
         return self.unique / self.valid if self.valid > 0 else 0.0
 
 
@@ -41,7 +45,7 @@ def canonicalize(smi: str) -> str | None:
     if mol is None:
         return None
     canon = Chem.MolToSmiles(mol, canonical=True)
-    return canon if canon else None
+    return canon or None
 
 
 def mol_hash(smi: str) -> str:
@@ -93,7 +97,7 @@ def sanitize_smiles(
             invalid_indices.append(idx)
             continue
 
-        mw = Descriptors.MolWt(mol)
+        mw = Descriptors.MolWt(mol)  # type: ignore[attr-defined]
         if mw > max_mw:
             logger.debug("Пропуск idx={}: MW={:.1f}", idx, mw)
             invalid_indices.append(idx)

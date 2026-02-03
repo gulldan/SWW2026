@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +37,7 @@ DATA_DIR = PROJECT_ROOT / "data" / "targets"
 CACHE_DIR = PROJECT_ROOT / "cache" / "freedpp_models"
 
 DEFAULT_DOCKER_IMAGE = "dualdocking/freedpp:latest"
+DOCKER_BIN = shutil.which("docker") or "docker"
 
 # ---------------------------------------------------------------------------
 # Config
@@ -50,7 +52,7 @@ class GenerationConfig:
     n_molecules: int = 1000
     seed: int = 42
     output_dir: Path = field(default_factory=lambda: Path("results/smoke"))
-    reward_mode: str = "single"  # "single" | "double"
+    reward_mode: str = "single_a"  # "single_a" | "single_b" | "double"
     second_target_id: str | None = None
 
     # FREED++-специфичные
@@ -61,7 +63,7 @@ class GenerationConfig:
     docker_image: str = DEFAULT_DOCKER_IMAGE
     training_timeout: int = 86400  # 24 ч
     box_padding: float = 10.0  # Å
-    vina_program: str = "qvina02"  # "qvina02" | "unidock"
+    vina_program: str = "unidock_gpu"  # "qvina02" | "unidock" | "unidock_gpu"
     steps_per_epoch: int = 256
 
 
@@ -72,9 +74,10 @@ class GenerationConfig:
 
 def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
     """Проверить наличие Docker-образа, собрать при необходимости."""
-    result = subprocess.run(
-        ["docker", "image", "inspect", image],
+    result = subprocess.run(  # noqa: S603
+        [DOCKER_BIN, "image", "inspect", image],
         capture_output=True,
+        check=False,
     )
     if result.returncode == 0:
         logger.debug("Docker-образ {} найден", image)
@@ -85,8 +88,8 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
     if not (dockerfile_dir / "Dockerfile").exists():
         raise FileNotFoundError(f"Dockerfile не найден: {dockerfile_dir / 'Dockerfile'}")
 
-    subprocess.run(
-        ["docker", "build", "-t", image, str(dockerfile_dir)],
+    subprocess.run(  # noqa: S603
+        [DOCKER_BIN, "build", "-t", image, str(dockerfile_dir)],
         check=True,
     )
     logger.info("Docker-образ {} собран", image)
@@ -173,9 +176,9 @@ def _prepare_receptor(
     if not pdbqt_path.exists():
         logger.info("Конвертация PDB → PDBQT: {} → {}", pdb_path, pdbqt_path)
         out_dir.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
+        subprocess.run(  # noqa: S603
             [
-                "docker",
+                DOCKER_BIN,
                 "run",
                 "--rm",
                 "-v",
@@ -205,6 +208,9 @@ def _prepare_receptor(
 _VINA_PATHS: dict[str, str] = {
     "qvina02": "/opt/freed/ffreed/env/qvina02",
     "unidock": "/usr/local/bin/unidock",
+    # В контейнере Uni-Dock GPU устанавливается как `unidock`.
+    # Оставляем ключ `unidock_gpu` для согласованности метаданных.
+    "unidock_gpu": "/usr/local/bin/unidock",
 }
 
 
@@ -223,7 +229,6 @@ def _resolve_vina_path(program: str) -> str:
 
 def _build_freedpp_args(
     config: GenerationConfig,
-    workspace: Path,
     pdbqt_a: Path,
     center_a: str,
     size_a: str,
@@ -286,10 +291,10 @@ def _run_freedpp(
 
     Вывод Docker стримится в реальном времени для наблюдения за прогрессом.
     """
-    args = _build_freedpp_args(config, workspace, pdbqt_a, center_a, size_a, commands)
+    args = _build_freedpp_args(config, pdbqt_a, center_a, size_a, commands)
 
     docker_cmd: list[str] = [
-        "docker",
+        DOCKER_BIN,
         "run",
         "--rm",
         "--gpus",
@@ -298,8 +303,22 @@ def _run_freedpp(
         f"{workspace}:/workspace",
     ]
 
+    # Передать контекст для reward (нормализация + режим)
+    docker_cmd.extend(
+        [
+            "-e",
+            f"REWARD_MODE={config.reward_mode}",
+            "-e",
+            f"TARGET_ID_A={config.target_id}",
+            "-e",
+            f"TARGET_ID_B={config.second_target_id or ''}",
+            "-e",
+            "NORMALIZATION_PATH=/workspace/normalization.yaml",
+        ]
+    )
+
     # Dual-target: mount второй receptor и конфиг
-    if config.reward_mode == "double" and pdbqt_b is not None:
+    if config.reward_mode in {"single_b", "double"} and pdbqt_b is not None:
         dual_cfg = {
             "receptor_b": f"/workspace/{pdbqt_b.name}",
             "center_b": center_b,
@@ -325,7 +344,7 @@ def _run_freedpp(
     # Стриминг вывода в реальном времени для видимости прогресса
     epoch_bar = None
     try:
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # noqa: S603
             docker_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -439,8 +458,14 @@ def generate(config: GenerationConfig) -> list[str]:
     list[str]
         Список сгенерированных SMILES.
     """
-    n_steps = 8 if config.reward_mode != "double" else 9
-    pbar = tqdm(total=n_steps, desc=f"Генерация [{config.target_id}]", unit="step", bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}] {postfix}")
+    needs_second = config.reward_mode in {"single_b", "double"}
+    n_steps = 8 if not needs_second else 9
+    pbar = tqdm(
+        total=n_steps,
+        desc=f"Генерация [{config.target_id}]",
+        unit="step",
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}] {postfix}",
+    )
 
     # 1. Docker image
     pbar.set_postfix_str("Docker-образ")
@@ -459,6 +484,17 @@ def generate(config: GenerationConfig) -> list[str]:
     workspace.mkdir(parents=True, exist_ok=True)
     pbar.update(1)
 
+    # 3.1. Нормализация (нужна для reward)
+    normalization_src = PROJECT_ROOT / "configs" / "normalization.yaml"
+    if not normalization_src.exists():
+        raise FileNotFoundError(f"normalization.yaml не найден: {normalization_src}")
+    normalization_dst = workspace / "normalization.yaml"
+    if not normalization_dst.exists():
+        import shutil
+
+        shutil.copy2(normalization_src, normalization_dst)
+        logger.info("normalization.yaml -> {}", normalization_dst)
+
     # 4. Prepare receptor A
     pbar.set_postfix_str(f"Receptor A → PDBQT ({config.target_id})")
     pdb_a = _resolve_pdb_path(config.target_id)
@@ -470,9 +506,9 @@ def generate(config: GenerationConfig) -> list[str]:
     )
     pbar.update(1)
 
-    # 5. Prepare receptor B (double mode)
+    # 5. Prepare receptor B (single_b / double mode)
     pdbqt_b = center_b = size_b = None
-    if config.reward_mode == "double" and config.second_target_id:
+    if needs_second and config.second_target_id:
         pbar.set_postfix_str(f"Receptor B → PDBQT ({config.second_target_id})")
         pdb_b = _resolve_pdb_path(config.second_target_id)
         pdbqt_b, center_b, size_b = _prepare_receptor(
@@ -499,18 +535,23 @@ def generate(config: GenerationConfig) -> list[str]:
         stale_output = workspace / "output" / "run"
         if stale_output.exists():
             logger.warning("Обнаружен stale output от прерванного запуска: {}", stale_output)
-            import shutil
-
             shutil.rmtree(stale_output, ignore_errors=True)
             # Fallback: Docker (root-owned файлы)
             if stale_output.exists():
                 logger.info("Удаление root-owned файлов через Docker...")
-                subprocess.run(
+                subprocess.run(  # noqa: S603
                     [
-                        "docker", "run", "--rm",
-                        "-v", f"{workspace}:/ws",
-                        "alpine", "rm", "-rf", "/ws/output/run",
+                        DOCKER_BIN,
+                        "run",
+                        "--rm",
+                        "-v",
+                        f"{workspace}:/ws",
+                        "alpine",
+                        "rm",
+                        "-rf",
+                        "/ws/output/run",
                     ],
+                    check=False,
                     timeout=30,
                 )
             logger.info("Stale output удалён")

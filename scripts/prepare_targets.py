@@ -29,6 +29,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data" / "targets"
 MSA_CACHE_DIR = PROJECT_ROOT / "cache" / "boltz_msa"
 CHECKPOINT_PATH = PROJECT_ROOT / "cache" / "prepare_checkpoint.json"
+DOCKER_BIN = shutil.which("docker") or "docker"
 
 MSA_RETRY_ATTEMPTS = 3
 MSA_RETRY_BACKOFF = 30  # секунд
@@ -158,12 +159,13 @@ def precompute_msa(target_id: str, sequence: str) -> Path | None:
         logger.info("Pre-computing MSA для {} (попытка {}/{})", target_id, attempt, MSA_RETRY_ATTEMPTS)
         logger.debug("CMD: {}", " ".join(cmd))
 
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             cmd,
             capture_output=True,
             text=True,
             timeout=600,
             cwd=str(PROJECT_ROOT),
+            check=False,
         )
 
         # MSA генерируется до GPU-инференса. Даже если predict упал
@@ -203,7 +205,7 @@ def precompute_msa(target_id: str, sequence: str) -> Path | None:
 
 
 def prepare_receptor_pdbqt(pdb_path: Path, target_id: str) -> Path:
-    """Конвертировать PDB → PDBQT через Docker OpenBabel.
+    """Конвертировать PDB → PDBQT через Docker (RDKit + Meeko).
 
     Parameters
     ----------
@@ -223,9 +225,10 @@ def prepare_receptor_pdbqt(pdb_path: Path, target_id: str) -> Path:
         return pdbqt_path
 
     # Проверить наличие Docker-образа
-    inspect = subprocess.run(
-        ["docker", "image", "inspect", FREEDPP_DOCKER_IMAGE],
+    inspect = subprocess.run(  # noqa: S603
+        [DOCKER_BIN, "image", "inspect", FREEDPP_DOCKER_IMAGE],
         capture_output=True,
+        check=False,
     )
     if inspect.returncode != 0:
         logger.warning(
@@ -236,9 +239,9 @@ def prepare_receptor_pdbqt(pdb_path: Path, target_id: str) -> Path:
         return pdbqt_path
 
     logger.info("Конвертация PDB → PDBQT: {} → {}", pdb_path, pdbqt_path)
-    subprocess.run(
+    subprocess.run(  # noqa: S603
         [
-            "docker",
+            DOCKER_BIN,
             "run",
             "--rm",
             "-v",

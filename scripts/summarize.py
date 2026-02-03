@@ -1,8 +1,4 @@
-"""Мини-аналитика: текстовый отчёт по результатам dual-target экспериментов.
-
-Читает parquet, metrics.json, stats.json и конфиги, формирует
-человекочитаемый текстовый отчёт с ключевыми выводами.
-"""
+"""Text summary report for dual-target experiments."""
 
 from __future__ import annotations
 
@@ -27,12 +23,14 @@ def _load_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text())
 
 
-def _fmt(val: float, decimals: int = 3) -> str:
-    return f"{val:.{decimals}f}"
+def _fmt(val: float | str, decimals: int = 3) -> str:
+    try:
+        return f"{float(val):.{decimals}f}"
+    except Exception:
+        return str(val)
 
 
 def _score_distribution_block(scores: pd.Series, label: str) -> str:
-    """Статистика распределения скоров."""
     if scores.empty or scores.isna().all():
         return f"  {label}: нет данных\n"
     q1, median, q3 = np.nanpercentile(scores, [25, 50, 75])
@@ -44,16 +42,18 @@ def _score_distribution_block(scores: pd.Series, label: str) -> str:
 
 
 def _top_molecules_block(df: pd.DataFrame, name_a: str, name_b: str, n: int = 3) -> str:
-    """Топ-N молекул по combined_min."""
+    if df.empty:
+        return "  Нет молекул для топа\n"
     top = df.nsmallest(n, "combined_min")
     lines = [f"  Топ-{n} молекул (по combined_min):"]
     for i, (_, row) in enumerate(top.iterrows(), 1):
-        smiles = row["smiles"]
+        smiles = row.get("smiles") or row.get("smiles_canonical") or ""
         if len(smiles) > 60:
             smiles = smiles[:57] + "..."
         lines.append(
             f"    {i}. {smiles}\n"
-            f"       {name_a}={_fmt(row['score_a'])}  {name_b}={_fmt(row['score_b'])}  "
+            f"       {name_a}={_fmt(row.get('score_a', row.get('affinity_a', float('nan'))))}  "
+            f"{name_b}={_fmt(row.get('score_b', row.get('affinity_b', float('nan'))))}  "
             f"min={_fmt(row['combined_min'])}"
         )
     return "\n".join(lines) + "\n"
@@ -65,8 +65,8 @@ def _build_report(
     stats: dict,
     pairs_cfg: dict,
     thresholds_cfg: dict,
+    modes: list[str],
 ) -> str:
-    """Сформировать полный текстовый отчёт."""
     lines: list[str] = []
     lines.append("=" * 72)
     lines.append("DUAL-TARGET DOCKING: СВОДНЫЙ ОТЧЁТ")
@@ -75,8 +75,6 @@ def _build_report(
 
     pairs = pairs_cfg.get("pairs", {})
     thresholds = thresholds_cfg.get("thresholds", {})
-    double_wins = 0
-    total_pairs = 0
 
     for pair_id in df["pair"].unique():
         pair_info = pairs.get(pair_id, {})
@@ -86,16 +84,18 @@ def _build_report(
         th_b = thresholds.get(pair_id, {}).get("target_b", 0.0)
 
         lines.append("-" * 72)
-        desc = pair_info.get("description", "")
         lines.append(f"Пара: {pair_id}")
+        desc = pair_info.get("description", "")
         if desc:
             lines.append(f"  {desc}")
         lines.append(f"  Пороги: {name_a} <= {th_a}, {name_b} <= {th_b}")
         lines.append("")
 
         df_pair = df[df["pair"] == pair_id]
+        col_a = "affinity_a" if "affinity_a" in df_pair.columns else "score_a"
+        col_b = "affinity_b" if "affinity_b" in df_pair.columns else "score_b"
 
-        for mode in ("single", "double"):
+        for mode in modes:
             df_mode = df_pair[df_pair["mode"] == mode]
             n = len(df_mode)
             lines.append(f"  [{mode.upper()}] N={n}")
@@ -103,79 +103,33 @@ def _build_report(
                 lines.append("    нет данных\n")
                 continue
 
-            lines.append(_score_distribution_block(df_mode["score_a"], name_a))
-            lines.append(_score_distribution_block(df_mode["score_b"], name_b))
+            lines.append(_score_distribution_block(df_mode[col_a], name_a))
+            lines.append(_score_distribution_block(df_mode[col_b], name_b))
             lines.append(_score_distribution_block(df_mode["combined_min"], "combined_min"))
 
-            # Hit rates из metrics.json
             pair_metrics = metrics.get(pair_id, {}).get(mode, {})
             if pair_metrics:
-                hr_a = pair_metrics.get("hit_rate_a", "?")
-                hr_b = pair_metrics.get("hit_rate_b", "?")
-                hr_dual = pair_metrics.get("dual_hit_rate", "?")
-                lines.append(f"  Hit rates: {name_a}={hr_a}  {name_b}={hr_b}  dual={hr_dual}")
+                hr_a = pair_metrics.get("hr_a_mean")
+                hr_both = pair_metrics.get("hr_both_mean")
+                balance = pair_metrics.get("balance_mean")
+                lines.append(f"  Метрики: HR_A={_fmt(hr_a)}  HR_both={_fmt(hr_both)}  balance={_fmt(balance)}")
                 lines.append("")
 
             lines.append(_top_molecules_block(df_mode, name_a, name_b))
 
-        # Статистическое сравнение
         pair_stats = stats.get(pair_id, {})
         if pair_stats:
-            lines.append("  Статистическое сравнение (single vs double):")
-            for col_key, col_label in [
-                ("score_a", name_a),
-                ("score_b", name_b),
-                ("combined_min", "combined_min"),
-            ]:
-                st = pair_stats.get(col_key, {})
-                if not st:
-                    continue
-                p_mw = st.get("mannwhitney_pvalue", float("nan"))
-                p_ks = st.get("ks_pvalue", float("nan"))
-                r_rb = st.get("rank_biserial_r", float("nan"))
-                sig = "***" if p_mw < 0.001 else "**" if p_mw < 0.01 else "*" if p_mw < 0.05 else "ns"
-                lines.append(f"    {col_label}: MW p={p_mw:.4g} ({sig})  KS p={p_ks:.4g}  r={r_rb}")
+            lines.append("  Статистические тесты:")
+            for test_id, entry in pair_stats.items():
+                p_adj = entry.get("p_value_adjusted", float("nan"))
+                diff = entry.get("observed_diff", float("nan"))
+                cliffs = entry.get("cliffs_delta", float("nan"))
+                sig = "*" if entry.get("significant") else "ns"
+                lines.append(
+                    f"    {test_id}: metric={entry.get('metric')} diff={_fmt(diff)} p_adj={_fmt(p_adj, 4)} "
+                    f"cliffs={_fmt(cliffs)} [{sig}]"
+                )
             lines.append("")
-
-            # Вердикт
-            cm_stats = pair_stats.get("combined_min", {})
-            p_val = cm_stats.get("mannwhitney_pvalue", 1.0)
-            total_pairs += 1
-            single_median = df_pair[df_pair["mode"] == "single"]["combined_min"].median()
-            double_median = df_pair[df_pair["mode"] == "double"]["combined_min"].median()
-            if p_val < 0.05 and double_median < single_median:
-                verdict = "Double ЗНАЧИМО лучше (p < 0.05, медиана ниже)"
-                double_wins += 1
-            elif p_val < 0.05:
-                verdict = "Значимое различие, но double НЕ лучше"
-            else:
-                verdict = "Различие НЕ значимо (p >= 0.05)"
-            lines.append(f"  Вердикт: {verdict}")
-            lines.append("")
-
-    # Общая оценка
-    lines.append("=" * 72)
-    lines.append("ОБЩАЯ ОЦЕНКА")
-    lines.append("=" * 72)
-    lines.append("")
-
-    if total_pairs > 0:
-        lines.append(f"Double значимо лучше в {double_wins}/{total_pairs} парах.")
-    else:
-        lines.append("Нет пар для сравнения.")
-
-    # Проверка фармакологической значимости скоров
-    all_combined = df["combined_min"].dropna()
-    if not all_combined.empty:
-        med = all_combined.median()
-        frac_sub_zero = (all_combined <= 0.0).mean()
-        lines.append("")
-        lines.append(f"Медиана combined_min по всем молекулам: {med:.3f}")
-        lines.append(f"Доля молекул с combined_min <= 0 (IC50 <= 1 мкМ): {frac_sub_zero:.1%}")
-        if frac_sub_zero > 0.1:
-            lines.append("Скоры в фармакологически осмысленном диапазоне.")
-        else:
-            lines.append("Мало молекул в фармакологически значимом диапазоне (IC50 <= 1 мкМ).")
 
     lines.append("")
     return "\n".join(lines)
@@ -183,7 +137,7 @@ def _build_report(
 
 @click.command()
 @click.option("--input", "input_path", default="report/data/all_results.parquet", help="Parquet с результатами")
-@click.option("--metrics", "metrics_path", default="report/metrics.json", help="Метрики хитов")
+@click.option("--metrics", "metrics_path", default="report/metrics.json", help="Метрики")
 @click.option("--stats", "stats_path", default="report/stats.json", help="Статистические тесты")
 @click.option("--config", default="configs/pairs.yaml", help="Конфиг пар мишеней")
 @click.option("--thresholds", default="configs/metrics.yaml", help="Пороги хитов")
@@ -196,7 +150,6 @@ def main(
     thresholds: str,
     output: str,
 ) -> None:
-    """Сформировать текстовый отчёт с мини-аналитикой."""
     in_path = PROJECT_ROOT / input_path
     if not in_path.exists():
         logger.error("Входной файл не найден: {}. Сначала запустите агрегацию.", in_path)
@@ -212,15 +165,16 @@ def main(
     pairs_cfg = _load_yaml(PROJECT_ROOT / config)
     thresholds_cfg = _load_yaml(PROJECT_ROOT / thresholds)
 
-    report = _build_report(df, metrics, stats, pairs_cfg, thresholds_cfg)
+    from dualdocking.config import load_experiment
+
+    modes = load_experiment(PROJECT_ROOT / "configs").get("modes", ["single_a", "single_b", "double"])
+
+    report = _build_report(df, metrics, stats, pairs_cfg, thresholds_cfg, modes)
 
     out_path = PROJECT_ROOT / output
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report)
     logger.info("Отчёт сохранён: {}", out_path)
-
-    # Печать в stdout для видимости в пайплайне
-    print(report)
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ def _metrics_yaml(path: Path) -> Path:
     return f
 
 
-def _make_df(n: int = 3, pair: str = "pair1", mode: str = "single") -> pd.DataFrame:
+def _make_df(n: int = 3, pair: str = "pair1", mode: str = "single_a") -> pd.DataFrame:
     smiles = ["CCO", "c1ccccc1", "CC(=O)O", "CCCC", "C=CC"][:n]
     return pd.DataFrame({
         "smiles": smiles,
@@ -89,10 +89,15 @@ def test_main_cli(tmp_path, monkeypatch):
     (tmp_path / "report" / "figures").mkdir(parents=True)
     (tmp_path / "configs").mkdir()
 
-    df = pd.concat([_make_df(3, mode="single"), _make_df(3, mode="double")])
+    df = pd.concat([
+        _make_df(3, mode="single_a"),
+        _make_df(3, mode="single_b"),
+        _make_df(3, mode="double"),
+    ])
     df.to_parquet(tmp_path / "report" / "data" / "all_results.parquet")
     _pairs_yaml(tmp_path / "configs")
     _metrics_yaml(tmp_path / "configs")
+    (tmp_path / "configs" / "experiment.yaml").write_text("modes: [single_a, single_b, double]\\n")
 
     import scripts.render_molecules as mod
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)

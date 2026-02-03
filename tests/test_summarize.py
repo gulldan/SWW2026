@@ -8,7 +8,7 @@ from click.testing import CliRunner
 from scripts.summarize import _build_report, _score_distribution_block, _top_molecules_block, main
 
 
-def _make_df(n: int = 5, pair: str = "pair1", mode: str = "single") -> pd.DataFrame:
+def _make_df(n: int = 5, pair: str = "pair1", mode: str = "single_a") -> pd.DataFrame:
     smiles = ["CCO", "c1ccccc1", "CC(=O)O", "CCCC", "C=CC"][:n]
     return pd.DataFrame({
         "smiles": smiles,
@@ -67,16 +67,30 @@ def test_top_molecules_block():
 
 
 def test_build_report_structure():
-    df = pd.concat([_make_df(3, mode="single"), _make_df(3, mode="double")])
-    metrics = {"pair1": {"single": {"hit_rate_a": 0.5, "hit_rate_b": 0.3, "dual_hit_rate": 0.1}}}
-    stats = {"pair1": {"combined_min": {"mannwhitney_pvalue": 0.03, "ks_pvalue": 0.04, "rank_biserial_r": 0.2}}}
+    df = pd.concat([
+        _make_df(3, mode="single_a"),
+        _make_df(3, mode="single_b"),
+        _make_df(3, mode="double"),
+    ])
+    metrics = {
+        "pair1": {
+            "single_a": {"hr_a_mean": 0.5, "hr_both_mean": 0.1, "balance_mean": 1.0},
+            "single_b": {"hr_a_mean": 0.4, "hr_both_mean": 0.2, "balance_mean": 1.1},
+            "double": {"hr_a_mean": 0.6, "hr_both_mean": 0.3, "balance_mean": 0.9},
+        }
+    }
+    stats = {
+        "pair1": {
+            "H1a": {"metric": "hr_both", "observed_diff": 0.1, "p_value_adjusted": 0.04, "cliffs_delta": 0.5, "significant": True},
+        }
+    }
 
-    report = _build_report(df, metrics, stats, _pairs_cfg(), _thresholds_cfg())
+    report = _build_report(df, metrics, stats, _pairs_cfg(), _thresholds_cfg(), ["single_a", "single_b", "double"])
 
     assert "СВОДНЫЙ ОТЧЁТ" in report
-    assert "ОБЩАЯ ОЦЕНКА" in report
     assert "pair1" in report
-    assert "SINGLE" in report
+    assert "SINGLE_A" in report
+    assert "SINGLE_B" in report
     assert "DOUBLE" in report
 
 
@@ -85,13 +99,18 @@ def test_main_cli(tmp_path, monkeypatch):
     (tmp_path / "report" / "data").mkdir(parents=True)
     (tmp_path / "configs").mkdir()
 
-    df = pd.concat([_make_df(3, mode="single"), _make_df(3, mode="double")])
+    df = pd.concat([
+        _make_df(3, mode="single_a"),
+        _make_df(3, mode="single_b"),
+        _make_df(3, mode="double"),
+    ])
     df.to_parquet(tmp_path / "report" / "data" / "all_results.parquet")
 
     (tmp_path / "report" / "metrics.json").write_text(json.dumps({}))
     (tmp_path / "report" / "stats.json").write_text(json.dumps({}))
     (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(_pairs_cfg()))
     (tmp_path / "configs" / "metrics.yaml").write_text(yaml.dump(_thresholds_cfg()))
+    (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump({"modes": ["single_a", "single_b", "double"]}))
 
     import scripts.summarize as mod
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)

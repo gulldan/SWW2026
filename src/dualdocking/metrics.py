@@ -26,17 +26,21 @@ class DualHitResult:
 
     @property
     def hit_rate_a(self) -> float:
+        """Доля молекул, являющихся хитами по мишени A."""
         return self.n_hit_a / self.n_total if self.n_total else 0.0
 
     @property
     def hit_rate_b(self) -> float:
+        """Доля молекул, являющихся хитами по мишени B."""
         return self.n_hit_b / self.n_total if self.n_total else 0.0
 
     @property
     def dual_hit_rate(self) -> float:
+        """Доля молекул, являющихся хитами одновременно по A и B."""
         return self.n_hit_both / self.n_total if self.n_total else 0.0
 
     def to_dict(self) -> dict:
+        """Сериализовать результат в словарь для отчёта."""
         return {
             "n_total": self.n_total,
             "n_hit_a": self.n_hit_a,

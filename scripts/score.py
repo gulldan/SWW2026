@@ -1,6 +1,6 @@
 """Скоринг сгенерированных молекул по обеим мишеням пары.
 
-Читает молекулы из results/<pair>/<mode>/generated.csv, оценивает по
+Читает молекулы из results/<pair>/<mode>/seed_<seed>/generated.csv, оценивает по
 обеим мишеням, записывает scores_A.csv, scores_B.csv, scored_joined.csv.
 
 Поддерживает чекпоинт: если scores_A.csv уже существует, скоринг мишени A
@@ -25,22 +25,23 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 @click.command()
 @click.option("--pair", required=True, help="ID пары из configs/pairs.yaml")
-@click.option("--mode", type=click.Choice(["single", "double"]), required=True)
+@click.option("--mode", type=click.Choice(["single_a", "single_b", "double"]), required=True)
+@click.option("--seed", default=42, type=int)
 @click.option("--config", default="configs/pairs.yaml")
 @click.option("--force", is_flag=True, default=False, help="Пересчитать даже если scores уже есть")
-def main(pair: str, mode: str, config: str, force: bool) -> None:
+def main(pair: str, mode: str, seed: int, config: str, force: bool) -> None:
     """Оценить молекулы по обеим мишеням."""
     from dualdocking.config import load_pairs
     from dualdocking.objectives import ObjectiveKind, compute_combined
     from dualdocking.scorer_boltz2 import score_batch
 
-    pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
+    pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
     if pair not in pairs:
         logger.error("Пара '{}' не найдена", pair)
         sys.exit(1)
 
     pair_cfg = pairs[pair]
-    result_dir = PROJECT_ROOT / "results" / pair / mode
+    result_dir = PROJECT_ROOT / "results" / pair / mode / f"seed_{seed}"
     mol_path = result_dir / "generated.csv"
 
     if not mol_path.exists():
@@ -71,7 +72,7 @@ def main(pair: str, mode: str, config: str, force: bool) -> None:
         if not force and scores_path.exists():
             logger.info("Чекпоинт: скоры мишени {} уже существуют ({}), пропускаем", target_id, scores_path)
             saved = pd.read_csv(scores_path)
-            all_scores[label] = saved["score"].values
+            all_scores[label] = saved["score"].to_numpy()
             continue
 
         logger.info("Скоринг {} молекул по мишени {}", len(smiles_list), target_id)
@@ -87,12 +88,29 @@ def main(pair: str, mode: str, config: str, force: bool) -> None:
 
     combined = compute_combined(scores_a, scores_b, ObjectiveKind.MIN, lower_is_better=True)
 
-    # Сохранить объединённую таблицу
+    # Сохранить объединённую таблицу (schema contract: smiles_canonical, affinity_a, affinity_b, is_hit_both)
+    from dualdocking.chem_sanitize import canonicalize
+    from dualdocking.config import load_metrics
+
+    metrics_cfg = load_metrics(PROJECT_ROOT / "configs")
+    thresholds = metrics_cfg.get("thresholds", {}).get(pair, {})
+    thr_a = thresholds.get("target_a", 0.0)
+    thr_b = thresholds.get("target_b", 0.0)
+
+    smiles_canon = [canonicalize(s) or "" for s in smiles_list]
+    affinity_a = scores_a
+    affinity_b = scores_b
+    is_hit_both = (affinity_a < thr_a) & (affinity_b < thr_b)
+
     joined = pd.DataFrame(
         {
             "smiles": smiles_list,
-            "score_a": scores_a,
-            "score_b": scores_b,
+            "smiles_canonical": smiles_canon,
+            "affinity_a": affinity_a,
+            "affinity_b": affinity_b,
+            "score_a": affinity_a,
+            "score_b": affinity_b,
+            "is_hit_both": is_hit_both,
             "combined_min": combined,
             "combined_harmonic": compute_combined(scores_a, scores_b, ObjectiveKind.HARMONIC, lower_is_better=True),
         }

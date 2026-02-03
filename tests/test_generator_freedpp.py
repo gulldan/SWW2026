@@ -34,8 +34,8 @@ def test_cache_key_varies() -> None:
 
 
 def test_cache_key_varies_by_mode() -> None:
-    """Single vs double → разные hash."""
-    cfg1 = GenerationConfig(target_id="CDK2", reward_mode="single")
+    """Single_a vs double → разные hash."""
+    cfg1 = GenerationConfig(target_id="CDK2", reward_mode="single_a")
     cfg2 = GenerationConfig(target_id="CDK2", reward_mode="double", second_target_id="ERK2")
     assert _cache_key(cfg1) != _cache_key(cfg2)
 
@@ -69,7 +69,7 @@ def test_parse_output_smiles_empty(tmp_path: Path) -> None:
 
 
 def test_build_freedpp_args_single() -> None:
-    """Single mode — корректные CLI args."""
+    """Single_a mode — корректные CLI args."""
     cfg = GenerationConfig(
         target_id="CDK2",
         n_molecules=100,

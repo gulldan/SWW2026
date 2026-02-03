@@ -11,7 +11,6 @@ ENV LANG=C.UTF-8
 # ── System dependencies ──────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
         wget git build-essential libxrender1 libxext6 libsm6 \
-        openbabel \
     && rm -rf /var/lib/apt/lists/*
 
 # ── uv ───────────────────────────────────────────────────────────────
@@ -44,7 +43,8 @@ RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache \
         tqdm \
         pyyaml \
         gym==0.26.2 \
-        crem==0.2.9
+        crem==0.2.9 \
+        meeko==0.5.1
 
 # moses (molsets) for metrics – skip pomegranate (Cython build fails on 3.10,
 # and FREED never calls ScaffoldConstrainedGenerator which needs it).
@@ -65,6 +65,7 @@ RUN chmod +x /opt/freed/ffreed/env/qvina02 2>/dev/null || true
 # unidock is only available via conda-forge, not PyPI.
 RUN wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C /usr/local bin/micromamba \
     && micromamba create -n unidock -c conda-forge unidock --yes --root-prefix /opt/micromamba \
+    && micromamba install -n unidock -c conda-forge openmm pdbfixer --yes --root-prefix /opt/micromamba \
     && ln -sf /opt/micromamba/envs/unidock/bin/unidock /usr/local/bin/unidock \
     && rm -rf /opt/micromamba/pkgs
 
@@ -76,6 +77,7 @@ COPY data/zinc_crem.json data/alert_collections.csv /opt/freed/data/
 # ── Entrypoint & dual-target patch ──────────────────────────────────
 COPY entrypoint.sh /opt/entrypoint.sh
 COPY dual_reward_patch.py /opt/dual_reward_patch.py
+COPY pdbfixer_add_h.py /opt/pdbfixer_add_h.py
 RUN chmod +x /opt/entrypoint.sh
 
 WORKDIR /opt/freed

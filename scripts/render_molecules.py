@@ -155,12 +155,20 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
     target_names = _load_target_names(PROJECT_ROOT / config)
     thresh = _load_thresholds(PROJECT_ROOT / thresholds)
 
+    from dualdocking.config import load_experiment
+
+    try:
+        modes = load_experiment(PROJECT_ROOT / "configs").get("modes", ["single_a", "single_b", "double"])
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Не удалось загрузить experiment.yaml: {}. Использую дефолтные режимы.", exc)
+        modes = ["single_a", "single_b", "double"]
+
     for pair_id in df["pair"].unique():
         name_a, name_b = target_names.get(pair_id, ("A", "B"))
         th_a, th_b = thresh.get(pair_id, (0.0, 0.0))
         df_pair = df[df["pair"] == pair_id]
 
-        for mode in ("single", "double"):
+        for mode in modes:
             df_mode = df_pair[df_pair["mode"] == mode]
             if df_mode.empty:
                 continue
@@ -174,25 +182,21 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
                 th_b,
             )
 
-        # Top hits: лучшие из обоих режимов
-        df_single = df_pair[df_pair["mode"] == "single"].nsmallest(top_n, "combined_min")
-        df_double = df_pair[df_pair["mode"] == "double"].nsmallest(top_n, "combined_min")
+        # Top hits: лучшие из всех режимов
+        frames = []
+        for mode in modes:
+            df_mode = df_pair[df_pair["mode"] == mode].nsmallest(top_n, "combined_min")
+            if not df_mode.empty:
+                frames.append(df_mode.assign(label=mode))
         df_top = (
-            pd.concat(
-                [
-                    df_single.assign(label="single"),
-                    df_double.assign(label="double"),
-                ]
-            )
-            .sort_values("combined_min", ascending=True)
-            .reset_index(drop=True)
+            pd.concat(frames).sort_values("combined_min", ascending=True).reset_index(drop=True) if frames else pd.DataFrame()
         )
 
         if not df_top.empty:
             _render_grid(
                 df_top,
                 fig_dir / f"{pair_id}_molecules_top_hits.png",
-                f"{pair_id} — top {top_n} hits (single + double)",
+                f"{pair_id} — top {top_n} hits (all modes)",
                 name_a,
                 name_b,
                 th_a,

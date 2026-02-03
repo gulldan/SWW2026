@@ -8,11 +8,12 @@
 
 1. [Диагностика: почему Uni-Dock не помогает](#1-диагностика)
 2. [Корневая причина: FREED++ вызывает докинг последовательно](#2-корневая-причина)
-3. [Решение A: Батчирование reward в FREED++](#3-решение-a-батчирование)
-4. [Решение B: Замена генератора (Saturn, REINVENT 4, GraphGA)](#4-решение-b-замена-генератора)
-5. [Ускорение Boltz-2 скоринга (Boltzina + иерархический пайплайн)](#5-ускорение-boltz-2)
-6. [Визуализация dual-docking результатов](#6-визуализация)
-7. [Рекомендации и приоритеты](#7-рекомендации)
+3. [Подготовка молекул: OpenBabel vs RDKit+Meeko](#25-подготовка-молекул-openbabel-vs-rdkitmeeko)
+4. [Решение A: Батчирование reward в FREED++](#3-решение-a-батчирование)
+5. [Решение B: Замена генератора (Saturn, REINVENT 4, GraphGA)](#4-решение-b-замена-генератора)
+6. [Ускорение Boltz-2 скоринга (Boltzina + иерархический пайплайн)](#5-ускорение-boltz-2)
+7. [Визуализация dual-docking результатов](#6-визуализация)
+8. [Рекомендации и приоритеты](#7-рекомендации)
 
 ---
 
@@ -32,7 +33,7 @@ Uni-Dock **уже интегрирован** в проект:
 | Этап | Инструмент | Скорость | Где работает | Статус |
 |------|-----------|----------|-------------|--------|
 | RL reward (FREED++) | Uni-Dock (настроен) | ~1 сек/мол* | GPU **недоиспользуется** | **Bottleneck** |
-| 3D конформер | OpenBabel | ~0.1-0.5 сек/мол | CPU only | Второстепенный |
+| 3D конформер | RDKit (ETKDG) | ~0.1-0.5 сек/мол | CPU only | Второстепенный |
 | Финальный скоринг | Boltz-2 | ~16-58 сек/мол | GPU | Медленно для >1000 мол |
 | SMILES валидация | RDKit | < 0.01 сек/мол | CPU | Не проблема |
 
@@ -63,7 +64,7 @@ def _dual_call(self, *args, **kwargs):
 ### Дополнительные последовательные операции
 
 Помимо докинга, для каждой молекулы FREED++ последовательно выполняет:
-1. **OpenBabel** 3D generation (CPU, ~0.1-0.5 сек)
+1. **RDKit** 3D generation (CPU, ~0.1-0.5 сек)
 2. **PDBQT конвертация** лиганда (CPU)
 3. **Uni-Dock** вызов (GPU, но по 1 молекуле — не эффективно)
 4. В dual mode — всё × 2 (два таргета)
@@ -71,6 +72,17 @@ def _dual_call(self, *args, **kwargs):
 Итого: ~2-4 сек на молекулу в dual mode, при том что GPU простаивает ~95% времени.
 
 ---
+
+## 2.5 Подготовка молекул: OpenBabel vs RDKit+Meeko
+
+**Короткий вывод для проекта:** RDKit+Meeko надёжнее для конверсии SMILES → PDBQT и воспроизводимости, а OpenBabel остаётся полезен для протонирования и быстрых конверсий. Практичный компромисс — гибридный пайплайн: protonation (OpenBabel/Dimorphite‑DL) → RDKit (3D) → Meeko (PDBQT).
+
+**Почему:**
+- Meeko прямо отмечает, что восстановление bond orders из PDBQT ненадёжно: формат не хранит bond order и H на углеродах, из‑за чего обратные конверсии могут быть неоднозначными.
+- В подготовке рецепторов Meeko требует точного совпадения тяжёлых атомов с шаблонами и различает протонированные состояния (HIS, N‑term и др.), поэтому нужен контролируемый препроцессинг PDB.
+- В DockStream RDKit используется как базовый инструмент подготовки и хранения лигандов, что отражает современную практику пайплайнов.
+- SwissDock 2024 использует OpenBabel и RDKit для конвертации входных форматов (PDBQT/SMILES/Mol2), подтверждая жизнеспособность гибридного стека в продакшене.
+- OpenBabel может выдавать предупреждения о проблемах кекулизации отдельных ароматических структур, что добавляет неопределённость при конвертациях.
 
 ## 3. Решение A: Батчирование reward в FREED++
 
@@ -94,7 +106,7 @@ FREED++ использует SAC (Soft Actor-Critic) — online RL алгори�
 1. Модификации RL-цикла FREED++ (Python 3.7, legacy код)
 2. Накопление experience buffer перед скорингом
 3. Перестройки dual_reward_patch для батчей
-4. OpenBabel 3D generation тоже нужно батчировать
+4. RDKit 3D generation тоже нужно батчировать
 
 **Вывод**: батчирование reward внутри FREED++ — возможно, но требует глубокого рефакторинга legacy-кода. Более практичный путь — замена генератора.
 
@@ -421,3 +433,8 @@ view.show()
 - [Boltz-2 CPU issue #207](https://github.com/jwohlwend/boltz/issues/207)
 - [Molstar React integration](https://github.com/molstar/molstar)
 - [@rdkit/rdkit WASM](https://www.npmjs.com/package/@rdkit/rdkit)
+- [Meeko docs: RDKit ↔ PDBQT](https://meeko.readthedocs.io/en/latest/guide_rdkit_mol_from_smiles_and_pdbqt.html)
+- [Meeko docs: receptor preparation](https://meeko.readthedocs.io/en/latest/cli_rec_prep.html)
+- [SwissDock 2024 (NAR)](https://academic.oup.com/nar/article/52/W1/W324/7660078)
+- [DockStream (J. Cheminf. 2021)](https://link.springer.com/article/10.1186/s13321-021-00563-7)
+- [OpenBabel issue: kekulize warnings](https://github.com/openbabel/openbabel/issues/2600)

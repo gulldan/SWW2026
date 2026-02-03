@@ -6,7 +6,8 @@ set -euo pipefail
 cd /mnt/data/SWW2026
 
 PAIRS=(CDK2_ERK2 EGFR_HER2 COX1_COX2 AChE_BChE)
-MODES=(single double)
+MODES=(single_a single_b double)
+SEEDS=(42 137 256 512 1024)
 
 echo "=============================================="
 echo " ПОЛНЫЙ ПАЙПЛАЙН — $(date)"
@@ -15,31 +16,35 @@ echo "=============================================="
 # ─── 1. Генерация FREED++ ───────────────────────
 for pair in "${PAIRS[@]}"; do
   for mode in "${MODES[@]}"; do
-    csv="results/${pair}/${mode}/generated.csv"
-    if [[ -f "$csv" ]] && [[ $(wc -l < "$csv") -gt 1 ]]; then
-      n=$(($(wc -l < "$csv") - 1))
-      echo "[SKIP] Генерация ${pair}/${mode} — уже есть ${n} молекул"
-      continue
-    fi
-    echo ""
-    echo "====== ГЕНЕРАЦИЯ: ${pair} / ${mode} — $(date) ======"
-    uv run python scripts/generate.py --pair "$pair" --mode "$mode"
-    echo "[DONE] Генерация ${pair}/${mode} — $(date)"
+    for seed in "${SEEDS[@]}"; do
+      csv="results/${pair}/${mode}/seed_${seed}/generated.csv"
+      if [[ -f "$csv" ]] && [[ $(wc -l < "$csv") -gt 1 ]]; then
+        n=$(($(wc -l < "$csv") - 1))
+        echo "[SKIP] Генерация ${pair}/${mode}/seed_${seed} — уже есть ${n} молекул"
+        continue
+      fi
+      echo ""
+      echo "====== ГЕНЕРАЦИЯ: ${pair} / ${mode} / seed_${seed} — $(date) ======"
+      uv run python scripts/generate.py --pair "$pair" --mode "$mode" --seed "$seed"
+      echo "[DONE] Генерация ${pair}/${mode}/seed_${seed} — $(date)"
+    done
   done
 done
 
 # ─── 2. Скоринг Boltz-2 ─────────────────────────
 for pair in "${PAIRS[@]}"; do
   for mode in "${MODES[@]}"; do
-    joined="results/${pair}/${mode}/scored_joined.csv"
-    if [[ -f "$joined" ]]; then
-      echo "[SKIP] Скоринг ${pair}/${mode} — scored_joined.csv уже есть"
-      continue
-    fi
-    echo ""
-    echo "====== СКОРИНГ: ${pair} / ${mode} — $(date) ======"
-    uv run python scripts/score.py --pair "$pair" --mode "$mode"
-    echo "[DONE] Скоринг ${pair}/${mode} — $(date)"
+    for seed in "${SEEDS[@]}"; do
+      joined="results/${pair}/${mode}/seed_${seed}/scored_joined.csv"
+      if [[ -f "$joined" ]]; then
+        echo "[SKIP] Скоринг ${pair}/${mode}/seed_${seed} — scored_joined.csv уже есть"
+        continue
+      fi
+      echo ""
+      echo "====== СКОРИНГ: ${pair} / ${mode} / seed_${seed} — $(date) ======"
+      uv run python scripts/score.py --pair "$pair" --mode "$mode" --seed "$seed"
+      echo "[DONE] Скоринг ${pair}/${mode}/seed_${seed} — $(date)"
+    done
   done
 done
 

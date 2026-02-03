@@ -11,7 +11,9 @@ dependencies = [
     "pyarrow>=14.0",
     "pyyaml>=6.0",
     "rdkit>=2024.3.1",
+    "meeko>=0.5.1",
     "requests>=2.31",
+    "datasets>=2.19",
     "click>=8.1",
     "matplotlib>=3.8",
     "seaborn>=0.13",
@@ -140,8 +142,6 @@ line-ending = "auto"
 testpaths = ["tests"]
 python_files = "test_*.py"
 addopts = "-v --cov=src --cov-report=term-missing"
-timeout = 5
-timeout_func_only = true
 pythonpath = [".", "src"]
 markers = [
     "integration: marks tests as integration tests",

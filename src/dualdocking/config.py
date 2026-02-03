@@ -16,14 +16,23 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
 
 def load_pairs(config_dir: str | Path = "configs") -> dict[str, Any]:
     """Загрузить pairs.yaml."""
-    return load_yaml(Path(config_dir) / "pairs.yaml")
+    path = Path(config_dir)
+    if path.is_dir():
+        path = path / "pairs.yaml"
+    return load_yaml(path)
 
 
 def load_metrics(config_dir: str | Path = "configs") -> dict[str, Any]:
     """Загрузить metrics.yaml."""
-    return load_yaml(Path(config_dir) / "metrics.yaml")
+    path = Path(config_dir)
+    if path.is_dir():
+        path = path / "metrics.yaml"
+    return load_yaml(path)
 
 
 def load_experiment(config_dir: str | Path = "configs") -> dict[str, Any]:
     """Загрузить experiment.yaml."""
-    return load_yaml(Path(config_dir) / "experiment.yaml")
+    path = Path(config_dir)
+    if path.is_dir():
+        path = path / "experiment.yaml"
+    return load_yaml(path)

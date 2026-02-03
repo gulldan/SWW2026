@@ -152,12 +152,13 @@ def _run_boltz_predict(yaml_path: Path, out_dir: Path) -> subprocess.CompletedPr
     ]
     logger.debug("Boltz CMD: {}", " ".join(cmd))
 
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603
         cmd,
         capture_output=True,
         text=True,
         timeout=BOLTZ_TIMEOUT,
         cwd=str(PROJECT_ROOT),
+        check=False,
     )
     return result
 

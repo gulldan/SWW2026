@@ -1,7 +1,7 @@
 """Агрегация результатов по всем парам в единый датасет анализа.
 
-Читает results/<pair>/<mode>/scored_joined.csv для каждой пары и режима,
-объединяет и записывает report/data/all_results.parquet.
+Читает results/<pair>/<mode>/seed_<seed>/scored_joined.csv для каждой пары,
+режима и сида, объединяет и записывает report/data/all_results.parquet.
 """
 
 from __future__ import annotations
@@ -19,25 +19,31 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 @click.command()
 @click.option("--config", default="configs/pairs.yaml")
+@click.option("--experiment-config", default="configs/experiment.yaml")
 @click.option("--output", default="report/data/all_results.parquet")
-def main(config: str, output: str) -> None:
+def main(config: str, experiment_config: str, output: str) -> None:
     """Агрегировать результаты всех пар и режимов."""
-    from dualdocking.config import load_pairs
+    from dualdocking.config import load_experiment, load_pairs
 
-    pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
+    pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
+    exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
+    seeds = exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
+    modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
     frames: list[pd.DataFrame] = []
 
     for pair_id in pairs:
-        for mode in ("single", "double"):
-            path = PROJECT_ROOT / "results" / pair_id / mode / "scored_joined.csv"
-            if not path.exists():
-                logger.warning("Отсутствует: {}", path)
-                continue
-            df = pd.read_csv(path)
-            df["pair"] = pair_id
-            df["mode"] = mode
-            frames.append(df)
-            logger.info("Загружено {} строк из {}", len(df), path)
+        for mode in modes:
+            for seed in seeds:
+                path = PROJECT_ROOT / "results" / pair_id / mode / f"seed_{seed}" / "scored_joined.csv"
+                if not path.exists():
+                    logger.warning("Отсутствует: {}", path)
+                    continue
+                df = pd.read_csv(path)
+                df["pair"] = pair_id
+                df["mode"] = mode
+                df["seed"] = seed
+                frames.append(df)
+                logger.info("Загружено {} строк из {}", len(df), path)
 
     if not frames:
         logger.error("Результаты не найдены. Сначала запустите генерацию и скоринг.")

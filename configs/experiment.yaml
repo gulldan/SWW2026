@@ -15,7 +15,8 @@ n_runs: 5
 
 # Режимы для сравнения
 modes:
-  - single    # оптимизация только под мишень A, затем оценка по обеим
+  - single_a  # оптимизация только под мишень A, затем оценка по обеим
+  - single_b  # оптимизация только под мишень B, затем оценка по обеим
   - double    # оптимизация под combined(A, B) одновременно
 
 # Целевые функции для double-target режима
@@ -51,7 +52,7 @@ generator:
     use_model_cache: true
     training_timeout: 86400  # 24ч
     box_padding: 10.0        # Å
-    vina_program: unidock    # "qvina02" for CPU fallback
+    vina_program: unidock_gpu    # "qvina02" for CPU fallback
 
 # Настройки скорера (Boltz-2)
 scorer:

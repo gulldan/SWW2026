@@ -36,7 +36,7 @@ docker run --rm -v $(pwd)/data:/workspace dualdocking/freedpp:latest \
 - Python 3.7, PyTorch 1.12+cu113, DGL 0.9
 - `rdkit` 2022.03 (molecule manipulation, SMILES)
 - `crem` 0.2.9 (fragment-based molecular assembly)
-- OpenBabel 3.x (PDB → PDBQT conversion)
+- RDKit + Meeko (PDB/PDBQT/ligand prep)
 - QuickVina2 binary (`ffreed/env/qvina02`)
 
 ### Key CLI Usage Patterns (via `python main.py`)

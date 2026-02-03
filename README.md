@@ -18,7 +18,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── <target_id>.fasta # Последовательности белков (UniProt)
 │   └── <target_id>.pdbqt # Receptor PDBQT для QuickVina2 (генерируется --prepare-all)
 ├── docker/freedpp/       # Docker-изоляция FREED++ (Python 3.7 / PyTorch 1.12)
-│   ├── Dockerfile        # CUDA 11.3, Conda, DGL 0.9, OpenBabel, QuickVina2
+│   ├── Dockerfile        # CUDA 11.3, Conda, DGL 0.9, RDKit+Meeko, QuickVina2
 │   ├── entrypoint.sh     # prepare-receptor / train / sample
 │   └── dual_reward_patch.py  # Двойной reward: worst-case (max для lower-is-better)
 ├── cache/                # Кеш (в .gitignore)
@@ -83,6 +83,34 @@ docker build -t dualdocking/freedpp:latest docker/freedpp/
 uv run pytest
 uv run ruff check src/ scripts/ tests/
 ```
+
+## Калибровочный набор для нормализации
+
+Нормализация reward в FREED++ требует внешнего SMILES-набора для расчёта mean/std по каждому таргету.
+Для этого используется конфиг `configs/calibration.yaml` и скрипт загрузки.
+
+Команды:
+
+```bash
+# Скачать/подготовить все наборы из configs/calibration.yaml
+uv run python scripts/fetch_calibration_sets.py
+
+# Или только выбранный набор (selected)
+uv run python scripts/fetch_calibration_sets.py --only-selected
+
+# Прогнать докинг калибровочного набора (Uni-Dock GPU)
+uv run python scripts/dock_calibration.py
+
+# Проверить/пересчитать normalization.yaml
+uv run python scripts/calibrate_normalization.py
+```
+
+По умолчанию выбран MOSES (ZINC Clean Leads). Для ZINC15 необходимо указать собственный URL
+в `configs/calibration.yaml` и включить источник, так как на ZINC могут действовать ограничения
+на перераспространение.
+
+Параметры докинга (exhaustiveness/num_modes/energy_range/timeout) задаются в
+`configs/calibration.yaml` и применяются одинаково для всех таргетов.
 
 ## Архитектура скоринга Boltz-2
 
