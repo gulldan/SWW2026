@@ -41,6 +41,24 @@ class DockingParams:
     box_padding: float
 
 
+def _parse_unidock_scores_sdf(text: str) -> list[float]:
+    scores: list[float] = []
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        if not line.startswith("> <Uni-Dock RESULT>"):
+            continue
+        if idx + 1 >= len(lines):
+            continue
+        payload = lines[idx + 1].strip()
+        for token in payload.replace(";", " ").split():
+            if token.startswith("ENERGY="):
+                try:
+                    scores.append(float(token.split("=", 1)[1]))
+                except ValueError:
+                    continue
+    return scores
+
+
 class DockerRunner:
     """Lightweight Docker exec helper for persistent containers."""
 
@@ -116,6 +134,9 @@ def _resolve_program(program: str, override: str | None = None) -> str:
 def _parse_score(text: str) -> float:
     for line in text.splitlines():
         match = re.match(r"^\s*1\s+(-?\d+(?:\.\d+)?)", line)
+        if match:
+            return float(match.group(1))
+        match = re.search(r"REMARK VINA RESULT:\s*(-?\d+(?:\.\d+)?)", line)
         if match:
             return float(match.group(1))
     match = re.search(r"Affinity:\s*(-?\d+(?:\.\d+)?)", text)
@@ -255,6 +276,22 @@ def _write_sdf_from_smiles(
     return True, ""
 
 
+def _contains_glue_atoms(pdbqt_path: Path) -> bool:
+    """Return True if PDBQT contains macrocycle glue atoms (e.g., G0)."""
+    try:
+        text = pdbqt_path.read_text()
+    except FileNotFoundError:
+        return False
+    for line in text.splitlines():
+        if not line.startswith("ATOM"):
+            continue
+        atom_name = line[12:16].strip()
+        atom_type = line[77:79].strip() if len(line) >= 79 else line.split()[-1]
+        if atom_name == "G" or atom_type.startswith("G"):
+            return True
+    return False
+
+
 def _ensure_ligand_pdbqt(
     runner: DockerRunner | None,
     smiles: str,
@@ -281,6 +318,7 @@ def _ensure_ligand_pdbqt(
         _container_path(sdf_path) if runner else str(sdf_path),
         "-o",
         _container_path(out_path) if runner else str(out_path),
+        "--rigid_macrocycles",
     ]
     if runner:
         result = runner.exec(cmd, timeout=timeout)
@@ -289,6 +327,8 @@ def _ensure_ligand_pdbqt(
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "").strip()
         return False, err
+    if _contains_glue_atoms(out_path):
+        return False, "Glue atoms (G0) detected in ligand; macrocycle handling failed"
     return True, ""
 
 
@@ -366,6 +406,97 @@ def _dock_ligand(
     return _parse_score(log_text)
 
 
+def _dock_batch_unidock(  # noqa: PLR0913
+    runner: DockerRunner | None,
+    binary: str,
+    receptor: Path,
+    ligands: list[Path],
+    center: tuple[float, float, float],
+    size: tuple[float, float, float],
+    params: DockingParams,
+    output_dir: Path,
+    batch_id: int,
+    seed: int,
+    timeout: int,
+) -> dict[Path, float | None]:
+    center_x, center_y, center_z = center
+    size_x, size_y, size_z = size
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    index_path = output_dir / f"ligand_index_{batch_id:04d}.txt"
+    index_lines = [_container_path(lig) if runner else str(lig) for lig in ligands]
+    index_path.write_text("\n".join(index_lines) + "\n")
+
+    for lig in ligands:
+        _safe_unlink(output_dir / f"{lig.stem}_out.sdf", runner)
+
+    cmd = [
+        binary,
+        "--receptor",
+        _container_path(receptor) if runner else str(receptor),
+        "--ligand_index",
+        _container_path(index_path) if runner else str(index_path),
+        "--center_x",
+        f"{center_x:.3f}",
+        "--center_y",
+        f"{center_y:.3f}",
+        "--center_z",
+        f"{center_z:.3f}",
+        "--size_x",
+        f"{size_x:.3f}",
+        "--size_y",
+        f"{size_y:.3f}",
+        "--size_z",
+        f"{size_z:.3f}",
+        "--exhaustiveness",
+        str(params.exhaustiveness),
+        "--num_modes",
+        str(params.num_modes),
+        "--energy_range",
+        str(params.energy_range),
+        "--dir",
+        _container_path(output_dir) if runner else str(output_dir),
+        "--seed",
+        str(seed),
+        "--verbosity",
+        "2",
+        "--keep_nonpolar_H",
+    ]
+
+    if runner:
+        result = runner.exec(cmd, timeout=timeout)
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=timeout)  # noqa: S603
+    run_error = ""
+    if result.returncode != 0:
+        run_error = (result.stderr or result.stdout or "").strip()
+
+    scores: dict[Path, float | None] = {}
+    for lig in ligands:
+        sdf_path = output_dir / f"{lig.stem}_out.sdf"
+        pdbqt_path = output_dir / f"{lig.stem}_out.pdbqt"
+        if sdf_path.exists():
+            scores_list = _parse_unidock_scores_sdf(sdf_path.read_text())
+            scores[lig] = min(scores_list) if scores_list else None
+            _safe_unlink(sdf_path, runner)
+            continue
+        if pdbqt_path.exists():
+            try:
+                scores[lig] = _parse_score(pdbqt_path.read_text())
+            except Exception:
+                scores[lig] = None
+            _safe_unlink(pdbqt_path, runner)
+            continue
+        scores[lig] = None
+
+    _safe_unlink(index_path, runner)
+    if run_error and all(score is None for score in scores.values()):
+        raise RuntimeError(run_error)
+    if run_error:
+        logger.warning("Uni-Dock batch {} completed with warnings: {}", batch_id, run_error)
+    return scores
+
+
 def _parse_vec(vec_str: str) -> tuple[float, float, float]:
     parts = [float(x) for x in vec_str.split(",")]
     if len(parts) != 3:
@@ -435,6 +566,8 @@ def main(  # noqa: PLR0913
         timeout_seconds=int(docking_cfg.get("timeout_seconds", 120)),
         box_padding=float(docking_cfg.get("box_padding", 10.0)),
     )
+    batch_size = int(docking_cfg.get("batch_size", 64))
+    batch_mode = bool(docking_cfg.get("batch_mode", False))
 
     scores_root = PROJECT_ROOT / scores_dir
     scores_root.mkdir(parents=True, exist_ok=True)
@@ -458,14 +591,13 @@ def main(  # noqa: PLR0913
                 len(existing),
                 n,
             )
-        smiles = existing
-        n = len(smiles)
-        candidates = smiles
+        n = len(existing)
+        candidates = existing
     else:
         rng = random.Random(seed)  # noqa: S311
         candidates = smiles_all.copy()
         rng.shuffle(candidates)
-        smiles = []
+    smiles = []
 
     pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
     target_ids: list[str] = []
@@ -480,6 +612,9 @@ def main(  # noqa: PLR0913
             raise ValueError("No target IDs matched the provided --target-id values")
 
     binary = _resolve_program(docking_program, docking_binary)
+    use_unidock_batch = batch_mode and "unidock" in Path(binary).name.lower()
+    if "unidock" in Path(binary).name.lower() and not use_unidock_batch:
+        logger.info("Uni-Dock batch mode disabled; using single-ligand docking")
 
     if dry_run:
         logger.info("Dry run enabled; no docking will be executed")
@@ -546,6 +681,8 @@ def main(  # noqa: PLR0913
                 "energy_range": params.energy_range,
                 "timeout_seconds": params.timeout_seconds,
                 "box_padding": params.box_padding,
+                "batch_mode": use_unidock_batch,
+                "batch_size": batch_size if use_unidock_batch else 1,
             },
             "targets": target_ids,
             "date": datetime.now(UTC).date().isoformat(),
@@ -578,34 +715,64 @@ def main(  # noqa: PLR0913
             target_work = work_dir / target
             target_work.mkdir(parents=True, exist_ok=True)
 
-            for idx, ligand_path in enumerate(tqdm(ligand_paths, desc=f"Dock {target}", unit="ligand")):
-                if dry_run:
-                    scores.append(0.0)
-                    continue
-                log_path = target_work / f"{target}_{idx:05d}.log"
-                out_path = target_work / f"{target}_{idx:05d}.pdbqt"
-                try:
-                    score = _dock_ligand(
-                        runner,
-                        binary,
-                        receptor_path,
-                        ligand_path,
-                        center,
-                        size,
-                        params,
-                        log_path,
-                        out_path,
-                    )
-                    scores.append(score)
-                except Exception as exc:
-                    failures += 1
-                    logger.error("Docking failed for {} #{}: {}", target, idx, exc)
-                    continue
-                finally:
-                    if log_path.exists():
-                        log_path.unlink(missing_ok=True)
-                    if out_path.exists():
-                        out_path.unlink(missing_ok=True)
+            if use_unidock_batch and not dry_run:
+                batch_iter = range(0, len(ligand_paths), batch_size)
+                for batch_id, start in enumerate(tqdm(batch_iter, desc=f"Dock {target}", unit="batch")):
+                    batch = ligand_paths[start : start + batch_size]
+                    try:
+                        batch_scores = _dock_batch_unidock(
+                            runner,
+                            binary,
+                            receptor_path,
+                            batch,
+                            center,
+                            size,
+                            params,
+                            target_work,
+                            batch_id=batch_id,
+                            seed=seed + start,
+                            timeout=params.timeout_seconds,
+                        )
+                    except Exception as exc:
+                        failures += len(batch)
+                        logger.error("Batch docking failed for {} batch {}: {}", target, batch_id, exc)
+                        continue
+                    for lig in batch:
+                        score = batch_scores.get(lig)
+                        if score is None:
+                            failures += 1
+                            logger.error("Docking failed for {} ligand {}", target, lig.name)
+                            continue
+                        scores.append(score)
+            else:
+                for idx, ligand_path in enumerate(tqdm(ligand_paths, desc=f"Dock {target}", unit="ligand")):
+                    if dry_run:
+                        scores.append(0.0)
+                        continue
+                    log_path = target_work / f"{target}_{idx:05d}.log"
+                    out_path = target_work / f"{target}_{idx:05d}.pdbqt"
+                    try:
+                        score = _dock_ligand(
+                            runner,
+                            binary,
+                            receptor_path,
+                            ligand_path,
+                            center,
+                            size,
+                            params,
+                            log_path,
+                            out_path,
+                        )
+                        scores.append(score)
+                    except Exception as exc:
+                        failures += 1
+                        logger.error("Docking failed for {} #{}: {}", target, idx, exc)
+                        continue
+                    finally:
+                        if log_path.exists():
+                            log_path.unlink(missing_ok=True)
+                        if out_path.exists():
+                            out_path.unlink(missing_ok=True)
 
             if failures:
                 logger.warning("{} docking failures for target {}", failures, target)

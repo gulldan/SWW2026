@@ -36,13 +36,33 @@ class DiversityResult:
         return out
 
 
+_MORGAN_GENERATOR = None
+
+
+def _get_morgan_generator() -> Any:
+    global _MORGAN_GENERATOR
+    if _MORGAN_GENERATOR is not None:
+        return _MORGAN_GENERATOR
+    try:
+        from rdkit.Chem import rdFingerprintGenerator
+
+        _MORGAN_GENERATOR = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+    except Exception:
+        _MORGAN_GENERATOR = None
+    return _MORGAN_GENERATOR
+
+
 def _fingerprints(smiles: list[str]) -> list[DataStructs.cDataStructs.ExplicitBitVect]:
     fps = []
+    generator = _get_morgan_generator()
     for smi in smiles:
         mol = Chem.MolFromSmiles(smi)
         if mol is None:
             continue
-        fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048)  # type: ignore[attr-defined]
+        if generator is not None:
+            fp = generator.GetFingerprint(mol)
+        else:
+            fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048)  # type: ignore[attr-defined]
         fps.append(fp)
     return fps
 

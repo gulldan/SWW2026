@@ -20,7 +20,8 @@
 \maketitle
 
 \begin{abstract}
-We report preliminary dual-target docking results using FREED++ generation and Boltz-2 scoring.
+We report preliminary dual-target docking results using FREED++ generation \cite{gao2024freedpp}
+and Boltz-2 scoring \cite{wohlwend2025boltz2}.
 This draft summarizes hit-rate and balance statistics for the CDK2/ERK2 pair.
 \end{abstract}
 
@@ -39,7 +40,7 @@ Mode & HR\_A (mean $\pm$ SEM) & HR\_both (mean $\pm$ SEM) & Balance (mean $\pm$ 
 {% set cdk = metrics.get('CDK2_ERK2', {}) %}
 {% for mode in ['single_a', 'single_b', 'double'] %}
 {% set m = cdk.get(mode, {}) %}
-{{ mode }} & {{ fmt(m.get('hr_a_mean')) }} $\pm$ {{ fmt(m.get('hr_a_sem')) }} &
+{{ mode.replace('_', '\\_') }} & {{ fmt(m.get('hr_a_mean')) }} $\pm$ {{ fmt(m.get('hr_a_sem')) }} &
 {{ fmt(m.get('hr_both_mean')) }} $\pm$ {{ fmt(m.get('hr_both_sem')) }} &
 {{ fmt(m.get('balance_mean')) }} $\pm$ {{ fmt(m.get('balance_sem')) }} \\
 {% endfor %}

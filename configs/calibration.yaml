@@ -13,6 +13,8 @@ docking:
   energy_range: 3.0
   timeout_seconds: 120
   box_padding: 10.0
+  batch_mode: true
+  batch_size: 64
 
 sources:
   moses:

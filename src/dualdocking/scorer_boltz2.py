@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import json
 import subprocess
 import tempfile
@@ -25,26 +26,57 @@ DATA_DIR = PROJECT_ROOT / "data" / "targets"
 MSA_CACHE_DIR = CACHE_DIR / "boltz_msa"
 
 BOLTZ_TIMEOUT = 600  # секунд на одну молекулу
+BOLTZ_BATCH_TIMEOUT = 3600  # секунд на батч
 MAX_LIGAND_ATOMS = 128
+BATCH_SIZE = 8  # молекул за один вызов boltz predict
 
 # Boltz CLI параметры
-BOLTZ_CLI_ARGS: list[str] = [
+_BOLTZ_CLI_ARGS_BASE: list[str] = [
     "--model",
     "boltz2",
-    "--accelerator",
-    "gpu",
     "--recycling_steps",
     "3",
     "--sampling_steps",
     "200",
     "--diffusion_samples",
-    "1",
+    "4",
     "--sampling_steps_affinity",
     "200",
     "--diffusion_samples_affinity",
     "5",
     "--override",
 ]
+
+_ACCELERATOR: str | None = None
+
+
+def _resolve_accelerator() -> str:
+    """Pick Boltz accelerator; GPU is required unless explicitly overridden."""
+    global _ACCELERATOR
+    if _ACCELERATOR is not None:
+        return _ACCELERATOR
+
+    env = os.getenv("BOLTZ_ACCELERATOR", "gpu").lower()
+    if env not in {"gpu", "cpu"}:
+        raise ValueError(f"Unsupported BOLTZ_ACCELERATOR={env}; use 'gpu' or 'cpu'")
+
+    if env == "gpu":
+        try:
+            import torch  # type: ignore
+
+            if not torch.cuda.is_available():
+                raise RuntimeError(
+                    "Boltz GPU requested but torch.cuda.is_available() is False. "
+                    "Reinstall boltz with CUDA support and ensure NVIDIA drivers are visible."
+                )
+        except Exception as exc:
+            raise RuntimeError(
+                "Boltz GPU requested but CUDA is not available. "
+                "Reinstall boltz with CUDA support and verify torch CUDA."
+            ) from exc
+
+    _ACCELERATOR = env
+    return _ACCELERATOR
 
 # Кеш sequence в памяти (target_id -> sequence)
 _sequence_cache: dict[str, str] = {}
@@ -148,7 +180,9 @@ def _run_boltz_predict(yaml_path: Path, out_dir: Path) -> subprocess.CompletedPr
         str(yaml_path),
         "--out_dir",
         str(out_dir),
-        *BOLTZ_CLI_ARGS,
+        "--accelerator",
+        _resolve_accelerator(),
+        *_BOLTZ_CLI_ARGS_BASE,
     ]
     logger.debug("Boltz CMD: {}", " ".join(cmd))
 
@@ -177,6 +211,110 @@ def _parse_affinity(out_dir: Path, stem: str) -> float:
 
     data = json.loads(affinity_path.read_text())
     return float(data["affinity_pred_value"])
+
+
+def _run_boltz_predict_dir(input_dir: Path, out_dir: Path, timeout: int = BOLTZ_BATCH_TIMEOUT) -> subprocess.CompletedProcess[str]:
+    """Запуск boltz predict на директории YAML файлов."""
+    cmd = [
+        "uv",
+        "run",
+        "boltz",
+        "predict",
+        str(input_dir),
+        "--out_dir",
+        str(out_dir),
+        "--accelerator",
+        _resolve_accelerator(),
+        *_BOLTZ_CLI_ARGS_BASE,
+    ]
+    logger.debug("Boltz batch CMD: {}", " ".join(cmd))
+
+    result = subprocess.run(  # noqa: S603
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=str(PROJECT_ROOT),
+        check=False,
+    )
+    return result
+
+
+def _score_batch_internal(
+    target_id: str,
+    smiles_list: list[str],
+    sequence: str,
+    msa_path: Path,
+) -> list[float]:
+    """Скорить батч молекул за один вызов boltz predict.
+
+    Создаёт директорию с YAML файлами и запускает boltz predict на ней.
+    Модель загружается один раз, что значительно быстрее.
+    """
+    scores = [float("nan")] * len(smiles_list)
+
+    # Валидация SMILES
+    valid_indices: list[int] = []
+    for idx, smi in enumerate(smiles_list):
+        if _validate_smiles(smi):
+            valid_indices.append(idx)
+        else:
+            logger.warning("Невалидный SMILES или слишком большая молекула (>{} атомов): {}", MAX_LIGAND_ATOMS, smi)
+
+    if not valid_indices:
+        return scores
+
+    with tempfile.TemporaryDirectory(prefix=f"boltz_batch_{target_id}_") as tmpdir:
+        tmp_path = Path(tmpdir)
+        input_dir = tmp_path / "inputs"
+        out_dir = tmp_path / "output"
+        input_dir.mkdir(parents=True, exist_ok=True)
+
+        # Создаём YAML для каждой валидной молекулы
+        stem_to_idx: dict[str, int] = {}
+        for idx in valid_indices:
+            smi = smiles_list[idx]
+            stem = f"mol_{idx:04d}"
+            yaml_path = input_dir / f"{stem}.yaml"
+            _write_boltz_yaml(sequence, smi, yaml_path, msa_path=msa_path)
+            stem_to_idx[stem] = idx
+
+        # Один вызов boltz predict на директорию
+        timeout = BOLTZ_BATCH_TIMEOUT
+        try:
+            result = _run_boltz_predict_dir(input_dir, out_dir, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            logger.error("Boltz batch таймаут ({} сек) для {} молекул", timeout, len(valid_indices))
+            return scores
+
+        if result.returncode != 0:
+            stderr = result.stderr or ""
+            if "CUDA out of memory" in stderr:
+                logger.error("Boltz batch OOM GPU для {} молекул", len(valid_indices))
+            else:
+                logger.error(
+                    "Boltz batch ошибка (rc={}) для {} молекул\nstderr: {}",
+                    result.returncode,
+                    len(valid_indices),
+                    stderr[-2000:],
+                )
+            # Попробуем распарсить частичные результаты
+
+        # Парсим результаты для каждой молекулы
+        # При батчевом запуске структура: boltz_results_{dir_name}/predictions/{stem}/affinity_{stem}.json
+        results_dir = out_dir / f"boltz_results_{input_dir.name}"
+        for stem, idx in stem_to_idx.items():
+            affinity_path = results_dir / "predictions" / stem / f"affinity_{stem}.json"
+            try:
+                if not affinity_path.exists():
+                    logger.debug("Affinity файл не найден: {}", affinity_path)
+                    continue
+                data = json.loads(affinity_path.read_text())
+                scores[idx] = float(data["affinity_pred_value"])
+            except (KeyError, json.JSONDecodeError) as exc:
+                logger.debug("Не удалось распарсить affinity для {}: {}", stem, exc)
+
+    return scores
 
 
 def score_single(target_id: str, smiles: str) -> float:
@@ -247,11 +385,13 @@ def score_batch(
     smiles_list: list[str],
     *,
     use_cache: bool = True,
+    batch_size: int = BATCH_SIZE,
 ) -> NDArray[np.float64]:
     """Оценить батч SMILES по мишени *target_id*.
 
     Скоры кешируются по паре (target, smiles) на диске.
-    Каждая молекула скорится отдельным вызовом ``boltz predict``.
+    Молекулы группируются в батчи и обрабатываются за один вызов boltz predict,
+    что значительно ускоряет работу (модель загружается один раз на батч).
 
     Parameters
     ----------
@@ -261,6 +401,8 @@ def score_batch(
         Канонические SMILES-строки.
     use_cache:
         Если True, пропускать уже оценённые молекулы.
+    batch_size:
+        Количество молекул в одном батче (по умолчанию BATCH_SIZE).
 
     Returns:
     -------
@@ -269,32 +411,59 @@ def score_batch(
     """
     from tqdm import tqdm
 
-    # Загрузить sequence один раз
-    _load_sequence(target_id)
+    # Загрузить sequence и MSA один раз
+    sequence = _load_sequence(target_id)
+    msa_path = _get_msa_path(target_id)
+    if msa_path is None:
+        msg = (
+            f"Pre-computed MSA не найден для {target_id}. "
+            f"Запустите: uv run python scripts/prepare_targets.py --pair <pair> --prepare-all"
+        )
+        raise FileNotFoundError(msg)
 
     cache = _load_cache(target_id) if use_cache else {}
-    scores: list[float] = []
+    scores: list[float] = [float("nan")] * len(smiles_list)
     to_score: list[tuple[int, str]] = []
 
+    # Проверяем кеш
     for idx, smi in enumerate(smiles_list):
         key = _cache_key(target_id, smi)
         if key in cache:
-            scores.append(cache[key])
+            scores[idx] = cache[key]
         else:
-            scores.append(float("nan"))
             to_score.append((idx, smi))
 
-    if to_score:
-        logger.info("Скоринг {} новых молекул для мишени {} (из {} всего)", len(to_score), target_id, len(smiles_list))
-        for idx, smi in tqdm(to_score, desc=f"Boltz-2 [{target_id}]", unit="mol"):
-            s = score_single(target_id, smi)
+    if not to_score:
+        logger.info("Все {} молекул для мишени {} найдены в кеше", len(smiles_list), target_id)
+        return np.array(scores, dtype=np.float64)
+
+    logger.info(
+        "Скоринг {} новых молекул для мишени {} (из {} всего, batch_size={})",
+        len(to_score), target_id, len(smiles_list), batch_size
+    )
+
+    # Группируем в батчи
+    num_batches = (len(to_score) + batch_size - 1) // batch_size
+    for batch_idx in tqdm(range(num_batches), desc=f"Boltz-2 [{target_id}]", unit="batch"):
+        start = batch_idx * batch_size
+        end = min(start + batch_size, len(to_score))
+        batch = to_score[start:end]
+
+        # Извлекаем SMILES для батча
+        batch_smiles = [smi for _, smi in batch]
+
+        # Скорим батч за один вызов boltz predict
+        batch_scores = _score_batch_internal(target_id, batch_smiles, sequence, msa_path)
+
+        # Записываем результаты
+        for i, (idx, smi) in enumerate(batch):
+            s = batch_scores[i]
+            scores[idx] = s
             key = _cache_key(target_id, smi)
             cache[key] = s
-            scores[idx] = s
-            # Инкрементальное сохранение кеша после каждой молекулы
-            if use_cache:
-                _save_cache(target_id, cache)
-    else:
-        logger.info("Все {} молекул для мишени {} найдены в кеше", len(smiles_list), target_id)
+
+        # Сохраняем кеш после каждого батча (не после каждой молекулы)
+        if use_cache:
+            _save_cache(target_id, cache)
 
     return np.array(scores, dtype=np.float64)

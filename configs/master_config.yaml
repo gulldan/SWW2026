@@ -8,24 +8,24 @@ experiment:
 data_sources:
   calibration_set:
     path: "data/calibration/zinc_druglike_calibration_1000_v2024.smi"
-    sha256: "UNKNOWN"
+    sha256: "ee4f11d1f9d56aeeadaf8a23a47dc40787225c745c880b42396a87096662a19b"
   baseline_set:
     path: "data/baseline/zinc_druglike_baseline_1000_seed42.smi"
-    sha256: "UNKNOWN"
+    sha256: "647b619f6807972a4645e5820b4aa542e9ba6de9616c092143ce1c07f62bad10"
 
 configs:
   experiment_yaml:
     path: "configs/experiment.yaml"
-    sha256: "UNKNOWN"
+    sha256: "ff7340217b885590ccc562619aa4929de06e4cbe9be511e79f9ccc30f49819ea"
   pairs_yaml:
     path: "configs/pairs.yaml"
-    sha256: "UNKNOWN"
+    sha256: "99d40f267fa8263e7181691fd7c978c9ff5b829f982a96ab9f1fb939c5bea426"
   metrics_yaml:
     path: "configs/metrics.yaml"
-    sha256: "UNKNOWN"
+    sha256: "e86e34366c47c419981f3feaf3e467840338e9e62e34b19cfa75653f0c1ef3f8"
   normalization_yaml:
     path: "configs/normalization.yaml"
-    sha256: "UNKNOWN"
+    sha256: "70a01637bb0dcaa10022bd74e6808e161558b184e2c8bf86a38d896be86cb67e"
 
 primary_metric:
   source: "Boltz-2 affinity_pred_value"
@@ -34,7 +34,7 @@ primary_metric:
   hit_threshold: 0.0
 
 software:
-  docker_image_digest: "UNKNOWN"
-  boltz_version: "UNKNOWN"
+  docker_image_digest: "sha256:84621724917265ea8f72445ced88af441730b45342b4613f4355ed5663c71d4a"
+  boltz_version: "2.2.1"
   docking_program: "unidock_gpu"
-  docking_version: "UNKNOWN"
+  docking_version: "Uni-Dock v1.1.3"

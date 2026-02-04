@@ -1,0 +1,65 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{natbib}
+
+\title{Dual-Target Docking: Draft Report}
+\author{Automated Pipeline}
+\date{ 2026-02-04 }
+
+
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We report preliminary dual-target docking results using FREED++ generation \cite{gao2024freedpp}
+and Boltz-2 scoring \cite{wohlwend2025boltz2}.
+This draft summarizes hit-rate and balance statistics for the CDK2/ERK2 pair.
+\end{abstract}
+
+\section*{Methods}
+Molecules were generated with FREED++ in three modes (single\_a, single\_b, double) and scored with Boltz-2.
+Normalization and diversity checks were applied prior to statistical testing.
+
+\section*{Results}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+Mode & HR\_A (mean $\pm$ SEM) & HR\_both (mean $\pm$ SEM) & Balance (mean $\pm$ SEM) \\
+\midrule
+
+
+
+single\_a & - $\pm$ - &
+- $\pm$ - &
+- $\pm$ - \\
+
+
+single\_b & - $\pm$ - &
+- $\pm$ - &
+- $\pm$ - \\
+
+
+double & - $\pm$ - &
+- $\pm$ - &
+- $\pm$ - \\
+
+\bottomrule
+\end{tabular}
+\caption{Hit-rate summary for CDK2\_ERK2.}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\fbox{\parbox{0.8\linewidth}{Placeholder for a key figure.}}
+\caption{Example figure placeholder.}
+\end{figure}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

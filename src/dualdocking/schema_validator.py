@@ -86,11 +86,11 @@ def validate_normalization_schema(path: str | Path) -> dict[str, Any]:
     return _result(errors)
 
 
-def validate_metrics_schema(path: str | Path) -> dict[str, Any]:
+def validate_metrics_schema(path: str | Path, pairs_config: str | Path = "configs") -> dict[str, Any]:
     """Validate metrics.json schema (summary only)."""
     errors: list[str] = []
     data = _load_json(path)
-    pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
+    pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
 
     required_fields = [
         "hr_a_mean",
@@ -115,11 +115,11 @@ def validate_metrics_schema(path: str | Path) -> dict[str, Any]:
     return _result(errors)
 
 
-def validate_stats_schema(path: str | Path) -> dict[str, Any]:
+def validate_stats_schema(path: str | Path, pairs_config: str | Path = "configs") -> dict[str, Any]:
     """Validate stats.json schema (16 tests total)."""
     errors: list[str] = []
     data = _load_json(path)
-    pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
+    pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
 
     total_tests = 0
     for pair_id in pairs:

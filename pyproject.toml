@@ -20,7 +20,7 @@ dependencies = [
     "scipy",
     "tqdm>=4.66",
     "loguru>=0.7",
-    "boltz",
+    "boltz[cuda]",
 ]
 
 [dependency-groups]

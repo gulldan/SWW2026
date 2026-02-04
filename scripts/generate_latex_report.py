@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+import shutil
 
 import click
 from loguru import logger
@@ -34,6 +35,13 @@ def main(mode: str, metrics: str, template: str, output: str) -> None:
         output_tex=PROJECT_ROOT / output,
     )
     logger.info("LaTeX draft -> {}", tex_path)
+
+    bib_src = (PROJECT_ROOT / template).with_name("references.bib")
+    if bib_src.exists():
+        bib_dst = tex_path.parent / "references.bib"
+        if bib_src.resolve() != bib_dst.resolve():
+            shutil.copyfile(bib_src, bib_dst)
+            logger.info("Bibliography -> {}", bib_dst)
 
     pdf_path = compile_latex_pdf(tex_path, mode=mode)
     if pdf_path:

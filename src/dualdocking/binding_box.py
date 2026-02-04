@@ -74,7 +74,7 @@ def extract_ligand_coords(pdb_path: str | Path) -> NDArray | None:
     NDArray | None
         Массив координат (N, 3) или None если лиганд не найден.
     """
-    coords: list[list[float]] = []
+    residues: dict[tuple[str, str, str, str], list[list[float]]] = {}
     pdb_path = Path(pdb_path)
 
     with pdb_path.open() as f:
@@ -88,17 +88,24 @@ def extract_ligand_coords(pdb_path: str | Path) -> NDArray | None:
             element = line[76:78].strip()
             if element == "H":
                 continue
+            chain = line[21:22].strip()
+            resseq = line[22:26].strip()
+            icode = line[26:27].strip()
             try:
                 x = float(line[30:38])
                 y = float(line[38:46])
                 z = float(line[46:54])
-                coords.append([x, y, z])
+                key = (resname, chain, resseq, icode)
+                residues.setdefault(key, []).append([x, y, z])
             except (ValueError, IndexError):
                 continue
 
-    if not coords:
+    if not residues:
         return None
-    return np.array(coords, dtype=np.float64)
+
+    # Choose the ligand with the most heavy atoms to avoid oversized boxes
+    best_coords = max(residues.values(), key=len)
+    return np.array(best_coords, dtype=np.float64)
 
 
 def compute_box(

@@ -11,6 +11,7 @@ from dualdocking.statistical import bootstrap_ci
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 ZINC_DIR = PROJECT_ROOT / "data" / "zinc"
+BASELINE_DIR = PROJECT_ROOT / "data" / "baseline"
 
 
 def fetch_zinc_subset(subset_name: str, n: int = 1000, seed: int = 42) -> list[str]:
@@ -21,7 +22,11 @@ def fetch_zinc_subset(subset_name: str, n: int = 1000, seed: int = 42) -> list[s
     """
     path = ZINC_DIR / f"{subset_name}.smi"
     if not path.exists():
-        raise FileNotFoundError(f"ZINC subset not found: {path}. Run scripts/fetch_zinc_baseline.sh or provide the file.")
+        path = BASELINE_DIR / f"{subset_name}.smi"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"ZINC subset not found: {path}. Run scripts/fetch_zinc_baseline.sh or provide the file."
+        )
 
     smiles = []
     for line in path.read_text().splitlines():

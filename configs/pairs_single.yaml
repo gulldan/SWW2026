@@ -1,0 +1,18 @@
+# Минимальная конфигурация для интеграционного теста (1 пара).
+pairs:
+  CDK2_ERK2:
+    description: "Селективность киназ - CDK2 vs ERK2 (обе Ser/Thr киназы, схожие ATP-связывающие карманы)"
+    target_a:
+      id: CDK2
+      name: "Циклин-зависимая киназа 2"
+      uniprot: P24941
+      pdb_id: 1HCL
+      organism: "Homo sapiens"
+      binding_site: "ATP-связывающий карман"
+    target_b:
+      id: ERK2
+      name: "Митоген-активируемая протеинкиназа 1 (ERK2)"
+      uniprot: P28482
+      pdb_id: 4QTA
+      organism: "Homo sapiens"
+      binding_site: "ATP-связывающий карман"

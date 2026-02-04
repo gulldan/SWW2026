@@ -112,9 +112,67 @@ uv run python scripts/calibrate_normalization.py
 Параметры докинга (exhaustiveness/num_modes/energy_range/timeout) задаются в
 `configs/calibration.yaml` и применяются одинаково для всех таргетов.
 
+## Baseline ZINC → Parquet
+
+Для базовой выборки удобно хранить исходный ZINC в Parquet.
+Скрипт `scripts/convert_baseline_to_parquet.py` конвертирует CSV (в т.ч. внутри `tar.xz`)
+стримингово и без загрузки всего файла в RAM.
+
+Пример для архива `zinc-druglike-cano.tar.xz` (CSV с колонкой `smiles`):
+
+```bash
+uv run python scripts/convert_baseline_to_parquet.py \
+  --input data/baseline/zinc-druglike-cano.tar.xz \
+  --output data/baseline/zinc-druglike-cano.parquet \
+  --column smiles
+```
+
+Проверка:
+
+```bash
+uv run python - <<'PY'
+import pyarrow.parquet as pq
+pf = pq.ParquetFile("data/baseline/zinc-druglike-cano.parquet")
+print("rows", pf.metadata.num_rows)
+print("schema", pf.schema)
+PY
+```
+
+### Baseline SMILES из Parquet
+
+Чтобы получить baseline‑подвыборку (seed=42) из большого Parquet:
+
+```bash
+uv run python scripts/sample_baseline_from_parquet.py \
+  --input data/baseline/zinc-druglike-cano.parquet \
+  --output data/baseline/zinc_druglike_baseline_1000_seed42.smi \
+  --n 1000 --seed 42 --column smiles
+```
+
 ## Архитектура скоринга Boltz-2
 
 Boltz-2 не имеет публичного Python API — взаимодействие только через CLI (`boltz predict`).
+
+## LaTeX отчёт
+
+Для генерации PDF нужен установленный LaTeX (pdflatex + bibtex).
+На Arch Linux:
+
+```bash
+sudo pacman -S --needed texlive-core texlive-latexextra texlive-bibtexextra
+```
+
+Генерация:
+
+```bash
+# Черновик (.tex)
+uv run python scripts/generate_latex_report.py --mode draft
+
+# Полная компиляция (.pdf)
+uv run python scripts/generate_latex_report.py --mode full
+```
+
+Выходные файлы: `report/manuscript.tex`, `report/manuscript.pdf`.
 
 ### Принцип: максимальное кеширование, работа без интернета
 

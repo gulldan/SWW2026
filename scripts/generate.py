@@ -38,11 +38,32 @@ def _git_commit() -> str:
     return out.splitlines()[0] if out else "unknown"
 
 
+def _master_config_field(path: str) -> str:
+    master_path = PROJECT_ROOT / "configs" / "master_config.yaml"
+    if not master_path.exists():
+        return "unknown"
+    import yaml
+
+    data = yaml.safe_load(master_path.read_text())
+    value: str | None = data
+    for part in path.split("."):
+        if isinstance(value, dict):
+            value = value.get(part)
+        else:
+            value = None
+            break
+    if not value:
+        return "unknown"
+    return str(value)
+
+
 def _docker_image_digest(image: str) -> str:
     out = _run_cmd(["docker", "image", "inspect", image, "--format", "{{index .RepoDigests 0}}"])
     if "@" in out:
         return out.split("@")[-1]
-    return out or "unknown"
+    if out:
+        return out
+    return _master_config_field("software.docker_image_digest")
 
 
 def _boltz_version() -> str:
@@ -79,13 +100,7 @@ def _normalization_meta() -> tuple[str, str]:
 
 
 def _master_config_version() -> str:
-    master_path = PROJECT_ROOT / "configs" / "master_config.yaml"
-    if not master_path.exists():
-        return "unknown"
-    import yaml
-
-    data = yaml.safe_load(master_path.read_text())
-    return str(data.get("version", "unknown"))
+    return _master_config_field("version")
 
 
 @click.command()
