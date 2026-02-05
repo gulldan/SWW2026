@@ -1,6 +1,6 @@
 # FREED++ Docker image
 # Isolates legacy environment (PyTorch 1.12, DGL 0.9, RDKit).
-# Build: docker build -t dualdocking/freedpp:latest docker/freedpp/
+# Build (from repo root): docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 # Requires: NVIDIA Container Toolkit for --gpus all
 
 FROM nvidia/cuda:11.8.0-devel-ubuntu20.04
@@ -72,11 +72,12 @@ RUN wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C
 # ── Data files (not shipped with FFREED repo) ─────────────────────────
 # Fragment library: 91 CReM fragments from ZINC-250K (AITRICS/FREED motifs_91.txt → JSON)
 # Alert filters: PAINS / SureChEMBL / Glaxo rules (PatWalters/rd_filters)
-COPY data/zinc_crem.json data/alert_collections.csv /opt/freed/data/
+COPY docker/freedpp/data/zinc_crem.json docker/freedpp/data/alert_collections.csv /opt/freed/data/
 
 # ── Entrypoint & dual-target patch ──────────────────────────────────
 COPY entrypoint.sh /opt/entrypoint.sh
 COPY dual_reward_patch.py /opt/dual_reward_patch.py
+COPY run_with_patch.py /opt/run_with_patch.py
 COPY pdbfixer_add_h.py /opt/pdbfixer_add_h.py
 RUN chmod +x /opt/entrypoint.sh
 

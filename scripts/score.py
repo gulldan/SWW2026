@@ -20,7 +20,6 @@ from loguru import logger
 from tqdm import tqdm
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 
 @click.command()
@@ -100,7 +99,7 @@ def main(pair: str, mode: str, seed: int, config: str, force: bool) -> None:
     smiles_canon = [canonicalize(s) or "" for s in smiles_list]
     affinity_a = scores_a
     affinity_b = scores_b
-    is_hit_both = (affinity_a < thr_a) & (affinity_b < thr_b)
+    is_hit_both = (affinity_a <= thr_a) & (affinity_b <= thr_b)
 
     joined = pd.DataFrame(
         {

@@ -13,7 +13,14 @@ def test_load_yaml(tmp_path):
 
 
 def test_load_pairs(tmp_path):
-    cfg = {"pairs": {"pair1": {"target_a": "A"}}}
+    cfg = {
+        "pairs": {
+            "pair1": {
+                "target_a": {"id": "CDK2"},
+                "target_b": {"id": "ERK2"},
+            }
+        }
+    }
     (tmp_path / "pairs.yaml").write_text(yaml.dump(cfg))
     result = load_pairs(tmp_path)
     assert "pairs" in result

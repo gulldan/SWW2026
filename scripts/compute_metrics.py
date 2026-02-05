@@ -50,7 +50,7 @@ def _load_scored_csv(path: Path, thr_a: float, thr_b: float) -> pd.DataFrame:
     if "is_hit_both" not in df.columns:
         aff_a = df["affinity_a"].to_numpy()
         aff_b = df["affinity_b"].to_numpy()
-        df["is_hit_both"] = (aff_a < thr_a) & (aff_b < thr_b)
+        df["is_hit_both"] = (aff_a <= thr_a) & (aff_b <= thr_b)
 
     # Deduplicate by canonical smiles
     df = df[df["smiles_canonical"].astype(str).str.len() > 0]
@@ -144,8 +144,8 @@ def main(
                 if len(aff_a) == 0:
                     continue
 
-                hr_a_values.append(float(np.mean(aff_a < thr_a)))
-                hr_both_values.append(float(np.mean((aff_a < thr_a) & (aff_b < thr_b))))
+                hr_a_values.append(float(np.mean(aff_a <= thr_a)))
+                hr_both_values.append(float(np.mean((aff_a <= thr_a) & (aff_b <= thr_b))))
                 balance_values.append(float(np.median(np.abs(aff_a - aff_b))))
 
             if not hr_a_values:

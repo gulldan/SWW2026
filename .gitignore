@@ -28,14 +28,23 @@ cache/
 data/targets/*/A/*.pdb
 data/targets/*/B/*.pdb
 data/*.pdb
-results/*/single/
-results/*/double/
-results/smoke/
+results/
+report/experiment_*.log
+report/post_*.log
+report/calibration_full.log
 report/data/*.parquet
 report/figures/*.png
-report/molecules/*.png
 report/metrics.json
 report/stats.json
+report/summary.txt
+report/proxy_correlation.json
+report/manuscript.tex
+report/manuscript.pdf
+report/manuscript.aux
+report/manuscript.bbl
+report/manuscript.blg
+report/manuscript.log
+report/references.bib
 
 # Secrets / credentials
 .env

@@ -23,11 +23,9 @@ fi
 
 # --- Mode 2: FREED++ training / sampling ---
 
-# If dual-mode is requested, add the patch to PYTHONPATH
 if [ -n "$DUAL_RECEPTOR_B" ]; then
-    export PYTHONPATH="/opt:$PYTHONPATH"
     echo "[entrypoint] Dual-target mode: DUAL_RECEPTOR_B=$DUAL_RECEPTOR_B"
 fi
 
 cd /opt/freed
-exec python -m ffreed.main "$@"
+exec python /opt/run_with_patch.py "$@"

@@ -20,7 +20,6 @@ import click
 from loguru import logger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 
 def _run_cmd(cmd: list[str]) -> str:
@@ -63,6 +62,10 @@ def _docker_image_digest(image: str) -> str:
         return out.split("@")[-1]
     if out:
         return out
+    # Local builds often have no RepoDigests; fall back to image ID.
+    image_id = _run_cmd(["docker", "image", "inspect", image, "--format", "{{.Id}}"])
+    if image_id:
+        return image_id
     return _master_config_field("software.docker_image_digest")
 
 

@@ -1,0 +1,18 @@
+All experiments are executed under a two-stage orchestration model.
+
+\textbf{Stage 1} (\texttt{scripts/run\_full\_experiment.py}) performs generation and
+scoring for each pair, mode, and seed.
+
+\textbf{Stage 2} (\texttt{scripts/run\_post\_pipeline.py}) performs aggregation,
+metric computation, statistical testing, figure generation, and manuscript assembly.
+
+Fairness controls:
+\begin{itemize}
+\item identical seed set across modes;
+\item identical molecule budget per run;
+\item identical hit thresholds per pair from \texttt{configs/metrics.yaml};
+\item identical score convention (lower is better);
+\item run-level metadata and timestamped logs for traceability.
+\end{itemize}
+
+Any interrupted run is resumed only if required artifacts are missing; otherwise it is skipped.

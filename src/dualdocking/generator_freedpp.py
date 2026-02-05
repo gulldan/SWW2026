@@ -17,10 +17,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from loguru import logger
@@ -38,6 +41,12 @@ CACHE_DIR = PROJECT_ROOT / "cache" / "freedpp_models"
 
 DEFAULT_DOCKER_IMAGE = "dualdocking/freedpp:latest"
 DOCKER_BIN = shutil.which("docker") or "docker"
+CACHE_KEY_VERSION = "v2_rdkit_meeko_20260205"
+FREED_DATA_DIR = PROJECT_ROOT / "docker" / "freedpp" / "data"
+FREED_DATA_FILES = (
+    FREED_DATA_DIR / "zinc_crem.json",
+    FREED_DATA_DIR / "alert_collections.csv",
+)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -77,19 +86,51 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
     result = subprocess.run(  # noqa: S603
         [DOCKER_BIN, "image", "inspect", image],
         capture_output=True,
+        text=True,
         check=False,
     )
     if result.returncode == 0:
         logger.debug("Docker-образ {} найден", image)
         return
 
+    stderr = result.stderr or ""
+    # Distinguish "image not found" from Docker daemon errors
+    if "No such image" not in stderr and "not found" not in stderr.lower():
+        raise RuntimeError(
+            f"Docker inspect failed (rc={result.returncode}): {stderr.strip()}"
+        )
+
     logger.info("Docker-образ {} не найден, собираю...", image)
     dockerfile_dir = PROJECT_ROOT / "docker" / "freedpp"
-    if not (dockerfile_dir / "Dockerfile").exists():
-        raise FileNotFoundError(f"Dockerfile не найден: {dockerfile_dir / 'Dockerfile'}")
+    dockerfile_path = dockerfile_dir / "Dockerfile"
+    if not dockerfile_path.exists():
+        raise FileNotFoundError(f"Dockerfile не найден: {dockerfile_path}")
+
+    missing_files = [p for p in FREED_DATA_FILES if not p.exists()]
+    if missing_files:
+        logger.info("Отсутствуют FREED data files, скачиваю: {}", ", ".join(str(p) for p in missing_files))
+        fetch_script = PROJECT_ROOT / "scripts" / "fetch_freed_data.py"
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, str(fetch_script)],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(PROJECT_ROOT),
+        )
+        if result.returncode != 0:
+            tail = ((result.stdout or "") + (result.stderr or ""))[-2000:]
+            raise RuntimeError(f"Не удалось скачать FREED data files:\n{tail}")
 
     subprocess.run(  # noqa: S603
-        [DOCKER_BIN, "build", "-t", image, str(dockerfile_dir)],
+        [
+            DOCKER_BIN,
+            "build",
+            "-t",
+            image,
+            "-f",
+            str(dockerfile_path),
+            str(PROJECT_ROOT),
+        ],
         check=True,
     )
     logger.info("Docker-образ {} собран", image)
@@ -103,11 +144,15 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
 def _cache_key(config: GenerationConfig) -> str:
     """SHA256-хеш от параметров, влияющих на обученную модель."""
     parts = [
+        CACHE_KEY_VERSION,
         config.target_id,
         config.second_target_id or "",
         config.reward_mode,
         str(config.epochs),
+        str(config.steps_per_epoch),
+        str(config.num_sub_proc),
         str(config.seed),
+        config.vina_program,
         config.starting_smile,
     ]
     raw = "|".join(parts)
@@ -339,11 +384,28 @@ def _run_freedpp(
     docker_cmd.append(config.docker_image)
     docker_cmd.extend(args)
 
+    def _ts() -> str:
+        return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+    run_id = os.environ.get("EXPERIMENT_RUN_ID", "adhoc")
+    log_ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    log_path = workspace / f"freedpp_{config.reward_mode}_seed_{config.seed}_{run_id}_{log_ts}.log"
+
     logger.info("Запуск FREED++: {}", " ".join(docker_cmd))
+    logger.info("FREED++ лог -> {}", log_path)
 
     # Стриминг вывода в реальном времени для видимости прогресса
     epoch_bar = None
+    log_file = None
+    stderr_lines: list[str] = []
+    process = None
     try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_file = log_path.open("w", encoding="utf-8")
+        log_file.write(f"[{_ts()}] RUN_ID={run_id}\n")
+        log_file.write(f"[{_ts()}] CMD: {' '.join(docker_cmd)}\n")
+        log_file.flush()
+
         process = subprocess.Popen(  # noqa: S603
             docker_cmd,
             stdout=subprocess.PIPE,
@@ -355,9 +417,10 @@ def _run_freedpp(
         if "train" in commands:
             epoch_bar = tqdm(total=config.epochs, desc="FREED++ обучение", unit="epoch")
 
-        stderr_lines: list[str] = []
         for line in process.stdout:  # type: ignore[union-attr]
             stripped = line.rstrip()
+            log_file.write(f"[{_ts()}] {stripped}\n")
+            log_file.flush()
             # Парсинг прогресса эпох из вывода FREED++
             if epoch_bar is not None and ("epoch" in stripped.lower() or "Epoch" in stripped):
                 # Пытаемся извлечь номер эпохи
@@ -375,13 +438,17 @@ def _run_freedpp(
     finally:
         if epoch_bar is not None:
             epoch_bar.close()
+        if log_file is not None:
+            log_file.close()
 
     stdout_text = "".join(stderr_lines)
 
-    if process.returncode != 0:
-        logger.error("FREED++ завершился с ошибкой (rc={})", process.returncode)
+    if process is None or process.returncode != 0:
+        rc = process.returncode if process is not None else -1
+        logger.error("FREED++ завершился с ошибкой (rc={})", rc)
         logger.error("output: {}", stdout_text[-2000:])
-        raise subprocess.CalledProcessError(process.returncode, docker_cmd, output=stdout_text)
+        logger.error("FREED++ лог -> {}", log_path)
+        raise subprocess.CalledProcessError(rc, docker_cmd, output=stdout_text)
 
     return subprocess.CompletedProcess(docker_cmd, process.returncode, stdout=stdout_text, stderr="")
 
@@ -403,7 +470,7 @@ def _parse_output_smiles(workspace: Path) -> list[str]:
     mols_dir = workspace / "output" / "run" / "mols"
     all_smiles: list[str] = []
 
-    # JSON формат (sample_*.json) — основной выход FREED++
+    # JSON format (primary)
     json_files = sorted(mols_dir.glob("sample_*.json"))
     for json_path in json_files:
         try:
@@ -411,24 +478,24 @@ def _parse_output_smiles(workspace: Path) -> list[str]:
             if isinstance(data, list):
                 all_smiles.extend(str(s) for s in data if s)
         except Exception as e:
-            logger.warning("Ошибка чтения {}: {}", json_path, e)
+            logger.warning("Error reading {}: {}", json_path, e)
 
-    # CSV формат (sample_*.csv) — fallback
-    csv_files = sorted(mols_dir.glob("sample_*.csv"))
-    for csv_path in csv_files:
-        try:
-            df = pd.read_csv(csv_path)
-            if "smiles" in df.columns:
-                all_smiles.extend(df["smiles"].dropna().tolist())
-            elif "Smiles" in df.columns:
-                all_smiles.extend(df["Smiles"].dropna().tolist())
-        except Exception as e:
-            logger.warning("Ошибка чтения {}: {}", csv_path, e)
+    # CSV format (fallback ONLY if no JSON found)
+    if not all_smiles:
+        csv_files = sorted(mols_dir.glob("sample_*.csv"))
+        for csv_path in csv_files:
+            try:
+                df = pd.read_csv(csv_path)
+                col = "smiles" if "smiles" in df.columns else "Smiles" if "Smiles" in df.columns else None
+                if col:
+                    all_smiles.extend(df[col].dropna().tolist())
+            except Exception as e:
+                logger.warning("Error reading {}: {}", csv_path, e)
 
     if not all_smiles:
-        logger.warning("Файлы с молекулами не найдены в {}", mols_dir)
+        logger.warning("No molecule files found in {}", mols_dir)
 
-    logger.info("Прочитано {} SMILES из {} файлов", len(all_smiles), len(json_files) + len(csv_files))
+    logger.info("Read {} SMILES from output", len(all_smiles))
     return all_smiles
 
 
@@ -490,8 +557,6 @@ def generate(config: GenerationConfig) -> list[str]:
         raise FileNotFoundError(f"normalization.yaml не найден: {normalization_src}")
     normalization_dst = workspace / "normalization.yaml"
     if not normalization_dst.exists():
-        import shutil
-
         shutil.copy2(normalization_src, normalization_dst)
         logger.info("normalization.yaml -> {}", normalization_dst)
 
@@ -522,8 +587,6 @@ def generate(config: GenerationConfig) -> list[str]:
     # 6. Determine commands
     if cached_model is not None:
         # Восстановить модель из кеша → только sampling
-        import shutil
-
         model_target = workspace / "output" / "run"
         if not model_target.exists():
             shutil.copytree(cached_model, model_target, dirs_exist_ok=True)
@@ -583,8 +646,6 @@ def generate(config: GenerationConfig) -> list[str]:
         if model_dir.exists():
             cache_dest = CACHE_DIR / key
             cache_dest.mkdir(parents=True, exist_ok=True)
-            import shutil
-
             shutil.copytree(model_dir, cache_dest, dirs_exist_ok=True)
             logger.info("Модель сохранена в кеш: {}", cache_dest)
     pbar.update(1)

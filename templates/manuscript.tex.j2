@@ -2,15 +2,31 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
 \usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{xcolor}
 
-\title{Dual-Target Docking: Draft Report}
-\author{Automated Pipeline}
+\title{ {{ title }} }
+\author{ {{ author }} }
 \date{ {{ date }} }
 
-{% macro fmt(val) -%}
-{%- if val is not none -%}
-{{ '%.3f' % val }}
+{% macro fmt(val, nd=3) -%}
+{%- if val is number -%}
+{{ ('%.' ~ nd ~ 'f') % val }}
+{%- else -%}
+-
+{%- endif -%}
+{%- endmacro %}
+
+{% macro pval(val) -%}
+{%- if val is number -%}
+{%- if val < 0.0001 -%}
+<1e-4
+{%- else -%}
+{{ '%.4f' % val }}
+{%- endif -%}
 {%- else -%}
 -
 {%- endif -%}
@@ -20,40 +36,108 @@
 \maketitle
 
 \begin{abstract}
-We report preliminary dual-target docking results using FREED++ generation \cite{gao2024freedpp}
-and Boltz-2 scoring \cite{wohlwend2025boltz2}.
-This draft summarizes hit-rate and balance statistics for the CDK2/ERK2 pair.
+{% if abstract_text %}
+{{ abstract_text }}
+{% else %}
+This manuscript reports a reproducible comparison of single-target and dual-target molecular generation
+under a common docking-driven evaluation protocol.
+{% endif %}
 \end{abstract}
 
-\section*{Methods}
-Molecules were generated with FREED++ in three modes (single\_a, single\_b, double) and scored with Boltz-2.
-Normalization and diversity checks were applied prior to statistical testing.
+\noindent\textbf{Keywords:} {% if keyword_text %}{{ keyword_text }}{% else %}dual-target docking, reproducible pipeline{% endif %}\\
+\textbf{Experiment Run ID:} \texttt{ {{ run_id }} }
 
-\section*{Results}
+{% for section in sections %}
+\section{ {{ section.title }} }
+{% if section.content %}
+{{ section.content }}
+{% else %}
+This section is intentionally left as a placeholder.
+{% endif %}
+{% endfor %}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{lccc}
+\section{Quantitative Results}
+{% if metric_rows %}
+\subsection{Primary Metrics Across Pairs and Modes}
+\begin{longtable}{p{0.22\linewidth} p{0.12\linewidth} p{0.18\linewidth} p{0.18\linewidth} p{0.18\linewidth}}
 \toprule
-Mode & HR\_A (mean $\pm$ SEM) & HR\_both (mean $\pm$ SEM) & Balance (mean $\pm$ SEM) \\
+Pair & Mode & HR\_A (mean $\pm$ SEM) & HR\_both (mean $\pm$ SEM) & Balance (mean $\pm$ SEM) \\
 \midrule
-{% set cdk = metrics.get('CDK2_ERK2', {}) %}
-{% for mode in ['single_a', 'single_b', 'double'] %}
-{% set m = cdk.get(mode, {}) %}
-{{ mode.replace('_', '\\_') }} & {{ fmt(m.get('hr_a_mean')) }} $\pm$ {{ fmt(m.get('hr_a_sem')) }} &
-{{ fmt(m.get('hr_both_mean')) }} $\pm$ {{ fmt(m.get('hr_both_sem')) }} &
-{{ fmt(m.get('balance_mean')) }} $\pm$ {{ fmt(m.get('balance_sem')) }} \\
+\endhead
+{% for row in metric_rows %}
+{{ row.pair_id.replace('_', '\\_') }} &
+{{ row.mode.replace('_', '\\_') }} &
+{{ fmt(row.hr_a_mean) }} $\pm$ {{ fmt(row.hr_a_sem) }} &
+{{ fmt(row.hr_both_mean) }} $\pm$ {{ fmt(row.hr_both_sem) }} &
+{{ fmt(row.balance_mean) }} $\pm$ {{ fmt(row.balance_sem) }} \\
 {% endfor %}
 \bottomrule
-\end{tabular}
-\caption{Hit-rate summary for CDK2\_ERK2.}
-\end{table}
+\end{longtable}
+{% else %}
+No metric table available. Run \texttt{scripts/compute\_metrics.py} first.
+{% endif %}
 
+{% if stats_rows %}
+\subsection{Hypothesis Tests (FDR-adjusted)}
+\begin{longtable}{p{0.17\linewidth} p{0.09\linewidth} p{0.19\linewidth} p{0.10\linewidth} p{0.10\linewidth} p{0.10\linewidth} p{0.10\linewidth}}
+\toprule
+Pair & Test & Comparison & Metric & $\Delta$ & p\_adj & Significant \\
+\midrule
+\endhead
+{% for row in stats_rows %}
+{{ row.pair_id.replace('_', '\\_') }} &
+{{ row.test_id }} &
+{{ (row.comparison or '').replace('_', '\\_') }} &
+{{ row.metric or '-' }} &
+{{ fmt(row.observed_diff) }} &
+{{ pval(row.p_value_adjusted) }} &
+{% if row.significant %}\textcolor{green!50!black}{yes}{% else %}no{% endif %} \\
+{% endfor %}
+\bottomrule
+\end{longtable}
+{% else %}
+No statistical table available. Run \texttt{scripts/compute\_metrics.py} first.
+{% endif %}
+
+\section{Figures}
+{% if figures %}
+{% for fig in figures[:6] %}
 \begin{figure}[h]
 \centering
-\fbox{\parbox{0.8\linewidth}{Placeholder for a key figure.}}
-\caption{Example figure placeholder.}
+\includegraphics[width=0.88\linewidth]{ {{ fig }} }
+\caption{Auto-generated figure: \texttt{ {{ fig }} }}
 \end{figure}
+{% endfor %}
+{% else %}
+No figures available. Run \texttt{scripts/plot\_results.py} and \texttt{scripts/render\_molecules.py}.
+{% endif %}
+
+\section{Reproducibility and Artifact Traceability}
+\subsection{Software Snapshot}
+\begin{itemize}
+\item Master config version: \texttt{ {{ master_config.get('version', 'unknown') }} }
+{% set sw = master_config.get('software', {}) %}
+\item Docker image digest: \texttt{ {{ sw.get('docker_image_digest', 'unknown') }} }
+\item Boltz version: \texttt{ {{ sw.get('boltz_version', 'unknown') }} }
+\item Docking program/version: \texttt{ {{ sw.get('docking_program', 'unknown') }} } / \texttt{ {{ sw.get('docking_version', 'unknown') }} }
+\end{itemize}
+
+\subsection{Data Snapshot}
+{% set ds = master_config.get('data_sources', {}) %}
+\begin{itemize}
+\item Calibration set: \texttt{ {{ ds.get('calibration_set', {}).get('path', 'unknown') }} }
+\item Baseline set: \texttt{ {{ ds.get('baseline_set', {}).get('path', 'unknown') }} }
+\end{itemize}
+
+\appendix
+\section{Machine Summary Excerpt}
+{% if summary_excerpt %}
+\begin{verbatim}
+{{ summary_excerpt }}
+\end{verbatim}
+{% else %}
+No summary excerpt available. Run \texttt{scripts/summarize.py}.
+{% endif %}
 
 \bibliographystyle{plain}
 \bibliography{references}

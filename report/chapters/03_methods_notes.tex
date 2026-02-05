@@ -1,0 +1,13 @@
+Генерация выполняется в трёх режимах:
+\texttt{single\_a}, \texttt{single\_b}, \texttt{double}.
+Для \texttt{double} используется worst-case reward на z-нормированных прокси-скорах.
+
+Скоринг выполняется скриптом \texttt{scripts/score.py} по двум мишеням пары с записью
+\texttt{scored\_joined.csv}. Далее метрики и статистика рассчитываются в
+\texttt{scripts/compute\_metrics.py} с bootstrap-процедурами и поправкой на множественные сравнения.
+
+Оркестрация разделена на два этапа:
+\begin{enumerate}
+\item Stage 1: \texttt{scripts/run\_full\_experiment.py} (generate + score).
+\item Stage 2: \texttt{scripts/run\_post\_pipeline.py} (aggregate, metrics, plots, render, summary, LaTeX).
+\end{enumerate}

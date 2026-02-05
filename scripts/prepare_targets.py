@@ -232,7 +232,7 @@ def prepare_receptor_pdbqt(pdb_path: Path, target_id: str) -> Path:
     )
     if inspect.returncode != 0:
         logger.warning(
-            "Docker-образ {} не найден. Сборка: docker build -t {} docker/freedpp/",
+            "Docker-образ {} не найден. Сборка: docker build -f docker/freedpp/Dockerfile -t {} .",
             FREEDPP_DOCKER_IMAGE,
             FREEDPP_DOCKER_IMAGE,
         )

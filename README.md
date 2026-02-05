@@ -1,6 +1,6 @@
 # Воркшоп: Dual-Target Docking
 
-Сравнение single-target и double-target молекулярной генерации с использованием **FREED++** (RL-генератор) и **Boltz-2** (structure-aware скорер).
+Сравнение single-target baseline режимов (`single_a`, `single_b`) и `double` режима генерации с использованием **FREED++** (RL-генератор) и **Boltz-2** (structure-aware скорер).
 
 ## Гипотеза
 
@@ -16,9 +16,9 @@ RL-генерация, оптимизированная под worst-case цел
 ├── data/targets/         # Скачанные PDB-структуры и FASTA-последовательности
 │   ├── <pair_id>/{A,B}/  # PDB файлы и метаданные (по парам)
 │   ├── <target_id>.fasta # Последовательности белков (UniProt)
-│   └── <target_id>.pdbqt # Receptor PDBQT для QuickVina2 (генерируется --prepare-all)
-├── docker/freedpp/       # Docker-изоляция FREED++ (Python 3.7 / PyTorch 1.12)
-│   ├── Dockerfile        # CUDA 11.3, Conda, DGL 0.9, RDKit+Meeko, QuickVina2
+│   └── <target_id>.pdbqt # Receptor PDBQT для Uni-Dock (генерируется --prepare-all)
+├── docker/freedpp/       # Docker-изоляция FREED++ (Python 3.10 / PyTorch 1.12 / DGL 0.9)
+│   ├── Dockerfile        # CUDA 11.8, Uni-Dock, RDKit+Meeko, патч dual reward
 │   ├── entrypoint.sh     # prepare-receptor / train / sample
 │   └── dual_reward_patch.py  # Двойной reward: worst-case (max для lower-is-better)
 ├── cache/                # Кеш (в .gitignore)
@@ -29,22 +29,25 @@ RL-генерация, оптимизированная под worst-case цел
 │   └── freedpp_models/   # Кеш обученных моделей FREED++ (по hash параметров)
 │       └── <hash>/       # Обученная модель (checkpoints, config)
 ├── docs/                 # Проектная документация
+│   ├── README.md         # Карта достоверности документации
 │   ├── goal.md
-│   ├── acceleration.md
-│   ├── resources.md
+│   ├── tasks.md
 │   ├── selection_criteria.md
-│   └── multi_objective_review.md
+│   └── ...               # При необходимости: исследовательские заметки
 ├── src/dualdocking/      # Основная библиотека
 │   ├── objectives.py     # Объединённые целевые функции (min, harmonic, Pareto)
 │   ├── scorer_boltz2.py  # Скоринг Boltz-2 через CLI (subprocess + disk cache)
 │   ├── generator_freedpp.py  # Обёртка генератора FREED++ (Docker subprocess)
 │   ├── binding_box.py    # Извлечение binding box из PDB (лиганд / fallback)
 │   ├── chem_sanitize.py  # Валидация и дедупликация SMILES
-│   ├── metrics.py        # Метрики двойных хитов и стат. тесты
+│   ├── statistical.py    # Иерархический bootstrap, FDR, effect sizes
 │   └── config.py         # Загрузка YAML-конфигов
 ├── scripts/              # CLI-скрипты
+│   ├── fetch_freed_data.py    # Загрузка docker/freedpp/data/{zinc_crem.json,alert_collections.csv}
+│   ├── fetch_baseline_zinc.py # Скачивание baseline archive zinc-druglike-cano.tar.xz
+│   ├── prepare_data_dependencies.py # One-shot подготовка data deps (FREED + baseline/parquet/sample)
 │   ├── prepare_targets.py    # Скачивание PDB, FASTA, pre-compute MSA, PDB→PDBQT
-│   ├── generate.py           # Запуск FREED++ (single/double режим)
+│   ├── generate.py           # Запуск FREED++ (single_a/single_b/double)
 │   ├── score.py              # Скоринг молекул через Boltz-2
 │   ├── boltz_smoke.py        # Smoke-тест Boltz-2 (3 молекулы, --dry-run)
 │   ├── aggregate.py          # Объединение результатов по парам
@@ -57,15 +60,17 @@ RL-генерация, оптимизированная под worst-case цел
 ├── report/               # Артефакты итогового отчёта
 │   ├── data/             # Агрегированные данные
 │   ├── figures/          # Сгенерированные графики
-│   └── molecules/        # 2D-рендер молекул
-└── cache/                # Кеш скоров и MSA (в .gitignore)
+│   ├── experiment_<run_id>_<utc>.log  # Логи run_full_experiment.py
+│   ├── metrics.json
+│   ├── stats.json
+│   └── summary.txt
 ```
 
 ## Установка
 
 ```bash
 # Клонирование
-git clone <repo-url> && cd dualdocking
+git clone <repo-url> && cd SWW2026
 
 # Создание окружения и установка (требуется uv >= 0.9)
 uv sync --extra dev
@@ -76,8 +81,11 @@ uv pip install -r requirements-boltz.txt
 # Prerequisites для FREED++ генератора:
 # - Docker >= 20.x
 # - nvidia-container-toolkit (для --gpus all)
-# Сборка Docker-образа FREED++:
-docker build -t dualdocking/freedpp:latest docker/freedpp/
+# Подготовить файлы, которые копируются в образ FREED++
+uv run python scripts/fetch_freed_data.py
+
+# Сборка Docker-образа FREED++ (из корня репозитория)
+docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 
 # Проверка
 uv run pytest
@@ -117,6 +125,29 @@ uv run python scripts/calibrate_normalization.py
 Для базовой выборки удобно хранить исходный ZINC в Parquet.
 Скрипт `scripts/convert_baseline_to_parquet.py` конвертирует CSV (в т.ч. внутри `tar.xz`)
 стримингово и без загрузки всего файла в RAM.
+
+### One-shot подготовка data dependencies
+
+```bash
+# Только FREED docker data (zinc_crem.json + alert_collections.csv)
+uv run python scripts/prepare_data_dependencies.py
+
+# Полный baseline цикл: скачать tar.xz + конвертировать в parquet + сделать sample .smi
+uv run python scripts/prepare_data_dependencies.py \
+  --fetch-baseline --baseline-url "https://<host>/zinc-druglike-cano.tar.xz" \
+  --convert-baseline --sample-baseline
+```
+
+Скачивание архива baseline:
+
+```bash
+# Вариант 1: передать URL явно
+uv run python scripts/fetch_baseline_zinc.py --url "https://<host>/zinc-druglike-cano.tar.xz"
+
+# Вариант 2: через переменную окружения
+export ZINC_BASELINE_URL="https://<host>/zinc-druglike-cano.tar.xz"
+uv run python scripts/fetch_baseline_zinc.py
+```
 
 Пример для архива `zinc-druglike-cano.tar.xz` (CSV с колонкой `smiles`):
 
@@ -165,14 +196,19 @@ sudo pacman -S --needed texlive-core texlive-latexextra texlive-bibtexextra
 Генерация:
 
 ```bash
-# Черновик (.tex)
-uv run python scripts/generate_latex_report.py --mode draft
+# Черновик (.tex), главы берутся из report/chapters + manifest.yaml
+uv run python scripts/generate_latex_report.py --mode draft --chapters-dir report/chapters --chapters-manifest report/chapters/manifest.yaml
 
 # Полная компиляция (.pdf)
 uv run python scripts/generate_latex_report.py --mode full
 ```
 
 Выходные файлы: `report/manuscript.tex`, `report/manuscript.pdf`.
+
+Модульность статьи:
+- структура и порядок секций: `report/chapters/manifest.yaml`
+- текст секций: `report/chapters/*.tex`
+- численные таблицы и фигуры подставляются автоматически из `report/metrics.json`, `report/stats.json`, `report/figures/*.png`.
 
 ### Принцип: максимальное кеширование, работа без интернета
 
@@ -243,7 +279,7 @@ uv run boltz predict warmup.yaml \
 
 ## FREED++ (генератор молекул)
 
-FREED++ — RL-генератор молекул (SAC + фрагментная сборка), использующий QuickVina2 docking score как reward. Работает через Docker из-за несовместимости зависимостей (Python 3.7 / PyTorch 1.12 / DGL 0.9).
+FREED++ — RL-генератор молекул (SAC + фрагментная сборка), работающий через Docker из-за несовместимости зависимостей с основным окружением проекта.
 
 ### Prerequisites
 
@@ -253,8 +289,10 @@ FREED++ — RL-генератор молекул (SAC + фрагментная �
 ### Сборка Docker-образа
 
 ```bash
-docker build -t dualdocking/freedpp:latest docker/freedpp/
+docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 ```
+
+Если менялись файлы в `docker/freedpp/` (например `dual_reward_patch.py` или `run_with_patch.py`), образ нужно пересобрать перед следующим запуском генерации.
 
 ### Архитектура
 
@@ -268,30 +306,31 @@ scripts/generate.py
       → list[str] SMILES
 ```
 
-- **Reward при обучении**: QuickVina2 (встроен в FREED++, ~1 сек/мол, CPU)
+- **Reward при обучении**: Uni-Dock через патч `dual_reward_patch.py` (backend подготовки лиганда: RDKit+Meeko)
 - **Интерпретация**: docking affinity в ккал/моль; более отрицательные значения = более сильное связывание
-- **Финальный скоринг**: Boltz-2 (`scorer_boltz2.py`, ~58 сек/мол, GPU)
+- **Финальный скоринг**: Boltz-2 (`scorer_boltz2.py`, GPU; время зависит от параметров и железа)
 
 ### Single vs Double режим
 
-- **Single**: один receptor → стандартный FREED++ reward
-- **Double**: два receptors → worst-case reward `max(score_a, score_b)` для *lower-is-better* (через `dual_reward_patch.py`, monkey-patch `DockingVina.__call__`)
+- **single_a**: оптимизация под мишень A (z-score reward)
+- **single_b**: оптимизация под мишень B (z-score reward)
+- **double**: оптимизация под worst-case `max(z_a, z_b)` для *lower-is-better* (через `dual_reward_patch.py`)
 
 ### Кеширование обученных моделей
 
-Обученные модели сохраняются в `cache/freedpp_models/{hash}/`, где hash = SHA256 от (target_id, second_target_id, reward_mode, epochs, seed, starting_smile). При повторном запуске с теми же параметрами используется `--commands "sample"` (минуты вместо часов).
+Обученные модели сохраняются в `cache/freedpp_models/{hash}/`. Ключ хэша включает версию схемы кэша, режим reward, таргеты и параметры обучения (`epochs`, `steps_per_epoch`, `num_sub_proc`, `seed`, `vina_program`, `starting_smile`). При повторном запуске с теми же параметрами используется `--commands "sample"` (минуты вместо часов).
 
 ### Smoke test
 
 ```bash
-uv run python scripts/generate.py --pair CDK2_ERK2 --mode single --epochs 2 --n-molecules 10
+uv run python scripts/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
 ```
 
 ## Воспроизведение (end-to-end для одной пары)
 
 ```bash
 # 0. Собрать Docker-образ FREED++ (однократно)
-docker build -t dualdocking/freedpp:latest docker/freedpp/
+docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 
 # 1. Подготовить всё (ОНЛАЙН: PDB, FASTA, MSA, Boltz checkpoints, PDB→PDBQT)
 uv run python scripts/prepare_targets.py --pair CDK2_ERK2 --prepare-all
@@ -306,25 +345,96 @@ uv run python scripts/boltz_smoke.py --target CDK2
 # 3a. Dry-run: проверить YAML без запуска Boltz
 uv run python scripts/boltz_smoke.py --target CDK2 --dry-run
 
-# 4. Генерация молекул (single-target)
-uv run python scripts/generate.py --pair CDK2_ERK2 --mode single
+# 4. Генерация молекул (single-target A)
+uv run python scripts/generate.py --pair CDK2_ERK2 --mode single_a
 
 # 5. Скоринг по обеим мишеням (OFFLINE)
-uv run python scripts/score.py --pair CDK2_ERK2 --mode single
+uv run python scripts/score.py --pair CDK2_ERK2 --mode single_a
 
-# 6. Генерация молекул (double-target)
+# 6. Генерация молекул (single-target B)
+uv run python scripts/generate.py --pair CDK2_ERK2 --mode single_b
+
+# 7. Скоринг single_b молекул
+uv run python scripts/score.py --pair CDK2_ERK2 --mode single_b
+
+# 8. Генерация молекул (double-target)
 uv run python scripts/generate.py --pair CDK2_ERK2 --mode double
 
-# 7. Скоринг double-target молекул
+# 9. Скоринг double-target молекул
 uv run python scripts/score.py --pair CDK2_ERK2 --mode double
 
-# 8. Агрегация и анализ
+# 10. Агрегация и анализ
 uv run python scripts/aggregate.py
 uv run python scripts/compute_metrics.py
 uv run python scripts/plot_results.py
 uv run python scripts/render_molecules.py
 uv run python scripts/summarize.py
 ```
+
+Оркестрация разделена на 2 этапа:
+
+```bash
+# Stage 1: generate + score
+# По умолчанию запускает scripts/prepare_data_dependencies.py (минимум: FREED data files)
+EXPERIMENT_RUN_ID=run_2026-02-05 uv run python scripts/run_full_experiment.py --resume --parallel 4
+
+# Опционально: вместе со Stage 1 скачать baseline archive
+EXPERIMENT_RUN_ID=run_2026-02-05 uv run python scripts/run_full_experiment.py --resume --parallel 4 \
+  --prepare-baseline --baseline-url "https://<host>/zinc-druglike-cano.tar.xz"
+
+# Stage 2: aggregate + metrics + plots + summary + LaTeX draft
+EXPERIMENT_RUN_ID=run_2026-02-05 uv run python scripts/run_post_pipeline.py --latex-mode draft
+```
+
+Полезные режимы:
+
+```bash
+# Stage 1 + Stage 2 одной командой (опционально)
+EXPERIMENT_RUN_ID=run_2026-02-05 uv run python scripts/run_full_experiment.py --resume --parallel 4 --with-post --latex-mode draft
+
+# Полная сборка PDF на этапе отчёта (требуется LaTeX в системе)
+EXPERIMENT_RUN_ID=run_2026-02-05 uv run python scripts/run_post_pipeline.py --latex-mode full
+```
+
+Логи:
+- Stage 1: `report/experiment_<EXPERIMENT_RUN_ID>_<UTC_TIMESTAMP>.log`
+- Stage 2: `report/post_<EXPERIMENT_RUN_ID>_<UTC_TIMESTAMP>.log`
+
+### Зачем несколько seed
+
+По умолчанию берутся сиды из `configs/experiment.yaml` (`[42, 137, 256, 512, 1024]`):
+- это снижает риск случайного вывода из одного удачного/неудачного запуска;
+- метрики и статистика (`scripts/compute_metrics.py`) считаются по независимым сидам.
+
+Для smoke/диагностики используйте один сид и маленький бюджет (`--epochs`, `--n-molecules`, `--steps-per-epoch`).
+
+## Troubleshooting
+
+### FREED++: повторяющиеся `|z_a| > 10` / `|z_b| > 10`
+
+Симптом:
+- в логе `freedpp_workspace/freedpp_*.log` много строк вида `dual_reward_patch: |z_a| > 10 (...)`
+- reward деградирует, результаты выглядят неинформативно
+
+Типичные причины:
+- локальный Docker-образ не пересобран после изменений в `docker/freedpp/*`
+- используется устаревший кэш модели, обученный на старом reward backend
+
+Проверка и исправление:
+
+```bash
+# 1) Пересобрать образ после любых правок docker/freedpp/*
+docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
+
+# 2) Проверить, что у образа есть локальный image id (для локальных билдов это нормально)
+docker image inspect dualdocking/freedpp:latest --format '{{.Id}}'
+
+# 3) Для диагностического прогона отключить кэш моделей
+# configs/experiment.yaml -> generator.freedpp.use_model_cache: false
+```
+
+Примечание:
+- если `docker image inspect ... --format '{{index .RepoDigests 0}}'` пустой, это ожидаемо для локально собранного образа без push в registry.
 
 ## Запуск по всем парам
 
@@ -334,7 +444,7 @@ uv run python scripts/prepare_targets.py --prepare-all
 
 # Генерация и скоринг (offline)
 for pair in CDK2_ERK2 EGFR_HER2 COX1_COX2 AChE_BChE; do
-  for mode in single double; do
+  for mode in single_a single_b double; do
     uv run python scripts/generate.py --pair $pair --mode $mode
     uv run python scripts/score.py --pair $pair --mode $mode
   done
@@ -355,22 +465,32 @@ results/
 │   ├── boltz_score.json      # Скоры 3 молекул
 │   └── dry_run/              # YAML файлы (--dry-run)
 ├── CDK2_ERK2/
-│   ├── single/
-│   │   ├── generated.csv     # SMILES
-│   │   ├── scores_A.csv      # Скоры Boltz-2 по мишени A (log10 IC50, μM)
-│   │   ├── scores_B.csv      # Скоры Boltz-2 по мишени B (log10 IC50, μM)
-│   │   └── scored_joined.csv # Объединённая таблица
+│   ├── single_a/
+│   │   └── ...
+│   ├── single_b/
+│   │   └── ...
 │   └── double/
-│       └── ...               # Та же структура
+│       └── ...               # generated.csv, scores_A.csv, scores_B.csv, scored_joined.csv
 ├── EGFR_HER2/ ...
 ├── COX1_COX2/ ...
 └── AChE_BChE/ ...
 
 report/
+├── chapters/                  # Редактируемые главы статьи (.tex), не generated
+│   ├── manifest.yaml
+│   ├── 00_abstract.tex
+│   ├── 01_introduction.tex
+│   ├── 02_related_work.tex
+│   ├── 03_methods_notes.tex
+│   ├── 04_experimental_protocol.tex
+│   ├── 05_results_scope.tex
+│   ├── 06_limitations.tex
+│   └── 07_conclusion.tex
 ├── data/
 │   └── all_results.parquet
 ├── figures/
-│   ├── {pair}_molecules_single.png
+│   ├── {pair}_molecules_single_a.png
+│   ├── {pair}_molecules_single_b.png
 │   ├── {pair}_molecules_double.png
 │   └── {pair}_molecules_top_hits.png
 ├── metrics.json

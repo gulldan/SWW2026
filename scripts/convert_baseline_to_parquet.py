@@ -110,7 +110,7 @@ def main(
                 if column.isdigit():
                     col_idx = int(column)
                     if col_idx < 0 or col_idx >= len(header):
-                        raise RuntimeError(f"Column index {col_idx} out of range (0..{len(header)-1})")
+                        raise RuntimeError(f"Column index {col_idx} out of range (0..{len(header) - 1})")
                     keep_indices = [col_idx]
                     keep_names = [header[col_idx]]
                 else:

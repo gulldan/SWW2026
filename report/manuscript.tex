@@ -2,11 +2,17 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
 \usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{xcolor}
 
-\title{Dual-Target Docking: Draft Report}
-\author{Automated Pipeline}
-\date{ 2026-02-04 }
+\title{ Dual-Target Docking for Multi-Target Hit Discovery: A Reproducible Empirical Study }
+\author{ SWW2026 Workshop Team }
+\date{ 2026-02-05 }
+
+
 
 
 
@@ -14,50 +20,195 @@
 \maketitle
 
 \begin{abstract}
-We report preliminary dual-target docking results using FREED++ generation \cite{gao2024freedpp}
-and Boltz-2 scoring \cite{wohlwend2025boltz2}.
-This draft summarizes hit-rate and balance statistics for the CDK2/ERK2 pair.
+
+This study evaluates whether dual-target reinforcement-learning generation
+increases the probability of obtaining simultaneous hits on two protein targets
+relative to single-target baselines.
+
+We implement a fully reproducible two-stage pipeline: Stage 1 performs molecular
+generation and scoring, while Stage 2 performs aggregation, statistical testing,
+visualization, and manuscript assembly.
+
+The experimental protocol enforces fairness by using matched molecular budgets,
+fixed seed sets, shared hit definitions, and uniform post-processing rules.
+Final conclusions are derived from pair-wise comparisons between
+\texttt{double} and both baselines (\texttt{single\_a}, \texttt{single\_b})
+with multiple-testing control.
+
+
 \end{abstract}
 
-\section*{Methods}
-Molecules were generated with FREED++ in three modes (single\_a, single\_b, double) and scored with Boltz-2.
-Normalization and diversity checks were applied prior to statistical testing.
-
-\section*{Results}
-
-\begin{table}[h]
-\centering
-\begin{tabular}{lccc}
-\toprule
-Mode & HR\_A (mean $\pm$ SEM) & HR\_both (mean $\pm$ SEM) & Balance (mean $\pm$ SEM) \\
-\midrule
+\noindent\textbf{Keywords:} dual-target docking, molecular generation, FREED++, Boltz-2, reproducibility\\
+\textbf{Experiment Run ID:} \texttt{ adhoc }
 
 
+\section{ Introduction }
 
-single\_a & - $\pm$ - &
-- $\pm$ - &
-- $\pm$ - \\
+Проект проверяет гипотезу: оптимизация генерации молекул одновременно под две мишени
+(\texttt{double}) увеличивает вероятность dual-hit относительно однобелковых режимов
+\texttt{single\_a} и \texttt{single\_b}.
+
+Эксперимент строится как воспроизводимый пайплайн:
+подготовка таргетов, генерация FREED++, скоринг Boltz-2, агрегирование, статистика,
+визуализация и отчёт.
+
+Ключевой принцип дизайна эксперимента --- честное сравнение режимов при одинаковом
+бюджете молекул, фиксированных сидах и одинаковых правилах hit-оценки.
 
 
-single\_b & - $\pm$ - &
-- $\pm$ - &
-- $\pm$ - \\
+
+\section{ Related Work }
+
+Базовый генератор --- FREED++ (fragment-based RL) из экосистемы FFREED.
+В текущем репозитории upstream reward path адаптирован под Uni-Dock с подготовкой
+лигандов через RDKit+Meeko для устойчивого воспроизведения.
+
+Для финального скоринга используется Boltz-2 через CLI, что позволяет работать с
+единой схемой структуры+аффинности. Этот шаг выполняется после генерации и не
+подменяет training reward внутри FREED++.
+
+Многоцелевая оптимизация в литературе обычно сравнивается между скаляризациями
+(\emph{worst-case}, гармоническое/геометрическое среднее, взвешенные формы)
+и Парето-подходами. В данной работе основной фокус --- строгий baseline-сравнительный
+эксперимент между \texttt{single\_a}, \texttt{single\_b} и \texttt{double}.
 
 
-double & - $\pm$ - &
-- $\pm$ - &
-- $\pm$ - \\
 
-\bottomrule
-\end{tabular}
-\caption{Hit-rate summary for CDK2\_ERK2.}
-\end{table}
+\section{ Methods }
 
-\begin{figure}[h]
-\centering
-\fbox{\parbox{0.8\linewidth}{Placeholder for a key figure.}}
-\caption{Example figure placeholder.}
-\end{figure}
+Генерация выполняется в трёх режимах:
+\texttt{single\_a}, \texttt{single\_b}, \texttt{double}.
+Для \texttt{double} используется worst-case reward на z-нормированных прокси-скорах.
+
+Скоринг выполняется скриптом \texttt{scripts/score.py} по двум мишеням пары с записью
+\texttt{scored\_joined.csv}. Далее метрики и статистика рассчитываются в
+\texttt{scripts/compute\_metrics.py} с bootstrap-процедурами и поправкой на множественные сравнения.
+
+Оркестрация разделена на два этапа:
+\begin{enumerate}
+\item Stage 1: \texttt{scripts/run\_full\_experiment.py} (generate + score).
+\item Stage 2: \texttt{scripts/run\_post\_pipeline.py} (aggregate, metrics, plots, render, summary, LaTeX).
+\end{enumerate}
+
+
+
+\section{ Experimental Protocol and Fairness Controls }
+
+All experiments are executed under a two-stage orchestration model.
+
+\textbf{Stage 1} (\texttt{scripts/run\_full\_experiment.py}) performs generation and
+scoring for each pair, mode, and seed.
+
+\textbf{Stage 2} (\texttt{scripts/run\_post\_pipeline.py}) performs aggregation,
+metric computation, statistical testing, figure generation, and manuscript assembly.
+
+Fairness controls:
+\begin{itemize}
+\item identical seed set across modes;
+\item identical molecule budget per run;
+\item identical hit thresholds per pair from \texttt{configs/metrics.yaml};
+\item identical score convention (lower is better);
+\item run-level metadata and timestamped logs for traceability.
+\end{itemize}
+
+Any interrupted run is resumed only if required artifacts are missing; otherwise it is skipped.
+
+
+
+\section{ Result Scope and Decision Criteria }
+
+This manuscript distinguishes between:
+\begin{itemize}
+\item \textbf{operational results} (all generated artifacts and intermediate statistics),
+\item \textbf{claim-bearing results} (tests that pass predefined significance and effect-size gates).
+\end{itemize}
+
+The primary claim criterion is improvement in dual-hit rate for \texttt{double}
+against both single-target baselines on the majority of target pairs, with
+FDR-adjusted significance support.
+
+Secondary criteria include balance between target scores and practical robustness
+across seeds.
+
+Where data are incomplete, the manuscript records the gap explicitly instead of
+backfilling with extrapolations.
+
+
+
+\section{ Limitations }
+
+Current limitations:
+\begin{itemize}
+\item computational cost remains high for full multi-pair, multi-seed runs;
+\item final external scorer latency constrains rapid iteration;
+\item conclusions depend on selected target pairs and may not generalize
+to all polypharmacology regimes.
+\end{itemize}
+
+Methodological limitations:
+\begin{itemize}
+\item reward shaping and normalization choices can bias search trajectories;
+\item docking-driven objectives remain proxy objectives rather than direct wet-lab endpoints.
+\end{itemize}
+
+These limitations are tracked to prevent over-claiming and to guide future protocol upgrades.
+
+
+
+\section{ Conclusion and Next Steps }
+
+The repository is organized to produce publication-ready artifacts from executable
+pipeline stages, rather than from manual post-hoc editing.
+
+Next steps for A*/Q1 readiness:
+\begin{enumerate}
+\item complete all planned pair/mode/seed runs without missing artifacts;
+\item freeze software/data snapshots and rerun Stage 2 for final tables and figures;
+\item tighten narrative around hypothesis acceptance/rejection using only pre-registered criteria;
+\item prepare a compact supplementary section with reproducibility commands and checksums.
+\end{enumerate}
+
+This structure keeps scientific claims auditable and directly linked to generated evidence.
+
+
+
+
+\section{Quantitative Results}
+
+No metric table available. Run \texttt{scripts/compute\_metrics.py} first.
+
+
+
+No statistical table available. Run \texttt{scripts/compute\_metrics.py} first.
+
+
+\section{Figures}
+
+No figures available. Run \texttt{scripts/plot\_results.py} and \texttt{scripts/render\_molecules.py}.
+
+
+\section{Reproducibility and Artifact Traceability}
+\subsection{Software Snapshot}
+\begin{itemize}
+\item Master config version: \texttt{ 2.4 }
+
+\item Docker image digest: \texttt{ sha256:84621724917265ea8f72445ced88af441730b45342b4613f4355ed5663c71d4a }
+\item Boltz version: \texttt{ 2.2.1 }
+\item Docking program/version: \texttt{ unidock_gpu } / \texttt{ Uni-Dock v1.1.3 }
+\end{itemize}
+
+\subsection{Data Snapshot}
+
+\begin{itemize}
+\item Calibration set: \texttt{ data/calibration/zinc_druglike_calibration_1000_v2024.smi }
+\item Baseline set: \texttt{ data/baseline/zinc_druglike_baseline_1000_seed42.smi }
+\end{itemize}
+
+\appendix
+\section{Machine Summary Excerpt}
+
+No summary excerpt available. Run \texttt{scripts/summarize.py}.
+
 
 \bibliographystyle{plain}
 \bibliography{references}

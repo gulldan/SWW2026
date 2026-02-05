@@ -92,17 +92,17 @@ def combined_harmonic(
 ) -> NDArray[np.float64]:
     """Гармоническое среднее (через utility).
 
-    Возвращает 0.0, если utility <= 0 (защита от деления на ноль).
+    Shifts utilities to positive domain before computing harmonic mean
+    to preserve discriminability when utilities are non-positive.
     """
     util_a = _to_utility(scores_a, lower_is_better)
     util_b = _to_utility(scores_b, lower_is_better)
+    # Shift to positive domain for harmonic mean
+    shift = max(0.0, -min(np.min(util_a), np.min(util_b))) + 1.0
+    sa, sb = util_a + shift, util_b + shift
     with np.errstate(divide="ignore", invalid="ignore"):
-        util = np.where(
-            (util_a > 0) & (util_b > 0),
-            2.0 * util_a * util_b / (util_a + util_b),
-            0.0,
-        )
-    return _from_utility(util, lower_is_better)
+        hm = 2.0 * sa * sb / (sa + sb)
+    return _from_utility(hm - shift, lower_is_better)
 
 
 def combined_geometric(
@@ -115,15 +115,16 @@ def combined_geometric(
 
     Простейшее улучшение по сравнению с min: балансирует оба скора,
     но мягче штрафует дисбаланс. Рекомендовано как первый шаг от baseline.
-    Возвращает 0.0, если utility <= 0.
+    Shifts utilities to positive domain before computing geometric mean
+    to preserve discriminability when utilities are non-positive.
     """
     util_a = _to_utility(scores_a, lower_is_better)
     util_b = _to_utility(scores_b, lower_is_better)
-    util = np.zeros_like(util_a)
-    mask = (util_a > 0) & (util_b > 0)
-    if np.any(mask):
-        util[mask] = np.sqrt(util_a[mask] * util_b[mask])
-    return _from_utility(util, lower_is_better)
+    # Shift to positive domain for geometric mean
+    shift = max(0.0, -min(np.min(util_a), np.min(util_b))) + 1.0
+    sa, sb = util_a + shift, util_b + shift
+    gm = np.sqrt(sa * sb)
+    return _from_utility(gm - shift, lower_is_better)
 
 
 def pareto_mask(
@@ -138,32 +139,27 @@ def pareto_mask(
     доминирует её. Для minimization: ``scores_a[j] <= scores_a[i]`` **и**
     ``scores_b[j] <= scores_b[i]`` хотя бы с одним строгим неравенством.
 
-    Сложность: O(n^2) - подходит для <= 50k молекул.
+    Сложность: O(n log n).
     """
     n = len(scores_a)
-    mask = np.ones(n, dtype=bool)
-    for i in range(n):
-        if not mask[i]:
-            continue
-        for j in range(n):
-            if i == j or not mask[j]:
-                continue
-            # Проверяем, доминирует ли j над i
-            if lower_is_better:
-                dominates = (
-                    scores_a[j] <= scores_a[i]
-                    and scores_b[j] <= scores_b[i]
-                    and (scores_a[j] < scores_a[i] or scores_b[j] < scores_b[i])
-                )
-            else:
-                dominates = (
-                    scores_a[j] >= scores_a[i]
-                    and scores_b[j] >= scores_b[i]
-                    and (scores_a[j] > scores_a[i] or scores_b[j] > scores_b[i])
-                )
-            if dominates:
-                mask[i] = False
-                break
+    mask = np.zeros(n, dtype=bool)
+    if n == 0:
+        return mask
+
+    sa = np.asarray(scores_a, dtype=np.float64)
+    sb = np.asarray(scores_b, dtype=np.float64)
+    if not lower_is_better:
+        sa, sb = -sa, -sb
+
+    # Sort by first objective ascending, break ties by second ascending
+    # (best sb first among ties → dominated tied points won't pass sb < best_b)
+    order = np.lexsort((sb, sa))
+
+    best_b = np.inf
+    for idx in order:
+        if sb[idx] <= best_b:
+            mask[idx] = True
+            best_b = sb[idx]
     return mask
 
 
@@ -214,21 +210,21 @@ def combined_tchebycheff(
     utopia_a: float = 0.0,
     utopia_b: float = 0.0,
     *,
-    lower_is_better: bool = True,
+    lower_is_better: bool = True,  # noqa: ARG001
 ) -> NDArray[np.float64]:
     """Декомпозиция Чебышёва: ``max(w*|s_a - z_a|, (1-w)*|s_b - z_b|)``.
 
     В отличие от взвешенной суммы, находит решения и на невыпуклых
     участках фронта Парето (MOEA/D, NSGA-III). Утопическая точка
     (utopia_a, utopia_b) - идеальные значения по каждой мишени.
+
+    Returns non-negative deviation (0 = at utopia). Works directly in
+    score-space — the ``|score - utopia|`` formulation is symmetric,
+    so no utility conversion is needed.
     """
     w = float(weight_a)
-    util_a = _to_utility(scores_a, lower_is_better)
-    util_b = _to_utility(scores_b, lower_is_better)
-    utopia_u_a = float(_to_utility(np.array([utopia_a], dtype=np.float64), lower_is_better)[0])
-    utopia_u_b = float(_to_utility(np.array([utopia_b], dtype=np.float64), lower_is_better)[0])
-    dev_a = w * np.abs(util_a - utopia_u_a)
-    dev_b = (1.0 - w) * np.abs(util_b - utopia_u_b)
+    dev_a = w * np.abs(scores_a - utopia_a)
+    dev_b = (1.0 - w) * np.abs(scores_b - utopia_b)
     return np.maximum(dev_a, dev_b)
 
 

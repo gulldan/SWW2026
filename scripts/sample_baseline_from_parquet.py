@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import bisect
+import hashlib
 import random
 from pathlib import Path
 

@@ -77,9 +77,8 @@ def test_build_freedpp_args_single() -> None:
         epochs=50,
         num_sub_proc=4,
     )
-    workspace = Path("/workspace")
     pdbqt_a = Path("/workspace/receptor.pdbqt")
-    args = _build_freedpp_args(cfg, workspace, pdbqt_a, "1.0,2.0,3.0", "20.0,20.0,20.0")
+    args = _build_freedpp_args(cfg, pdbqt_a, "1.0,2.0,3.0", "20.0,20.0,20.0")
 
     assert "--commands" in args
     assert "train,sample" in args
@@ -100,9 +99,8 @@ def test_build_freedpp_args_double() -> None:
         reward_mode="double",
         second_target_id="ERK2",
     )
-    workspace = Path("/workspace")
     pdbqt_a = Path("/workspace/receptor.pdbqt")
-    args = _build_freedpp_args(cfg, workspace, pdbqt_a, "1.0,2.0,3.0", "20.0,20.0,20.0")
+    args = _build_freedpp_args(cfg, pdbqt_a, "1.0,2.0,3.0", "20.0,20.0,20.0")
     assert "--receptor" in args
 
 
@@ -135,3 +133,27 @@ def test_resolve_pdb_path_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(FileNotFoundError, match="NONEXISTENT"):
         _resolve_pdb_path("NONEXISTENT")
+
+
+def test_parse_output_smiles_no_double_count(tmp_path: Path) -> None:
+    """When both JSON and CSV exist with overlapping SMILES, no double-counting."""
+    import json as json_mod
+
+    mols_dir = tmp_path / "output" / "run" / "mols"
+    mols_dir.mkdir(parents=True)
+
+    # Create JSON with some SMILES
+    json_path = mols_dir / "sample_000200.json"
+    json_path.write_text(json_mod.dumps(["c1ccccc1", "CCO", "CC(=O)O"]))
+
+    # Create CSV with overlapping SMILES
+    csv_path = mols_dir / "sample_000200.csv"
+    with csv_path.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["smiles", "score"])
+        writer.writerow(["c1ccccc1", "-7.5"])
+        writer.writerow(["CCCC", "-6.0"])
+
+    smiles = _parse_output_smiles(tmp_path)
+    # JSON is primary; CSV should NOT be read when JSON produced results
+    assert smiles == ["c1ccccc1", "CCO", "CC(=O)O"]

@@ -15,11 +15,20 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
 
 
 def load_pairs(config_dir: str | Path = "configs") -> dict[str, Any]:
-    """Загрузить pairs.yaml."""
+    """Загрузить pairs.yaml с валидацией структуры."""
     path = Path(config_dir)
     if path.is_dir():
         path = path / "pairs.yaml"
-    return load_yaml(path)
+    data = load_yaml(path)
+    if "pairs" not in data:
+        raise ValueError("pairs.yaml must contain 'pairs' key")
+    for pair_id, pair_cfg in data["pairs"].items():
+        for role in ("target_a", "target_b"):
+            if role not in pair_cfg:
+                raise ValueError(f"Pair '{pair_id}' missing '{role}'")
+            if "id" not in pair_cfg[role]:
+                raise ValueError(f"Pair '{pair_id}'.{role} missing 'id'")
+    return data
 
 
 def load_metrics(config_dir: str | Path = "configs") -> dict[str, Any]:

@@ -2,47 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from dualdocking.statistical import bootstrap_ci
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-ZINC_DIR = PROJECT_ROOT / "data" / "zinc"
-BASELINE_DIR = PROJECT_ROOT / "data" / "baseline"
-
-
-def fetch_zinc_subset(subset_name: str, n: int = 1000, seed: int = 42) -> list[str]:
-    """Fetch a deterministic subset of ZINC SMILES from local cache.
-
-    The function expects a local file: data/zinc/<subset_name>.smi
-    with SMILES in the first column.
-    """
-    path = ZINC_DIR / f"{subset_name}.smi"
-    if not path.exists():
-        path = BASELINE_DIR / f"{subset_name}.smi"
-    if not path.exists():
-        raise FileNotFoundError(
-            f"ZINC subset not found: {path}. Run scripts/fetch_zinc_baseline.sh or provide the file."
-        )
-
-    smiles = []
-    for line in path.read_text().splitlines():
-        if not line.strip():
-            continue
-        smiles.append(line.split()[0])
-
-    if not smiles:
-        raise ValueError(f"ZINC subset empty: {path}")
-
-    rng = np.random.default_rng(seed)
-    if n >= len(smiles):
-        return smiles
-
-    indices = rng.choice(len(smiles), size=n, replace=False)
-    return [smiles[i] for i in indices]
 
 
 def bootstrap_stability_check(scores: list[float] | np.ndarray, n_bootstrap: int = 1000) -> dict[str, Any]:

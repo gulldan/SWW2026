@@ -7,10 +7,11 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import json
+import os
 import subprocess
 import tempfile
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -71,12 +72,14 @@ def _resolve_accelerator() -> str:
                 )
         except Exception as exc:
             raise RuntimeError(
-                "Boltz GPU requested but CUDA is not available. "
-                "Reinstall boltz with CUDA support and verify torch CUDA."
+                "Boltz GPU requested but CUDA is not available. Reinstall boltz with CUDA support and verify torch CUDA."
             ) from exc
 
     _ACCELERATOR = env
     return _ACCELERATOR
+
+
+_cache_lock = threading.Lock()
 
 # Кеш sequence в памяти (target_id -> sequence)
 _sequence_cache: dict[str, str] = {}
@@ -89,15 +92,19 @@ def _cache_key(target_id: str, smi: str) -> str:
 
 def _load_cache(target_id: str) -> dict[str, float]:
     path = CACHE_DIR / f"{target_id}.json"
-    if path.exists():
-        return json.loads(path.read_text())
+    with _cache_lock:
+        if path.exists():
+            data = json.loads(path.read_text())
+            return {k: v for k, v in data.items() if isinstance(v, (int, float)) and not np.isnan(v)}
     return {}
 
 
 def _save_cache(target_id: str, cache: dict[str, float]) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     path = CACHE_DIR / f"{target_id}.json"
-    path.write_text(json.dumps(cache, indent=2))
+    clean = {k: v for k, v in cache.items() if not (isinstance(v, float) and np.isnan(v))}
+    with _cache_lock:
+        path.write_text(json.dumps(clean, indent=2))
 
 
 def _load_sequence(target_id: str) -> str:
@@ -213,7 +220,9 @@ def _parse_affinity(out_dir: Path, stem: str) -> float:
     return float(data["affinity_pred_value"])
 
 
-def _run_boltz_predict_dir(input_dir: Path, out_dir: Path, timeout: int = BOLTZ_BATCH_TIMEOUT) -> subprocess.CompletedProcess[str]:
+def _run_boltz_predict_dir(
+    input_dir: Path, out_dir: Path, timeout: int = BOLTZ_BATCH_TIMEOUT
+) -> subprocess.CompletedProcess[str]:
     """Запуск boltz predict на директории YAML файлов."""
     cmd = [
         "uv",
@@ -439,7 +448,10 @@ def score_batch(
 
     logger.info(
         "Скоринг {} новых молекул для мишени {} (из {} всего, batch_size={})",
-        len(to_score), target_id, len(smiles_list), batch_size
+        len(to_score),
+        target_id,
+        len(smiles_list),
+        batch_size,
     )
 
     # Группируем в батчи
@@ -459,8 +471,9 @@ def score_batch(
         for i, (idx, smi) in enumerate(batch):
             s = batch_scores[i]
             scores[idx] = s
-            key = _cache_key(target_id, smi)
-            cache[key] = s
+            if not np.isnan(s):
+                key = _cache_key(target_id, smi)
+                cache[key] = s
 
         # Сохраняем кеш после каждого батча (не после каждой молекулы)
         if use_cache:

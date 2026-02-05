@@ -1,0 +1,13 @@
+This study evaluates whether dual-target reinforcement-learning generation
+increases the probability of obtaining simultaneous hits on two protein targets
+relative to single-target baselines.
+
+We implement a fully reproducible two-stage pipeline: Stage 1 performs molecular
+generation and scoring, while Stage 2 performs aggregation, statistical testing,
+visualization, and manuscript assembly.
+
+The experimental protocol enforces fairness by using matched molecular budgets,
+fixed seed sets, shared hit definitions, and uniform post-processing rules.
+Final conclusions are derived from pair-wise comparisons between
+\texttt{double} and both baselines (\texttt{single\_a}, \texttt{single\_b})
+with multiple-testing control.
