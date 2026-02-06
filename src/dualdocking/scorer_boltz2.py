@@ -11,12 +11,13 @@ import json
 import os
 import subprocess
 import tempfile
-import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 from loguru import logger
+
+from dualdocking.cache_io import load_cache, save_cache
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -63,7 +64,7 @@ def _resolve_accelerator() -> str:
 
     if env == "gpu":
         try:
-            import torch  # type: ignore
+            import torch
 
             if not torch.cuda.is_available():
                 raise RuntimeError(
@@ -79,8 +80,6 @@ def _resolve_accelerator() -> str:
     return _ACCELERATOR
 
 
-_cache_lock = threading.Lock()
-
 # Кеш sequence в памяти (target_id -> sequence)
 _sequence_cache: dict[str, str] = {}
 
@@ -91,20 +90,11 @@ def _cache_key(target_id: str, smi: str) -> str:
 
 
 def _load_cache(target_id: str) -> dict[str, float]:
-    path = CACHE_DIR / f"{target_id}.json"
-    with _cache_lock:
-        if path.exists():
-            data = json.loads(path.read_text())
-            return {k: v for k, v in data.items() if isinstance(v, (int, float)) and not np.isnan(v)}
-    return {}
+    return load_cache(CACHE_DIR / f"{target_id}.json")
 
 
 def _save_cache(target_id: str, cache: dict[str, float]) -> None:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    path = CACHE_DIR / f"{target_id}.json"
-    clean = {k: v for k, v in cache.items() if not (isinstance(v, float) and np.isnan(v))}
-    with _cache_lock:
-        path.write_text(json.dumps(clean, indent=2))
+    save_cache(CACHE_DIR / f"{target_id}.json", cache)
 
 
 def _load_sequence(target_id: str) -> str:

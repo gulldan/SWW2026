@@ -128,9 +128,7 @@ def main(  # noqa: PLR0913
     sample_path = PROJECT_ROOT / sample_output
     if sample_baseline:
         if not dry_run and not parquet_path.exists():
-            raise click.ClickException(
-                f"Parquet file not found: {parquet_path}. Use --convert-baseline first."
-            )
+            raise click.ClickException(f"Parquet file not found: {parquet_path}. Use --convert-baseline first.")
         if sample_path.exists() and not sample_overwrite:
             logger.info("Sample baseline exists, skip: {}", sample_path)
         else:

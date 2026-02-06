@@ -81,4 +81,3 @@ def main(dry_run: bool, latex_mode: str) -> None:
 
 if __name__ == "__main__":
     main()
-

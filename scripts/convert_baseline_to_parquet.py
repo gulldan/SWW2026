@@ -19,8 +19,7 @@ from loguru import logger
 def _open_input(path: Path, member: str | None = None) -> Iterator[io.BufferedReader]:
     if path.suffixes[-2:] in ([".tar", ".xz"], [".tar", ".gz"], [".tar", ".bz2"]) or path.suffix == ".tar":
         mode = "r:*"
-        tf = tarfile.open(path, mode=mode)
-        try:
+        with tarfile.open(path, mode=mode) as tf:
             if member is None:
                 selected = None
                 for item in tf:
@@ -35,8 +34,6 @@ def _open_input(path: Path, member: str | None = None) -> Iterator[io.BufferedRe
             if fileobj is None:
                 raise RuntimeError(f"Failed to extract {selected.name} from {path}")
             yield fileobj  # type: ignore[misc]
-        finally:
-            tf.close()
         return
 
     with path.open("rb") as f:
@@ -51,9 +48,7 @@ def _detect_header(path: Path, member: str | None, delimiter: str) -> bool:
     lowered = first.lower()
     if "smiles" in lowered.split(delimiter):
         return True
-    if lowered == "smiles":
-        return True
-    return False
+    return lowered == "smiles"
 
 
 @click.command()

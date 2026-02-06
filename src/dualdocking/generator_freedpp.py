@@ -96,9 +96,7 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
     stderr = result.stderr or ""
     # Distinguish "image not found" from Docker daemon errors
     if "No such image" not in stderr and "not found" not in stderr.lower():
-        raise RuntimeError(
-            f"Docker inspect failed (rc={result.returncode}): {stderr.strip()}"
-        )
+        raise RuntimeError(f"Docker inspect failed (rc={result.returncode}): {stderr.strip()}")
 
     logger.info("Docker-образ {} не найден, собираю...", image)
     dockerfile_dir = PROJECT_ROOT / "docker" / "freedpp"

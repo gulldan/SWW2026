@@ -20,14 +20,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT_DIR = PROJECT_ROOT / "docker" / "freedpp" / "data"
 
 # AITRICS/FREED motifs text file (line-separated CReM fragments)
-MOTIFS_URL = (
-    "https://raw.githubusercontent.com/AITRICS/FREED/main/gym_molecule/dataset/motifs_zinc_random_92.txt"
-)
+MOTIFS_URL = "https://raw.githubusercontent.com/AITRICS/FREED/main/gym_molecule/dataset/motifs_zinc_random_92.txt"
 
 # Pat Walters rd_filters merged alert collections (PAINS / SureChEMBL / Glaxo)
-ALERT_COLLECTIONS_URL = (
-    "https://raw.githubusercontent.com/PatWalters/rd_filters/master/rd_filters/data/alert_collection.csv"
-)
+ALERT_COLLECTIONS_URL = "https://raw.githubusercontent.com/PatWalters/rd_filters/master/rd_filters/data/alert_collection.csv"
 
 
 def _download(url: str, dest: Path, timeout: int) -> None:
