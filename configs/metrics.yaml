@@ -9,6 +9,7 @@ hit_definition:
   rule: "score_A <= threshold_A AND score_B <= threshold_B"
 
 thresholds:
+  # --- Non-AD контроль ---
   CDK2_ERK2:
     target_a: 0.0    # 1 μM
     target_b: 0.0
@@ -19,6 +20,22 @@ thresholds:
     target_a: 0.0
     target_b: 0.0
   AChE_BChE:
+    target_a: 0.0
+    target_b: 0.0
+  # --- AD-специфичные пары ---
+  BACE1_GSK3B:
+    target_a: 0.0
+    target_b: 0.0
+  AChE_BACE1:
+    target_a: 0.0
+    target_b: 0.0
+  GSK3B_CDK5:
+    target_a: 0.0
+    target_b: 0.0
+  BACE1_CDK5:
+    target_a: 0.0
+    target_b: 0.0
+  AChE_MAOB:
     target_a: 0.0
     target_b: 0.0
 

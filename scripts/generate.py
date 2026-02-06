@@ -141,6 +141,27 @@ def main(
     exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
     freedpp_cfg = exp_cfg.get("generator", {}).get("freedpp", {})
 
+    # Проверка калибровки нормализации для таргетов
+    norm_path = PROJECT_ROOT / "configs" / "normalization.yaml"
+    if norm_path.exists():
+        import yaml
+
+        norm_data = yaml.safe_load(norm_path.read_text())
+        norm_targets = norm_data.get("targets", {})
+        for role in ("target_a", "target_b"):
+            tid = pair_cfg[role]["id"]
+            entry = norm_targets.get(tid, {})
+            if not entry:
+                logger.error("Таргет '{}' отсутствует в normalization.yaml. Запустите calibrate_normalization.py", tid)
+                sys.exit(1)
+            if not entry.get("stable_mean") or not entry.get("stable_std"):
+                logger.warning(
+                    "Таргет '{}' не калиброван (stable=false, n_samples={}). "
+                    "Запустите: dock_calibration.py + calibrate_normalization.py",
+                    tid,
+                    entry.get("n_samples", 0),
+                )
+
     second_target_id = None
     if mode in {"single_b", "double"}:
         second_target_id = pair_cfg["target_b"]["id"]

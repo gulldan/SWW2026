@@ -10,7 +10,7 @@ RL-генерация, оптимизированная под worst-case цел
 
 ```
 ├── configs/              # Конфигурация эксперимента
-│   ├── pairs.yaml        # 4 пары белковых мишеней
+│   ├── pairs.yaml        # 9 пар белковых мишеней (4 non-AD + 5 AD)
 │   ├── metrics.yaml      # Пороги хитов и определения метрик
 │   └── experiment.yaml   # Бюджет, сиды, параметры запуска (вкл. freedpp секция)
 ├── data/targets/         # Скачанные PDB-структуры и FASTA-последовательности
@@ -43,6 +43,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── statistical.py    # Иерархический bootstrap, FDR, effect sizes
 │   └── config.py         # Загрузка YAML-конфигов
 ├── scripts/              # CLI-скрипты
+│   ├── stage0_fetch.py       # Stage 0: единая точка входа для ВСЕХ загрузок (offline после)
 │   ├── fetch_freed_data.py    # Загрузка docker/freedpp/data/{zinc_crem.json,alert_collections.csv}
 │   ├── fetch_baseline_zinc.py # Скачивание baseline archive zinc-druglike-cano.tar.xz
 │   ├── prepare_data_dependencies.py # One-shot подготовка data deps (FREED + baseline/parquet/sample)
@@ -134,7 +135,7 @@ uv run python scripts/prepare_data_dependencies.py
 
 # Полный baseline цикл: скачать tar.xz + конвертировать в parquet + сделать sample .smi
 uv run python scripts/prepare_data_dependencies.py \
-  --fetch-baseline --baseline-url "https://<host>/zinc-druglike-cano.tar.xz" \
+  --fetch-baseline --baseline-url "https://huggingface.co/datasets/Pixelatory/ZINC20-Druglike/resolve/main/zinc-druglike-cano.tar.xz?download=true" \
   --convert-baseline --sample-baseline
 ```
 
@@ -212,7 +213,7 @@ uv run python scripts/generate_latex_report.py --mode full
 
 ### Принцип: максимальное кеширование, работа без интернета
 
-Все внешние данные выкачиваются один раз при `prepare_targets.py --prepare-all` и кешируются локально:
+Все внешние данные выкачиваются один раз при `scripts/stage0_fetch.py` и кешируются локально:
 
 | Данные | Расположение | Источник |
 |--------|-------------|----------|
@@ -326,14 +327,64 @@ scripts/generate.py
 uv run python scripts/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
 ```
 
+## Stage 0: Fetch (единая точка входа для всех загрузок)
+
+**Всё что требует интернета** собрано в одном скрипте `scripts/stage0_fetch.py`.
+После успешного выполнения дальнейшие стадии работают **полностью offline**.
+
+```bash
+# Полная загрузка всех зависимостей (интернет нужен только здесь)
+uv run python scripts/stage0_fetch.py
+
+# С baseline ZINC (опционально, нужен URL)
+uv run python scripts/stage0_fetch.py --baseline-url "https://<host>/zinc-druglike-cano.tar.xz"
+
+# Без Docker-сборки (если образ уже есть)
+uv run python scripts/stage0_fetch.py --skip-docker-build
+
+# Только проверить что всё скачано
+uv run python scripts/stage0_fetch.py --verify-only
+
+# Dry-run: показать команды без выполнения
+uv run python scripts/stage0_fetch.py --dry-run
+```
+
+### Что скачивает Stage 0
+
+| Шаг | Что | Откуда | Куда | Требуется |
+|-----|-----|--------|------|-----------|
+| 1 | Python-пакеты | PyPI, GitHub | `.venv/` | `uv sync` |
+| 2 | FREED data files | GitHub raw | `docker/freedpp/data/` | Для Docker build |
+| 3 | Docker-образ FREED++ | NVIDIA, PyPI, conda-forge, GitHub | Docker cache | GPU + nvidia-toolkit |
+| 4 | Calibration SMILES | HuggingFace | `data/calibration/*.smi` | Для нормализации reward |
+| 5 | Baseline ZINC | URL (user) | `data/baseline/*.tar.xz` | Опционально |
+| 6 | PDB структуры | RCSB | `data/targets/` | Для всех 9 пар |
+| 7 | FASTA | UniProt | `data/targets/*.fasta` | Для MSA |
+| 8 | MSA | ColabFold API | `cache/boltz_msa/*.csv` | Для offline Boltz-2 |
+| 9 | PDB→PDBQT | Docker (local) | `data/targets/*.pdbqt` | Для UniDock GPU |
+
+### После Stage 0: полный pipeline offline
+
+```bash
+# Stage 0.5: Calibration (offline, нужен GPU)
+uv run python scripts/dock_calibration.py
+uv run python scripts/calibrate_normalization.py
+
+# Stage 1: Generate + Score (offline)
+EXPERIMENT_RUN_ID=run01 uv run python scripts/run_full_experiment.py --resume --parallel 2
+
+# Stage 2: Analysis (offline)
+EXPERIMENT_RUN_ID=run01 uv run python scripts/run_post_pipeline.py --latex-mode draft
+```
+
 ## Воспроизведение (end-to-end для одной пары)
 
 ```bash
-# 0. Собрать Docker-образ FREED++ (однократно)
-docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
+# 0. Stage 0: скачать всё необходимое (ОНЛАЙН)
+uv run python scripts/stage0_fetch.py
 
-# 1. Подготовить всё (ОНЛАЙН: PDB, FASTA, MSA, Boltz checkpoints, PDB→PDBQT)
-uv run python scripts/prepare_targets.py --pair CDK2_ERK2 --prepare-all
+# 1. Подготовить таргеты (уже включено в Stage 0, можно пропустить)
+# uv run python scripts/prepare_targets.py --pair CDK2_ERK2 --prepare-all
 
 # 2. Проверить что данные на месте
 ls data/targets/CDK2.fasta data/targets/ERK2.fasta

@@ -3,7 +3,7 @@
 FREED++ требует Python 3.7 / PyTorch 1.12 / DGL 0.9 — несовместимо с
 проектом (Python ≥3.11), поэтому изоляция через Docker.
 
-Reward при обучении: QuickVina2 (встроен в FREED++, ~1 сек/мол, CPU).
+Reward при обучении: UniDock GPU (unidock_gpu, GPU-ускоренный докинг).
 Финальный скоринг: Boltz-2 (scorer_boltz2.py, ~58 сек/мол, GPU).
 
 Ссылки
@@ -245,7 +245,7 @@ def _prepare_receptor(
 
 
 # ---------------------------------------------------------------------------
-# Vina program resolution
+# Docking program resolution (параметр vina_program из FREED++ API)
 # ---------------------------------------------------------------------------
 
 _VINA_PATHS: dict[str, str] = {
@@ -258,7 +258,7 @@ _VINA_PATHS: dict[str, str] = {
 
 
 def _resolve_vina_path(program: str) -> str:
-    """Map vina_program name to container-internal binary path."""
+    """Map vina_program name (FREED++ API) to container-internal binary path."""
     if program in _VINA_PATHS:
         return _VINA_PATHS[program]
     # Treat as an explicit path (e.g. user-provided absolute path)

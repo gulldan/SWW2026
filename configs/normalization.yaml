@@ -1,5 +1,5 @@
 version: '1.0'
-calibration_set: /mnt/data/SWW2026/data/calibration/zinc_druglike_calibration_1000_v2024.smi
+calibration_set: data/calibration/zinc_druglike_calibration_1000_v2024.smi
 subset_name: zinc_druglike_calibration_1000_v2024
 n: 1000
 seed: 137
@@ -9,6 +9,7 @@ boltz_version: 2.2.1
 docking_program: unidock_gpu
 docking_version: Uni-Dock v1.1.3
 targets:
+  # --- Калиброванные таргеты (данные от 2026-02-04) ---
   CDK2:
     mean: -7.419879
     std: 0.7052061614089097
@@ -105,3 +106,57 @@ targets:
     n_samples: 1000
     stable_mean: true
     stable_std: true
+  # --- Placeholder-записи для новых AD-таргетов ---
+  # ВНИМАНИЕ: значения ниже — оценочные placeholder'ы (медиана существующих таргетов).
+  # Перед запуском эксперимента ОБЯЗАТЕЛЬНО перекалибровать:
+  #   uv run python scripts/prepare_targets.py --prepare-all
+  #   uv run python scripts/dock_calibration.py
+  #   uv run python scripts/calibrate_normalization.py
+  BACE1:
+    mean: -8.0
+    std: 0.85
+    ci_mean:
+    - -8.05
+    - -7.95
+    ci_std:
+    - 0.81
+    - 0.89
+    n_samples: 0
+    stable_mean: false
+    stable_std: false
+  GSK3B:
+    mean: -8.0
+    std: 0.85
+    ci_mean:
+    - -8.05
+    - -7.95
+    ci_std:
+    - 0.81
+    - 0.89
+    n_samples: 0
+    stable_mean: false
+    stable_std: false
+  CDK5:
+    mean: -8.0
+    std: 0.85
+    ci_mean:
+    - -8.05
+    - -7.95
+    ci_std:
+    - 0.81
+    - 0.89
+    n_samples: 0
+    stable_mean: false
+    stable_std: false
+  MAOB:
+    mean: -8.0
+    std: 0.85
+    ci_mean:
+    - -8.05
+    - -7.95
+    ci_std:
+    - 0.81
+    - 0.89
+    n_samples: 0
+    stable_mean: false
+    stable_std: false

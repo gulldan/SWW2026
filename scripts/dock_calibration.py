@@ -672,7 +672,7 @@ def main(  # noqa: PLR0913
             "docking_version": docking_version,
             "docker_image": docker_image,
             "docker_image_digest": _docker_image_digest(docker_image),
-            "calibration_set": str(calibration_path),
+            "calibration_set": str(calibration_set or cfg.get("output_path")),
             "n": len(smiles),
             "seed": seed,
             "params": {

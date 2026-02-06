@@ -12,4 +12,47 @@ Methodological limitations:
 \item docking-driven objectives remain proxy objectives rather than direct wet-lab endpoints.
 \end{itemize}
 
+Boltz-2 limitations:
+\begin{itemize}
+\item \textbf{Data leakage:} all selected targets appear in the Boltz-2 training set
+(PDB cutoff 06/2023, $\sim$3M affinity records from ChEMBL). This does not invalidate
+the comparison between generation modes (bias is identical across modes), but predicted
+affinities may be optimistic in absolute terms. This must be noted when interpreting results.
+\item \textbf{Cofactor incompatibility:} the Boltz-2 affinity module does not explicitly
+model cofactors (Passaro et al. 2025, Rowan FAQ). For pairs COX1\_COX2 (heme in active site)
+and AChE\_MAOB (covalent FAD in MAO-B), Boltz-2 affinity predictions should be interpreted
+with caution. For MAO-B, \texttt{affinity\_probability\_binary} (binder vs decoy classifier)
+is recommended over \texttt{affinity\_pred\_value}, as the binary classifier is less
+sensitive to cofactor presence.
+\end{itemize}
+
+Docking score limitations:
+\begin{itemize}
+\item \textbf{Docking as a weak proxy:} PoseX benchmark (2025) shows that docking programs
+(including AutoDock Vina and UniDock) exhibit near-random performance on several targets
+in virtual screening. This is precisely why independent validation via Boltz-2 strengthens
+the study---if the \texttt{double} mode advantage is confirmed by two independent methods,
+the result is more convincing.
+\item \textbf{UniDock GPU as reward backend:} FREED++ uses UniDock GPU
+(\texttt{unidock\_gpu}) for docking-based reward computation. While UniDock GPU is
+significantly faster than CPU-based alternatives (QuickVina2), the underlying scoring
+function remains an approximation of binding free energy.
+\end{itemize}
+
+Reward function limitations:
+\begin{itemize}
+\item \textbf{Reward function choice:} the choice of $R = \max(z_A, z_B)$ (worst-case)
+versus $R = z_A + z_B$ (sum) versus $R = \min(z_A, z_B)$ influences the characteristics
+of generated molecules. Different strategies introduce different biases toward balanced
+vs.\ single-target-dominant solutions. The experiment compares at least two strategies
+to assess sensitivity.
+\end{itemize}
+
+Validation limitations:
+\begin{itemize}
+\item \textbf{No wet-lab validation:} all results are computational. Molecules optimized
+for docking scores may not be real inhibitors. Experimental IC\textsubscript{50}
+confirmation is beyond the scope of this workshop.
+\end{itemize}
+
 These limitations are tracked to prevent over-claiming and to guide future protocol upgrades.

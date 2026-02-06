@@ -314,7 +314,7 @@ def prepare_pair(pair_id: str, pair_cfg: dict, *, prepare_all: bool = False, che
                 precompute_msa(target_id, sequence)
                 _mark_step(checkpoint, pair_id, role, "msa")
 
-            # Шаг 4: PDB → PDBQT (для FREED++ / QuickVina2)
+            # Шаг 4: PDB → PDBQT (для FREED++ / UniDock GPU)
             if _step_done(checkpoint, pair_id, role, "pdbqt"):
                 logger.debug("Чекпоинт: PDBQT {} уже готов", target_id)
             else:

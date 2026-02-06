@@ -1,6 +1,8 @@
 Генерация выполняется в трёх режимах:
 \texttt{single\_a}, \texttt{single\_b}, \texttt{double}.
 Для \texttt{double} используется worst-case reward на z-нормированных прокси-скорах.
+Reward backend --- UniDock GPU (\texttt{unidock\_gpu}), GPU-ускоренный докинг,
+CLI-совместимый с AutoDock Vina.
 
 Скоринг выполняется скриптом \texttt{scripts/score.py} по двум мишеням пары с записью
 \texttt{scored\_joined.csv}. Далее метрики и статистика рассчитываются в
@@ -11,3 +13,31 @@
 \item Stage 1: \texttt{scripts/run\_full\_experiment.py} (generate + score).
 \item Stage 2: \texttt{scripts/run\_post\_pipeline.py} (aggregate, metrics, plots, render, summary, LaTeX).
 \end{enumerate}
+
+\subsection*{Reward function для double-режима}
+
+Ключевой design choice --- как FREED++ комбинирует $DS_A$ и $DS_B$ в один reward.
+Baseline стратегия: $R = -\max(z_A, z_B)$ (worst-case в z-пространстве).
+Гарантирует активность к обоим таргетам, но жёсткая.
+
+Альтернативная стратегия: $R = -(z_A + z_B)$ (сумма z-скоров).
+Компенсирует: хороший $z_A$ + плохой $z_B$ = средний reward.
+Ближайший прецедент: SFG-Drug (MDPI 2025) --- dual MEK1/mTOR, использовали сумму DS.
+
+Сравнение двух стратегий --- бонусный результат, показывающий чувствительность
+генерации к выбору reward function.
+
+\subsection*{Категории пар}
+
+Эксперимент включает 9 пар мишеней, разделённых на категории:
+\begin{itemize}
+\item \textbf{Non-AD контроль} (4 пары): CDK2\_ERK2, EGFR\_HER2, COX1\_COX2, AChE\_BChE ---
+  гомологичные мишени с высоким сходством binding pocket.
+\item \textbf{AD-гетерогенные} (5 пар): BACE1\_GSK3B, AChE\_BACE1, GSK3B\_CDK5,
+  BACE1\_CDK5, AChE\_MAOB --- мишени из разных белковых семейств, специфичные для болезни Альцгеймера.
+\end{itemize}
+
+Гомологичные пары (AChE\_BChE, CDK2\_ERK2) служат ``лёгким'' тестом --- высокое сходство
+карманов облегчает dual generation. Гетерогенные AD-пары (BACE1\_GSK3B, GSK3B\_CDK5) ---
+``жёсткий'' тест, проверяющий способность \texttt{double} режима находить dual-active
+молекулы для структурно различных мишеней.

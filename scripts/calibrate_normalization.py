@@ -134,7 +134,7 @@ def main(
 
     normalization = {
         "version": "1.0",
-        "calibration_set": str(calibration_path),
+        "calibration_set": str(calibration_set),
         "subset_name": subset_name,
         "n": int(n),
         "seed": int(seed),

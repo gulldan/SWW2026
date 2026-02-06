@@ -16,3 +16,15 @@ Fairness controls:
 \end{itemize}
 
 Any interrupted run is resumed only if required artifacts are missing; otherwise it is skipped.
+
+\subsection*{Key comparisons}
+
+\begin{itemize}
+\item \texttt{double} vs \texttt{single\_a} cross-evaluated on target B:
+  does \texttt{double} lose on one target for dual-activity?
+\item \texttt{double} vs $\text{top}(\texttt{single\_a}) \cap \text{top}(\texttt{single\_b})$:
+  does \texttt{double} find molecules that post-hoc intersection misses?
+\item Homologous pairs (AChE\_BChE, CDK2\_ERK2) vs heterogeneous (BACE1\_GSK3B):
+  how much does pocket similarity facilitate dual generation?
+\item UniDock GPU ranking vs Boltz-2 ranking: are two independent methods in agreement?
+\end{itemize}

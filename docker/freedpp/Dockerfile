@@ -61,7 +61,7 @@ RUN git clone https://github.com/AIRI-Institute/FFREED.git /opt/freed \
 RUN chmod +x /opt/freed/ffreed/env/qvina02 2>/dev/null || true
 
 # ── Uni-Dock (GPU-accelerated docking) ────────────────────────────────
-# CLI-compatible with Vina: --receptor, --ligand, --center_x/y/z, etc.
+# CLI-совместим с AutoDock Vina: --receptor, --ligand, --center_x/y/z, etc.
 # unidock is only available via conda-forge, not PyPI.
 RUN wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C /usr/local bin/micromamba \
     && micromamba create -n unidock -c conda-forge unidock --yes --root-prefix /opt/micromamba \
