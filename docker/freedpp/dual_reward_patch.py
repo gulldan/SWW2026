@@ -11,10 +11,12 @@ Box parameters for the second receptor are read from ``/workspace/dual_config.js
 
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import os
 import re
+import threading
 from contextlib import suppress
 from pathlib import Path
 from subprocess import TimeoutExpired, run
@@ -27,6 +29,87 @@ _MAX_Z_WARNINGS = 5
 _z_warn_count = {"a": 0, "b": 0}
 _err_warn_count = {"a": 0, "b": 0}
 _RESULT_PATTERN = re.compile(r"RESULT[:\s]+(-?\d+(?:\.\d+)?)", re.IGNORECASE)
+
+# ---------------------------------------------------------------------------
+# Invalid-docking exclusion (ENG-01 / KVA-255)
+# ---------------------------------------------------------------------------
+
+_INVALID_Z_PENALTY = float(os.environ.get("INVALID_Z_PENALTY", "4.0"))
+if not (0 < _INVALID_Z_PENALTY < float("inf")):
+    raise ValueError(f"INVALID_Z_PENALTY must be a positive finite number, got {_INVALID_Z_PENALTY}")
+
+_call_stats: dict[str, int] = {
+    "total": 0,
+    "invalid_a": 0,
+    "invalid_b": 0,
+    "timeout_a": 0,
+    "timeout_b": 0,
+}
+
+# Thread-local side-channel: _rdkit_docking sets timeout status for the current
+# thread, _dual_call consumes and resets it after each _original_call.
+_timeout_state = threading.local()
+
+
+def _set_last_docking_timed_out(value: bool) -> None:
+    _timeout_state.last_docking_timed_out = value
+
+
+def _consume_last_docking_timed_out() -> bool:
+    value = bool(getattr(_timeout_state, "last_docking_timed_out", False))
+    _timeout_state.last_docking_timed_out = False
+    return value
+
+
+def _get_last_docking_timed_out() -> bool:
+    return bool(getattr(_timeout_state, "last_docking_timed_out", False))
+
+
+_METADATA_PATH = Path(os.environ.get("REWARD_METADATA_PATH", "/workspace/reward_metadata.json"))
+
+
+def _capped_zscore(
+    score: float,
+    error_val: float,
+    mean: float,
+    std: float,
+    penalty_cap: float,
+) -> tuple[float, bool]:
+    """Compute z-score, capping at *penalty_cap* when *score* equals *error_val*.
+
+    Returns (z_value, is_invalid).
+    """
+    if score == error_val:
+        return penalty_cap, True
+    if std == 0:
+        raise ZeroDivisionError("std=0 в normalization.yaml")
+    return (score - mean) / std, False
+
+
+def _write_reward_metadata() -> None:
+    """Write invalid-reward statistics to JSON (registered via atexit)."""
+    total = _call_stats["total"]
+    if total == 0:
+        return
+    metadata = {
+        "total_calls": total,
+        "invalid_count_a": _call_stats["invalid_a"],
+        "invalid_count_b": _call_stats["invalid_b"],
+        "invalid_reward_fraction_a": _call_stats["invalid_a"] / total,
+        "invalid_reward_fraction_b": _call_stats["invalid_b"] / total,
+        "timeout_count_a": _call_stats["timeout_a"],
+        "timeout_count_b": _call_stats["timeout_b"],
+        "timeout_fraction_a": _call_stats["timeout_a"] / total,
+        "timeout_fraction_b": _call_stats["timeout_b"] / total,
+        "invalid_z_penalty": _INVALID_Z_PENALTY,
+    }
+    try:
+        _METADATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _METADATA_PATH.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2)
+        logger.info("dual_reward_patch: reward metadata written to %s", _METADATA_PATH)
+    except OSError as exc:
+        logger.warning("dual_reward_patch: failed to write reward metadata: %s", exc)
 
 
 def _load_normalization(path: str) -> dict[str, Any]:
@@ -132,11 +215,6 @@ def _apply_dual_patch() -> None:
 
     _original_call = DockingVina.__call__
 
-    def _zscore(value: float, mean: float, std: float) -> float:
-        if std == 0:
-            raise ZeroDivisionError("std=0 в normalization.yaml")
-        return (value - mean) / std
-
     def _warn_large_z(label: str, z_value: float) -> None:
         if abs(z_value) <= 10:
             return
@@ -168,6 +246,8 @@ def _apply_dual_patch() -> None:
         timeout_gen3d: int,  # noqa: ARG001
         **kwargs: Any,  # noqa: ARG001
     ) -> float:
+        _set_last_docking_timed_out(value=False)
+
         center = _coords(box_center)
         size = _coords(box_size)
 
@@ -215,6 +295,7 @@ def _apply_dual_patch() -> None:
                     check=False,
                 )
             except TimeoutExpired:
+                _set_last_docking_timed_out(value=True)
                 return error_val
 
             if result.returncode != 0:
@@ -235,12 +316,21 @@ def _apply_dual_patch() -> None:
 
     def _dual_call(self: Any, *args: Any, **kwargs: Any) -> float:
         """Score molecule against receptor A (and B when requested)."""
+        _call_stats["total"] += 1
+
         # Score A — original receptor
         score_a = _original_call(self, *args, **kwargs)
+        timed_out_a = _consume_last_docking_timed_out()
         error_val_a = float(self.config.get("error_val", 100.0))
-        _warn_error_value("a", score_a, error_val_a)
-        z_a = _zscore(score_a, mean_a, std_a)
-        _warn_large_z("a", z_a)
+
+        z_a, invalid_a = _capped_zscore(score_a, error_val_a, mean_a, std_a, _INVALID_Z_PENALTY)
+        if invalid_a:
+            _call_stats["invalid_a"] += 1
+            if timed_out_a:
+                _call_stats["timeout_a"] += 1
+            _warn_error_value("a", score_a, error_val_a)
+        else:
+            _warn_large_z("a", z_a)
 
         if reward_mode == "single_a":
             return -z_a
@@ -274,10 +364,17 @@ def _apply_dual_patch() -> None:
             cfg["box_center"] = orig_center
             cfg["box_size"] = orig_size
 
+        timed_out_b = _consume_last_docking_timed_out()
         error_val_b = float(cfg.get("error_val", 100.0))
-        _warn_error_value("b", score_b, error_val_b)
-        z_b = _zscore(score_b, mean_b, std_b)
-        _warn_large_z("b", z_b)
+
+        z_b, invalid_b = _capped_zscore(score_b, error_val_b, mean_b, std_b, _INVALID_Z_PENALTY)
+        if invalid_b:
+            _call_stats["invalid_b"] += 1
+            if timed_out_b:
+                _call_stats["timeout_b"] += 1
+            _warn_error_value("b", score_b, error_val_b)
+        else:
+            _warn_large_z("b", z_b)
 
         if reward_mode == "single_b":
             return -z_b
@@ -286,9 +383,11 @@ def _apply_dual_patch() -> None:
         return -max(z_a, z_b)
 
     DockingVina.__call__ = _dual_call
+    atexit.register(_write_reward_metadata)
     logger.info(
-        "dual_reward_patch: patched DockingVina (reward_mode=%s, ligand_backend=rdkit_meeko)",
+        "dual_reward_patch: patched DockingVina (reward_mode=%s, ligand_backend=rdkit_meeko, invalid_z_penalty=%.1f)",
         reward_mode,
+        _INVALID_Z_PENALTY,
     )
 
 

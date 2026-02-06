@@ -37,6 +37,12 @@
 - Smoke-прогоны `single_b` и `double` проходят без аномалий `|z| > 10`.
 - Обновлён кэш-ключ модели для отсечения старых артефактов.
 - Проведена валидация `README.md` и `docs/*` на соответствие текущим CLI-скриптам.
+- **ENG-01 (KVA-255)**: Reward — исключён невалидный docking из обучения.
+  - `_capped_zscore()` ограничивает z-penalty для error_val (default 4.0, настраивается `INVALID_Z_PENALTY`).
+  - Счётчики `invalid_a/b` ведутся в runtime, `reward_metadata.json` пишется при завершении (`atexit`).
+  - Валидация `INVALID_Z_PENALTY > 0 && finite`, `mkdir -p` для `REWARD_METADATA_PATH`.
+  - Smoke-артефакт: `docs/tasks/ENG-01_smoke.json`.
+- **ENG-06 (KVA-260)**: Inter-process lock + atomic write для cache JSON (`cache_io.py`).
 
 ## Что в работе
 
