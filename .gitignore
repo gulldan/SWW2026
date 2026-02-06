@@ -10,7 +10,6 @@ wheels/
 
 # Virtual environments
 .venv/
-.python-version
 .ruff_cache
 .pytest_cache
 # IDE
