@@ -1,9 +1,9 @@
 # FREED++ Docker image
-# Isolates legacy environment (PyTorch 1.12, DGL 0.9, RDKit).
+# Environment: Python 3.12, PyTorch 2.4, DGL 2.4, CUDA 12.1, RDKit (H100/sm_90 native).
 # Build (from repo root): docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 # Requires: NVIDIA Container Toolkit for --gpus all
 
-FROM nvidia/cuda:11.8.0-devel-ubuntu20.04
+FROM nvidia/cuda:12.4.1-devel-ubuntu20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
@@ -17,45 +17,60 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy
 
-# ── Python 3.10 + venv ──────────────────────────────────────────────
-# DGL 0.9.1 has cp310 wheels on PyPI; PyTorch 1.12.1 supports 3.10.
-RUN uv python install 3.10
-RUN uv venv --python 3.10 /opt/venv
+# ── Python 3.12 + venv ──────────────────────────────────────────────
+RUN uv python install 3.12
+RUN uv venv --python 3.12 /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# ── PyTorch 1.12 + CUDA 11.3 ────────────────────────────────────────
+# ── PyTorch 2.4 + CUDA 12.1 (sm_90 / H100 native) ─────────────────
 RUN uv pip install --no-cache \
-        torch==1.12.1+cu113 \
-        torchvision==0.13.1+cu113 \
-        --extra-index-url https://download.pytorch.org/whl/cu113
+        torch==2.4.0 \
+        torchvision==0.19.0 \
+        --index-url https://download.pytorch.org/whl/cu124
 
 # ── DGL 0.9.1 + CUDA 11.3 ──────────────────────────────────────────────
-RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache dgl-cu113==0.9.1 -f https://data.dgl.ai/wheels/repo.html
+RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache dgl -f https://data.dgl.ai/wheels/torch-2.4/cu124/repo.html
 
 # ── Remaining dependencies ───────────────────────────────────────────
 RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache \
-        rdkit-pypi==2022.9.5 \
-        numpy==1.23.5 \
-        pandas==1.5.3 \
-        scipy==1.10.1 \
-        networkx==2.8.8 \
+        rdkit \
+        numpy==1.26.4 \
+        "pandas<2.0" \
+        scipy==1.14.1 \
+        networkx \
         tqdm \
         pyyaml \
-        gym==0.26.2 \
-        crem==0.2.9 \
-        meeko==0.5.1
+        gymnasium==0.29.1 \
+        crem \
+        "meeko==0.5.1"
 
 # moses (molsets) for metrics – skip pomegranate (Cython build fails on 3.10,
 # and FREED never calls ScaffoldConstrainedGenerator which needs it).
 RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache --no-deps molsets==0.3.1 \
     && UV_HTTP_TIMEOUT=1200 uv pip install --no-cache fcd_torch>=1.0.5 matplotlib seaborn \
     && UV_HTTP_TIMEOUT=1200 uv pip install --no-cache tensorboardX
+# 4) moses/sascorer: rdkit.six removed in modern RDKit (was a Python 2/3 shim)
+RUN sed -i 's/from rdkit.six import iteritems/iteritems = lambda d: d.items()/' \
+    /opt/venv/lib/python3.12/site-packages/moses/metrics/SA_Score/sascorer.py
 
 # ── Clone FFREED ─────────────────────────────────────────────────────
 RUN git clone https://github.com/AIRI-Institute/FFREED.git /opt/freed \
     && cd /opt/freed \
     && git checkout $(git rev-parse HEAD)
+
+# ── Patch FREED for modern deps ──────────────────────────────────────
+# 1) DGL 2.x: copy_src(src=, out=) → copy_u(u, out) with positional args
+RUN sed -i "s/fn\.copy_src(src='\([^']*\)', out='\([^']*\)')/fn.copy_u('\1', '\2')/g" /opt/freed/ffreed/train/nn/gcn.py
+# 2) gymnasium: gym 0.26 replaced by gymnasium 0.29 (numpy 1.24+ broke np.bool)
+RUN find /opt/freed -name '*.py' -exec sed -i \
+        -e 's/^import gym$/import gymnasium as gym/' \
+        -e 's/^from gym\b/from gymnasium/' {} +
+# 3) numpy 2.x compat: np.bool → bool (replay_buffer.py)
+RUN find /opt/freed -name '*.py' -exec sed -i \
+        -e 's/np\.bool\b/bool/g' \
+        -e 's/np\.int\b/int/g' \
+        -e 's/np\.float\b/float/g' {} +
 
 # Ensure QuickVina2 binary is executable
 RUN chmod +x /opt/freed/ffreed/env/qvina02 2>/dev/null || true
@@ -73,7 +88,6 @@ RUN wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C
 # Fragment library: 91 CReM fragments from ZINC-250K (AITRICS/FREED motifs_91.txt → JSON)
 # Alert filters: PAINS / SureChEMBL / Glaxo rules (PatWalters/rd_filters)
 COPY docker/freedpp/data/zinc_crem.json docker/freedpp/data/alert_collections.csv /opt/freed/data/
-
 # ── Entrypoint & dual-target patch ──────────────────────────────────
 COPY docker/freedpp/entrypoint.sh /opt/entrypoint.sh
 COPY docker/freedpp/dual_reward_patch.py /opt/dual_reward_patch.py
