@@ -57,13 +57,15 @@ def _render_grid(
     name_b: str,
     th_a: float,
     th_b: float,
+    primary_col: str = "combined_min",
 ) -> None:
     """Отрисовка сетки молекул через matplotlib subplots."""
     if df.empty:
         logger.warning("Нет данных для {}", title)
         return
 
-    df = df.sort_values("combined_min", ascending=True).reset_index(drop=True)
+    sort_col = primary_col if primary_col in df.columns else "combined_min"
+    df = df.sort_values(sort_col, ascending=True).reset_index(drop=True)
     n = len(df)
     n_cols = min(MAX_COLS, n)
     n_rows = (n + n_cols - 1) // n_cols
@@ -111,7 +113,8 @@ def _render_grid(
             ax.add_patch(rect)
 
         ax.set_title(f"#{int(idx) + 1}", fontsize=11, fontweight="bold")
-        score_text = f"{name_a}: {row['score_a']:.2f}  |  {name_b}: {row['score_b']:.2f}\nmin: {row['combined_min']:.2f}"
+        primary_val = row.get(sort_col, float("nan"))
+        score_text = f"{name_a}: {row['score_a']:.2f}  |  {name_b}: {row['score_b']:.2f}\n{sort_col}: {primary_val:.2f}"
         if hit:
             score_text += "  [HIT]"
         ax.text(
@@ -156,12 +159,21 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
     thresh = _load_thresholds(PROJECT_ROOT / thresholds)
 
     from dualdocking.config import load_experiment
+    from dualdocking.objectives import parse_objectives_config
 
     try:
-        modes = load_experiment(PROJECT_ROOT / "configs").get("modes", ["single_a", "single_b", "double"])
+        exp_cfg = load_experiment(PROJECT_ROOT / "configs")
+        modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("Не удалось загрузить experiment.yaml: {}. Использую дефолтные режимы.", exc)
+        exp_cfg = {}
         modes = ["single_a", "single_b", "double"]
+
+    objectives = parse_objectives_config(exp_cfg)
+    primary_col = next((obj.column_name for obj in objectives if obj.is_primary), "combined_min")
+    if primary_col not in df.columns:
+        logger.warning("Primary objective {} missing in data, falling back to combined_min", primary_col)
+        primary_col = "combined_min"
 
     for pair_id in df["pair"].unique():
         name_a, name_b = target_names.get(pair_id, ("A", "B"))
@@ -180,16 +192,18 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
                 name_b,
                 th_a,
                 th_b,
+                primary_col=primary_col,
             )
 
         # Top hits: лучшие из всех режимов
+        sort_col = primary_col if primary_col in df_pair.columns else "combined_min"
         frames = []
         for mode in modes:
-            df_mode = df_pair[df_pair["mode"] == mode].nsmallest(top_n, "combined_min")
+            df_mode = df_pair[df_pair["mode"] == mode].nsmallest(top_n, sort_col)
             if not df_mode.empty:
                 frames.append(df_mode.assign(label=mode))
         df_top = (
-            pd.concat(frames).sort_values("combined_min", ascending=True).reset_index(drop=True) if frames else pd.DataFrame()
+            pd.concat(frames).sort_values(sort_col, ascending=True).reset_index(drop=True) if frames else pd.DataFrame()
         )
 
         if not df_top.empty:
@@ -201,6 +215,7 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
                 name_b,
                 th_a,
                 th_b,
+                primary_col=primary_col,
             )
 
     logger.info("Все молекулы отрисованы в {}", fig_dir)

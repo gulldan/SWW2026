@@ -18,13 +18,26 @@ from matplotlib.patches import Patch
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def plot_score_comparison(df_pair: pd.DataFrame, pair_id: str, fig_dir: Path, modes: list[str]) -> None:
+def plot_score_comparison(
+    df_pair: pd.DataFrame,
+    pair_id: str,
+    fig_dir: Path,
+    modes: list[str],
+    objective_columns: list[tuple[str, str]] | None = None,
+) -> None:
     """Построить графики сравнения распределений скоров для пары."""
     fig_dir.mkdir(parents=True, exist_ok=True)
 
     col_a = "affinity_a" if "affinity_a" in df_pair.columns else "score_a"
     col_b = "affinity_b" if "affinity_b" in df_pair.columns else "score_b"
-    for col, label in [(col_a, "Скор A"), (col_b, "Скор B"), ("combined_min", "Комбинированный (worst-case)")]:
+    score_cols: list[tuple[str, str]] = [(col_a, "Скор A"), (col_b, "Скор B")]
+    if objective_columns:
+        score_cols.extend((c, lbl) for c, lbl in objective_columns if c in df_pair.columns)
+    elif "combined_min" in df_pair.columns:
+        score_cols.append(("combined_min", "Комбинированный (worst-case)"))
+    for col, label in score_cols:
+        if col not in df_pair.columns:
+            continue
         fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
         # Гистограмма
@@ -54,7 +67,7 @@ def plot_score_comparison(df_pair: pd.DataFrame, pair_id: str, fig_dir: Path, mo
 
     # Боксплот (matplotlib, чтобы избежать deprecation warning seaborn)
     fig, ax = plt.subplots(figsize=(9, 5))
-    metrics = [col_a, col_b, "combined_min"]
+    metrics = [col_a, col_b] + [c for c, _ in score_cols if c not in (col_a, col_b) and c in df_pair.columns]
     data: list[np.ndarray] = []
     positions: list[float] = []
     group_width = len(modes) + 1
@@ -109,17 +122,23 @@ def main(input_path: str, output_dir: str) -> None:
     fig_dir = PROJECT_ROOT / output_dir
 
     from dualdocking.config import load_experiment
+    from dualdocking.objectives import parse_objectives_config
 
     try:
-        modes = load_experiment(PROJECT_ROOT / "configs").get("modes", ["single_a", "single_b", "double"])
+        exp_cfg = load_experiment(PROJECT_ROOT / "configs")
+        modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("Не удалось загрузить experiment.yaml: {}. Использую дефолтные режимы.", exc)
+        exp_cfg = {}
         modes = ["single_a", "single_b", "double"]
+
+    objectives = parse_objectives_config(exp_cfg)
+    objective_columns = [(obj.column_name, obj.column_name) for obj in objectives]
 
     for pair_id in df["pair"].unique():
         logger.info("Построение графиков для пары: {}", pair_id)
         df_pair = df[df["pair"] == pair_id]
-        plot_score_comparison(df_pair, pair_id, fig_dir, modes)
+        plot_score_comparison(df_pair, pair_id, fig_dir, modes, objective_columns=objective_columns)
 
     logger.info("Все графики сохранены в {}", fig_dir)
 

@@ -39,8 +39,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -57,6 +58,65 @@ class ObjectiveKind(StrEnum):
     GEOMETRIC = "geometric"
     WEIGHTED_PRODUCT = "weighted_product"
     TCHEBYCHEFF = "tchebycheff"
+
+
+@dataclass(frozen=True)
+class ObjectiveSpec:
+    """Specification for a single objective function from config."""
+
+    kind: ObjectiveKind
+    column_name: str
+    is_primary: bool
+    params: dict[str, float] = field(default_factory=dict)
+
+
+def _column_name_for(kind: ObjectiveKind, params: dict[str, float]) -> str:
+    """Build column name: ``combined_{kind}`` or ``combined_{kind}_{param}``."""
+    base = f"combined_{kind.value}"
+    # Only include the first relevant param value for disambiguation
+    for key in ("weight_a",):
+        if key in params:
+            base = f"{base}_{params[key]}"
+    return base
+
+
+def parse_objectives_config(exp_cfg: dict[str, Any]) -> list[ObjectiveSpec]:
+    """Parse objectives section from experiment config into ObjectiveSpec list.
+
+    Falls back to a single MIN objective when the section is missing or empty.
+    """
+    obj_section = exp_cfg.get("objectives")
+    if not obj_section or not isinstance(obj_section, dict):
+        return [ObjectiveSpec(kind=ObjectiveKind.MIN, column_name="combined_min", is_primary=True)]
+
+    specs: list[ObjectiveSpec] = []
+    seen_columns: set[str] = set()
+
+    baseline_kind = ObjectiveKind(str(obj_section.get("baseline", "min")))
+    baseline_col = _column_name_for(baseline_kind, {})
+    specs.append(ObjectiveSpec(kind=baseline_kind, column_name=baseline_col, is_primary=True))
+    seen_columns.add(baseline_col)
+
+    # Alternatives
+    alternatives = obj_section.get("alternatives")
+    if not alternatives or not isinstance(alternatives, list):
+        return specs
+
+    for alt in alternatives:
+        if not isinstance(alt, dict):
+            continue
+        kind = ObjectiveKind(str(alt["kind"]))
+        params: dict[str, float] = {}
+        for pkey in ("weight_a", "utopia_a", "utopia_b"):
+            if pkey in alt:
+                params[pkey] = float(alt[pkey])
+        col = _column_name_for(kind, params)
+        if col in seen_columns:
+            continue
+        specs.append(ObjectiveSpec(kind=kind, column_name=col, is_primary=False, params=params))
+        seen_columns.add(col)
+
+    return specs
 
 
 def _to_utility(scores: NDArray[np.float64], lower_is_better: bool) -> NDArray[np.float64]:

@@ -76,6 +76,7 @@ def main(
     """Compute metrics and statistical comparisons."""
     from dualdocking.config import load_experiment, load_metrics, load_pairs
     from dualdocking.fairness import validate_fairness, validate_reward_quality
+    from dualdocking.objectives import parse_objectives_config
     from dualdocking.statistical import (
         BootstrapResult,
         cliffs_delta,
@@ -161,7 +162,7 @@ def main(
             if not hr_a_values:
                 continue
 
-            metrics_out[pair_id][mode] = {
+            mode_metrics: dict[str, float] = {
                 "hr_a_mean": float(np.mean(hr_a_values)),
                 "hr_a_sem": _sem(hr_a_values),
                 "hr_both_mean": float(np.mean(hr_both_values)),
@@ -169,6 +170,22 @@ def main(
                 "balance_mean": float(np.mean(balance_values)),
                 "balance_sem": _sem(balance_values),
             }
+
+            # Per-objective mean/SEM
+            objectives = parse_objectives_config(exp_cfg)
+            for obj in objectives:
+                col = obj.column_name
+                obj_values: list[float] = []
+                for df in seed_dfs.values():
+                    if col in df.columns:
+                        vals = df[col].dropna().to_numpy()
+                        if len(vals) > 0:
+                            obj_values.append(float(np.mean(vals)))
+                if obj_values:
+                    mode_metrics[f"{col}_mean"] = float(np.mean(obj_values))
+                    mode_metrics[f"{col}_sem"] = _sem(obj_values)
+
+            metrics_out[pair_id][mode] = mode_metrics
 
     # Statistical tests
     stats_out: dict[str, dict[str, dict[str, float | bool | str]]] = {}

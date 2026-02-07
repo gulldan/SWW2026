@@ -27,11 +27,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 @click.option("--mode", type=click.Choice(["single_a", "single_b", "double"]), required=True)
 @click.option("--seed", default=42, type=int)
 @click.option("--config", default="configs/pairs.yaml")
+@click.option("--experiment-config", default="configs/experiment.yaml", help="Experiment config for objectives")
 @click.option("--force", is_flag=True, default=False, help="Пересчитать даже если scores уже есть")
-def main(pair: str, mode: str, seed: int, config: str, force: bool) -> None:
+def main(pair: str, mode: str, seed: int, config: str, experiment_config: str, force: bool) -> None:
     """Оценить молекулы по обеим мишеням."""
-    from dualdocking.config import load_pairs
-    from dualdocking.objectives import ObjectiveKind, compute_combined
+    from dualdocking.config import load_experiment, load_pairs
+    from dualdocking.objectives import compute_combined, parse_objectives_config
     from dualdocking.scorer_boltz2 import score_batch
 
     pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
@@ -85,7 +86,9 @@ def main(pair: str, mode: str, seed: int, config: str, force: bool) -> None:
     scores_a = all_scores["A"]
     scores_b = all_scores["B"]
 
-    combined = compute_combined(scores_a, scores_b, ObjectiveKind.MIN, lower_is_better=True)
+    # Parse objectives from experiment config
+    exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
+    objectives = parse_objectives_config(exp_cfg)
 
     # Сохранить объединённую таблицу (schema contract: smiles_canonical, affinity_a, affinity_b, is_hit_both)
     from dualdocking.chem_sanitize import canonicalize
@@ -110,11 +113,16 @@ def main(pair: str, mode: str, seed: int, config: str, force: bool) -> None:
             "score_a": affinity_a,
             "score_b": affinity_b,
             "is_hit_both": is_hit_both,
-            "combined_min": combined,
-            "combined_harmonic": compute_combined(scores_a, scores_b, ObjectiveKind.HARMONIC, lower_is_better=True),
         }
     )
-    joined = joined.sort_values("combined_min")
+
+    # Config-driven objective computation
+    primary_col = "combined_min"
+    for obj in objectives:
+        joined[obj.column_name] = compute_combined(scores_a, scores_b, obj.kind, lower_is_better=True, **obj.params)
+        if obj.is_primary:
+            primary_col = obj.column_name
+    joined = joined.sort_values(primary_col)
     joined.to_csv(result_dir / "scored_joined.csv", index=False)
 
     logger.info("Скоры сохранены в {}", result_dir)

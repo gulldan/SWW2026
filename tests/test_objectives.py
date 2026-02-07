@@ -1,9 +1,11 @@
 """Tests for dual-target objective functions."""
 
+import pytest
 import numpy as np
 
 from dualdocking.objectives import (
     ObjectiveKind,
+    ObjectiveSpec,
     combined_geometric,
     combined_harmonic,
     combined_min,
@@ -13,6 +15,7 @@ from dualdocking.objectives import (
     compute_combined,
     hypervolume_contributions,
     pareto_mask,
+    parse_objectives_config,
 )
 
 
@@ -208,3 +211,108 @@ def test_pareto_mask_sorted_algorithm():
 
     result = pareto_mask(a, b, lower_is_better=True)
     np.testing.assert_array_equal(result, ref_mask)
+
+
+# --- parse_objectives_config tests ---
+
+
+def _full_experiment_cfg():
+    return {
+        "objectives": {
+            "baseline": "min",
+            "alternatives": [
+                {"kind": "geometric"},
+                {"kind": "harmonic"},
+                {"kind": "weighted_sum", "weight_a": 0.5},
+                {"kind": "weighted_product", "weight_a": 0.5},
+                {"kind": "tchebycheff", "weight_a": 0.5, "utopia_a": -3.0, "utopia_b": -3.0},
+            ],
+        }
+    }
+
+
+def test_parse_objectives_config_full():
+    specs = parse_objectives_config(_full_experiment_cfg())
+    assert len(specs) == 6
+    assert specs[0].is_primary
+    assert specs[0].kind == ObjectiveKind.MIN
+    kinds = [s.kind for s in specs]
+    assert ObjectiveKind.GEOMETRIC in kinds
+    assert ObjectiveKind.HARMONIC in kinds
+    assert ObjectiveKind.WEIGHTED_SUM in kinds
+    assert ObjectiveKind.WEIGHTED_PRODUCT in kinds
+    assert ObjectiveKind.TCHEBYCHEFF in kinds
+
+
+def test_parse_objectives_config_missing_section():
+    specs = parse_objectives_config({})
+    assert len(specs) == 1
+    assert specs[0].kind == ObjectiveKind.MIN
+    assert specs[0].is_primary
+
+
+def test_parse_objectives_config_empty_alternatives():
+    specs = parse_objectives_config({"objectives": {"baseline": "min", "alternatives": []}})
+    assert len(specs) == 1
+    assert specs[0].is_primary
+
+
+def test_parse_objectives_config_params_passed():
+    cfg = {
+        "objectives": {
+            "baseline": "min",
+            "alternatives": [
+                {"kind": "tchebycheff", "weight_a": 0.5, "utopia_a": -3.0, "utopia_b": -3.0},
+            ],
+        }
+    }
+    specs = parse_objectives_config(cfg)
+    tch = [s for s in specs if s.kind == ObjectiveKind.TCHEBYCHEFF][0]
+    assert tch.params["weight_a"] == 0.5
+    assert tch.params["utopia_a"] == -3.0
+    assert tch.params["utopia_b"] == -3.0
+
+
+def test_parse_objectives_config_duplicate_column_skipped():
+    cfg = {
+        "objectives": {
+            "baseline": "min",
+            "alternatives": [
+                {"kind": "min"},
+            ],
+        }
+    }
+    specs = parse_objectives_config(cfg)
+    assert len(specs) == 1
+
+
+def test_parse_objectives_config_same_kind_different_params():
+    cfg = {
+        "objectives": {
+            "baseline": "min",
+            "alternatives": [
+                {"kind": "weighted_sum", "weight_a": 0.3},
+                {"kind": "weighted_sum", "weight_a": 0.7},
+            ],
+        }
+    }
+    specs = parse_objectives_config(cfg)
+    ws_specs = [s for s in specs if s.kind == ObjectiveKind.WEIGHTED_SUM]
+    assert len(ws_specs) == 2
+    cols = {s.column_name for s in ws_specs}
+    assert "combined_weighted_sum_0.3" in cols
+    assert "combined_weighted_sum_0.7" in cols
+
+
+def test_parse_objectives_config_unknown_kind_raises():
+    cfg = {"objectives": {"baseline": "min", "alternatives": [{"kind": "nonexistent"}]}}
+    with pytest.raises(ValueError):
+        parse_objectives_config(cfg)
+
+
+def test_parse_objectives_config_no_alternatives_key():
+    cfg = {"objectives": {"baseline": "harmonic"}}
+    specs = parse_objectives_config(cfg)
+    assert len(specs) == 1
+    assert specs[0].kind == ObjectiveKind.HARMONIC
+    assert specs[0].is_primary

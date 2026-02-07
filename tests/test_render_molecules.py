@@ -40,6 +40,11 @@ def _make_df(n: int = 3, pair: str = "pair1", mode: str = "single_a") -> pd.Data
         "score_a": [-8.0 + i for i in range(n)],
         "score_b": [-7.0 + i for i in range(n)],
         "combined_min": [-7.5 + i for i in range(n)],
+        "combined_harmonic": [-7.3 + i for i in range(n)],
+        "combined_geometric": [-7.4 + i for i in range(n)],
+        "combined_weighted_sum_0.5": [-7.2 + i for i in range(n)],
+        "combined_weighted_product_0.5": [-7.1 + i for i in range(n)],
+        "combined_tchebycheff_0.5": [0.5 + i for i in range(n)],
         "pair": [pair] * n,
         "mode": [mode] * n,
     })
@@ -97,7 +102,14 @@ def test_main_cli(tmp_path, monkeypatch):
     df.to_parquet(tmp_path / "report" / "data" / "all_results.parquet")
     _pairs_yaml(tmp_path / "configs")
     _metrics_yaml(tmp_path / "configs")
-    (tmp_path / "configs" / "experiment.yaml").write_text("modes: [single_a, single_b, double]\\n")
+    exp = {
+        "modes": ["single_a", "single_b", "double"],
+        "objectives": {
+            "baseline": "min",
+            "alternatives": [{"kind": "harmonic"}],
+        },
+    }
+    (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(exp))
 
     import scripts.render_molecules as mod
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
@@ -114,3 +126,19 @@ def test_main_cli(tmp_path, monkeypatch):
 
     figs = list((tmp_path / "report" / "figures").glob("*.png"))
     assert len(figs) >= 2
+
+
+def test_primary_col_fallback(tmp_path):
+    """Primary col missing from data → falls back to combined_min."""
+    df = pd.DataFrame({
+        "smiles": ["CCO", "c1ccccc1"],
+        "score_a": [-8.0, -7.0],
+        "score_b": [-7.0, -6.0],
+        "combined_min": [-7.5, -6.5],
+        "pair": ["pair1", "pair1"],
+        "mode": ["double", "double"],
+    })
+    out = tmp_path / "grid.png"
+    # primary_col doesn't exist in df → should fall back to combined_min
+    _render_grid(df, out, "Test", "A", "B", -7.0, -6.5, primary_col="combined_nonexistent")
+    assert out.exists()

@@ -23,6 +23,19 @@ def _metrics_cfg():
     return {"thresholds": {"pair1": {"target_a": 0.0, "target_b": 0.0}}}
 
 
+def _experiment_cfg_with_objectives():
+    return {
+        "modes": ["single_a", "single_b", "double"],
+        "seeds": [1, 2, 3, 4, 5],
+        "objectives": {
+            "baseline": "min",
+            "alternatives": [
+                {"kind": "harmonic"},
+            ],
+        },
+    }
+
+
 def _write_run(run_dir: Path, rng: np.random.Generator) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     # minimal generated.csv for fairness gate (monkeypatched in test)
@@ -35,6 +48,7 @@ def _write_run(run_dir: Path, rng: np.random.Generator) -> None:
             "affinity_b": rng.normal(-1.0, 0.1, 10),
             "is_hit_both": [True] * 10,
             "combined_min": rng.normal(-1.0, 0.1, 10),
+            "combined_harmonic": rng.normal(-1.0, 0.1, 10),
         }
     )
     df.to_csv(run_dir / "scored_joined.csv", index=False)
@@ -163,3 +177,51 @@ def test_main_missing_input(tmp_path, monkeypatch):
         ],
     )
     assert result.exit_code == 0
+
+
+def test_objective_means_in_metrics(tmp_path, monkeypatch):
+    """Verify combined_*_mean and combined_*_sem keys in metrics output."""
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+
+    (tmp_path / "configs").mkdir()
+    (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(_pairs_cfg()))
+    (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(_experiment_cfg_with_objectives()))
+    (tmp_path / "configs" / "metrics.yaml").write_text(yaml.dump(_metrics_cfg()))
+
+    rng = np.random.default_rng(42)
+    for mode in ("single_a", "single_b", "double"):
+        for seed in [1, 2, 3, 4, 5]:
+            run_dir = tmp_path / "results" / "pair1" / mode / f"seed_{seed}"
+            _write_run(run_dir, rng)
+
+    import dualdocking.fairness as fairness_mod
+
+    monkeypatch.setattr(fairness_mod, "validate_fairness", lambda _: {"budget_consistent": True, "issues": []})
+    monkeypatch.setattr(
+        fairness_mod,
+        "validate_reward_quality",
+        lambda *_args, **_kwargs: {"run_valid": True, "issues": []},
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "--results-root",
+            "results",
+            "--pairs-config",
+            "configs/pairs.yaml",
+            "--experiment-config",
+            "configs/experiment.yaml",
+            "--metrics-config",
+            "configs/metrics.yaml",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    metrics = json.loads((tmp_path / "report" / "metrics.json").read_text())
+    double_metrics = metrics["pair1"]["double"]
+    assert "combined_min_mean" in double_metrics
+    assert "combined_min_sem" in double_metrics
+    assert "combined_harmonic_mean" in double_metrics
+    assert "combined_harmonic_sem" in double_metrics

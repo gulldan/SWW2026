@@ -103,21 +103,44 @@ def _build_metric_rows(pairs_cfg: dict[str, Any], metrics: dict[str, Any], pair_
             data = per_mode.get(mode)
             if not isinstance(data, dict):
                 continue
-            rows.append(
-                {
-                    "pair_id": pair_id,
-                    "target_a": target_a,
-                    "target_b": target_b,
-                    "mode": mode,
-                    "hr_a_mean": data.get("hr_a_mean"),
-                    "hr_a_sem": data.get("hr_a_sem"),
-                    "hr_both_mean": data.get("hr_both_mean"),
-                    "hr_both_sem": data.get("hr_both_sem"),
-                    "balance_mean": data.get("balance_mean"),
-                    "balance_sem": data.get("balance_sem"),
-                }
-            )
+            row: dict[str, Any] = {
+                "pair_id": pair_id,
+                "target_a": target_a,
+                "target_b": target_b,
+                "mode": mode,
+                "hr_a_mean": data.get("hr_a_mean"),
+                "hr_a_sem": data.get("hr_a_sem"),
+                "hr_both_mean": data.get("hr_both_mean"),
+                "hr_both_sem": data.get("hr_both_sem"),
+                "balance_mean": data.get("balance_mean"),
+                "balance_sem": data.get("balance_sem"),
+            }
+            row.update({
+                key: val
+                for key, val in data.items()
+                if key.startswith("combined_") and key.endswith(("_mean", "_sem"))
+            })
+            rows.append(row)
     return rows
+
+
+def _objective_columns_from_metrics(metrics: dict[str, Any]) -> list[str]:
+    """Extract unique objective column base names from metrics data."""
+    cols: list[str] = []
+    seen: set[str] = set()
+    for pair_data in metrics.values():
+        if not isinstance(pair_data, dict):
+            continue
+        for mode_data in pair_data.values():
+            if not isinstance(mode_data, dict):
+                continue
+            for key in mode_data:
+                if key.startswith("combined_") and key.endswith("_mean"):
+                    base = key[: -len("_mean")]
+                    if base not in seen:
+                        cols.append(base)
+                        seen.add(base)
+    return cols
 
 
 def _build_stats_rows(stats: dict[str, Any], pair_ids: list[str]) -> list[dict[str, Any]]:
@@ -201,6 +224,8 @@ def main(
     keywords = manifest.get("keywords", [])
     keyword_text = ", ".join(str(k) for k in keywords if str(k).strip())
 
+    objective_columns = _objective_columns_from_metrics(metrics_data)
+
     context = {
         "title": str(manifest.get("title", "Dual-Target Docking: Modular Research Report")),
         "author": str(manifest.get("author", "Automated Pipeline")),
@@ -211,6 +236,7 @@ def main(
         "stats": stats_data,
         "metric_rows": metric_rows,
         "stats_rows": stats_rows,
+        "objective_columns": objective_columns,
         "figures": figures,
         "summary_excerpt": _summary_excerpt(PROJECT_ROOT / summary_path),
         "master_config": master_cfg,
