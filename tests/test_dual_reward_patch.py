@@ -94,7 +94,7 @@ def _setup_env(monkeypatch, tmp_path, *, reward_mode="single_a"):
     monkeypatch.setenv("REWARD_METADATA_PATH", str(tmp_path / "reward_metadata.json"))
     monkeypatch.setenv("INVALID_Z_PENALTY", "4.0")
 
-    if reward_mode in ("single_b", "double"):
+    if reward_mode == "double":
         dual_cfg_path = tmp_path / "dual_config.json"
         dual_cfg_path.write_text(
             json.dumps(
@@ -458,6 +458,15 @@ class TestDualCallSingleA:
         self.vina()
         assert self.mod._get_last_docking_timed_out() is False
 
+    def test_primary_target_in_metadata_single_a(self):
+        """Metadata reports primary_target=CDK2 and reward_mode=single_a."""
+        self.vina._scores = [-7.5]
+        self.vina()
+        self.mod._write_reward_metadata()
+        data = json.loads(self.mod._METADATA_PATH.read_text())
+        assert data["primary_target"] == "CDK2"
+        assert data["reward_mode"] == "single_a"
+
 
 # ---------------------------------------------------------------------------
 # Integration: _dual_call in double mode
@@ -527,7 +536,7 @@ class TestDualCallDouble:
 
 
 class TestDualCallSingleB:
-    """Exercise _dual_call in single_b mode."""
+    """Exercise _dual_call in single_b mode (B is primary receptor)."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, _integration_single_b):
@@ -535,7 +544,7 @@ class TestDualCallSingleB:
 
     def test_normal_b_score(self):
         """Normal B score → no invalids, correct reward."""
-        self.vina._scores = [-7.5, -6.0]  # A (ignored for reward), B
+        self.vina._scores = [-6.0]  # Only B (primary)
         reward = self.vina()
         # z_b = (-6.0 - (-6.0))/0.5 = 0.0 → reward = 0.0
         assert reward == pytest.approx(0.0)
@@ -543,10 +552,34 @@ class TestDualCallSingleB:
 
     def test_error_b_score(self):
         """Error B score → invalid_b incremented, capped reward."""
-        self.vina._scores = [-7.5, 100.0]
+        self.vina._scores = [100.0]  # Only B (primary, error)
         reward = self.vina()
         assert reward == pytest.approx(-4.0)
         assert self.mod._call_stats["invalid_b"] == 1
+
+    def test_single_b_does_not_score_a(self):
+        """single_b only scores B — A is never called."""
+        self.vina._scores = [-6.0]
+        self.vina()
+        assert self.mod._call_stats["total"] == 1
+        assert self.mod._call_stats["invalid_a"] == 0
+
+    def test_single_b_timeout_tracked(self):
+        """Timeout on B is tracked correctly with 1 score."""
+        self.vina._scores = _ScoresWithTimeout([100.0], self.mod, timeout_at=1)
+        self.vina()
+        assert self.mod._call_stats["timeout_b"] == 1
+        assert self.mod._call_stats["invalid_b"] == 1
+        assert self.mod._call_stats["timeout_a"] == 0
+
+    def test_primary_target_in_metadata_single_b(self):
+        """Metadata reports primary_target=ERK2 and reward_mode=single_b."""
+        self.vina._scores = [-6.0]
+        self.vina()
+        self.mod._write_reward_metadata()
+        data = json.loads(self.mod._METADATA_PATH.read_text())
+        assert data["primary_target"] == "ERK2"
+        assert data["reward_mode"] == "single_b"
 
 
 # ---------------------------------------------------------------------------

@@ -313,9 +313,9 @@ scripts/generate.py
 
 ### Single vs Double режим
 
-- **single_a**: оптимизация под мишень A (z-score reward)
-- **single_b**: оптимизация под мишень B (z-score reward)
-- **double**: оптимизация под worst-case `max(z_a, z_b)` для *lower-is-better* (через `dual_reward_patch.py`)
+- **single_a**: receptor A is primary (generation + reward); B is not scored during training
+- **single_b**: receptor B is primary (generation + reward); A is not scored during training (clean baseline)
+- **double**: receptor A is primary for generation; both A and B scored; reward = worst-case `max(z_a, z_b)` (via `dual_reward_patch.py`)
 
 ### Кеширование обученных моделей
 

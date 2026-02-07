@@ -41,7 +41,7 @@ CACHE_DIR = PROJECT_ROOT / "cache" / "freedpp_models"
 
 DEFAULT_DOCKER_IMAGE = "dualdocking/freedpp:latest"
 DOCKER_BIN = shutil.which("docker") or "docker"
-CACHE_KEY_VERSION = "v2_rdkit_meeko_20260205"
+CACHE_KEY_VERSION = "v3_clean_single_b_20260207"
 FREED_DATA_DIR = PROJECT_ROOT / "docker" / "freedpp" / "data"
 FREED_DATA_FILES = (
     FREED_DATA_DIR / "zinc_crem.json",
@@ -334,7 +334,16 @@ def _run_freedpp(
 
     Вывод Docker стримится в реальном времени для наблюдения за прогрессом.
     """
-    args = _build_freedpp_args(config, pdbqt_a, center_a, size_a, commands)
+    # For single_b, B is the primary receptor for FREED++ generation + reward.
+    # _build_freedpp_args param names (pdbqt_a, center_a, size_a) refer to the
+    # primary receptor, not necessarily target A.
+    if config.reward_mode == "single_b":
+        if pdbqt_b is None:
+            raise ValueError("single_b requires receptor B (second_target_id must be set)")
+        assert center_b is not None and size_b is not None  # guarded by pdbqt_b check
+        args = _build_freedpp_args(config, pdbqt_b, center_b, size_b, commands)
+    else:
+        args = _build_freedpp_args(config, pdbqt_a, center_a, size_a, commands)
 
     docker_cmd: list[str] = [
         DOCKER_BIN,
@@ -360,8 +369,8 @@ def _run_freedpp(
         ]
     )
 
-    # Dual-target: mount второй receptor и конфиг
-    if config.reward_mode in {"single_b", "double"} and pdbqt_b is not None:
+    # Dual-target: mount второй receptor и конфиг (only needed for double mode)
+    if config.reward_mode == "double" and pdbqt_b is not None:
         dual_cfg = {
             "receptor_b": f"/workspace/{pdbqt_b.name}",
             "center_b": center_b,
@@ -524,6 +533,8 @@ def generate(config: GenerationConfig) -> list[str]:
         Список сгенерированных SMILES.
     """
     needs_second = config.reward_mode in {"single_b", "double"}
+    if needs_second and not config.second_target_id:
+        raise ValueError(f"{config.reward_mode} mode requires second_target_id")
     n_steps = 8 if not needs_second else 9
     pbar = tqdm(
         total=n_steps,

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -14,6 +16,7 @@ from dualdocking.generator_freedpp import (
     _cache_key,
     _parse_output_smiles,
     _resolve_pdb_path,
+    _run_freedpp,
 )
 
 # --- _cache_key ---
@@ -157,3 +160,96 @@ def test_parse_output_smiles_no_double_count(tmp_path: Path) -> None:
     smiles = _parse_output_smiles(tmp_path)
     # JSON is primary; CSV should NOT be read when JSON produced results
     assert smiles == ["c1ccccc1", "CCO", "CC(=O)O"]
+
+
+# --- _run_freedpp branching ---
+
+
+class _FakePopen:
+    """Captures the docker command for inspection."""
+
+    def __init__(self, cmd, **kwargs):
+        self.cmd = cmd
+        self.returncode = 0
+        self.stdout = iter([])
+
+    def wait(self, timeout=None):
+        pass
+
+
+class TestRunFreedppBranching:
+    """Test _run_freedpp receptor selection and env var logic."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path):
+        self.workspace = tmp_path / "workspace"
+        self.workspace.mkdir()
+        self.pdbqt_a = tmp_path / "receptor_a.pdbqt"
+        self.pdbqt_a.write_text("ATOM ...")
+        self.pdbqt_b = tmp_path / "receptor_b.pdbqt"
+        self.pdbqt_b.write_text("ATOM ...")
+
+    def _run(self, config, pdbqt_b=None, center_b=None, size_b=None):
+        captured = {}
+        real_popen = _FakePopen
+
+        def fake_popen(cmd, **kwargs):
+            captured["cmd"] = cmd
+            return real_popen(cmd, **kwargs)
+
+        with (
+            patch("dualdocking.generator_freedpp.subprocess.Popen", side_effect=fake_popen),
+            patch("dualdocking.generator_freedpp.tqdm", side_effect=lambda *a, **kw: None),
+        ):
+            _run_freedpp(
+                config,
+                self.workspace,
+                self.pdbqt_a,
+                "1.0,2.0,3.0",
+                "20.0,20.0,20.0",
+                pdbqt_b=pdbqt_b,
+                center_b=center_b,
+                size_b=size_b,
+            )
+        return captured["cmd"]
+
+    def test_run_freedpp_single_a_uses_receptor_a(self):
+        cfg = GenerationConfig(target_id="CDK2", reward_mode="single_a")
+        cmd = self._run(cfg)
+        cmd_str = " ".join(cmd)
+        assert "receptor_a.pdbqt" in cmd_str
+        assert "REWARD_MODE=single_a" in cmd_str
+
+    def test_run_freedpp_single_b_uses_receptor_b(self):
+        cfg = GenerationConfig(
+            target_id="CDK2", reward_mode="single_b", second_target_id="ERK2"
+        )
+        cmd = self._run(cfg, pdbqt_b=self.pdbqt_b, center_b="4.0,5.0,6.0", size_b="25.0,25.0,25.0")
+        cmd_str = " ".join(cmd)
+        assert "receptor_b.pdbqt" in cmd_str
+        assert "REWARD_MODE=single_b" in cmd_str
+        # single_b should NOT have DUAL_RECEPTOR_B env var
+        assert "DUAL_RECEPTOR_B" not in cmd_str
+
+    def test_run_freedpp_double_has_dual_config(self):
+        cfg = GenerationConfig(
+            target_id="CDK2", reward_mode="double", second_target_id="ERK2"
+        )
+        cmd = self._run(cfg, pdbqt_b=self.pdbqt_b, center_b="4.0,5.0,6.0", size_b="25.0,25.0,25.0")
+        cmd_str = " ".join(cmd)
+        assert "DUAL_RECEPTOR_B" in cmd_str
+        assert "DUAL_CONFIG" in cmd_str
+        # double uses receptor A as primary
+        assert "receptor_a.pdbqt" in cmd_str
+        # dual_config.json should be written
+        dual_cfg_path = self.workspace / "dual_config.json"
+        assert dual_cfg_path.exists()
+        data = json.loads(dual_cfg_path.read_text())
+        assert "receptor_b" in data
+
+    def test_run_freedpp_single_b_fails_without_receptor_b(self):
+        cfg = GenerationConfig(
+            target_id="CDK2", reward_mode="single_b", second_target_id="ERK2"
+        )
+        with pytest.raises(ValueError, match="single_b requires receptor B"):
+            self._run(cfg, pdbqt_b=None)

@@ -91,6 +91,9 @@ def _write_reward_metadata() -> None:
     total = _call_stats["total"]
     if total == 0:
         return
+    reward_mode = os.environ.get("REWARD_MODE", "single_a")
+    target_id_a = os.environ.get("TARGET_ID_A", "")
+    target_id_b = os.environ.get("TARGET_ID_B", "")
     metadata = {
         "total_calls": total,
         "invalid_count_a": _call_stats["invalid_a"],
@@ -102,6 +105,8 @@ def _write_reward_metadata() -> None:
         "timeout_fraction_a": _call_stats["timeout_a"] / total,
         "timeout_fraction_b": _call_stats["timeout_b"] / total,
         "invalid_z_penalty": _INVALID_Z_PENALTY,
+        "primary_target": target_id_b if reward_mode == "single_b" else target_id_a,
+        "reward_mode": reward_mode,
     }
     try:
         _METADATA_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -199,13 +204,20 @@ def _apply_dual_patch() -> None:
     std_a = float(targets[target_id_a]["std"])
 
     dual_receptor_b = os.environ.get("DUAL_RECEPTOR_B")
-    dual_cfg = None
+
+    # Load mean_b/std_b as closure variables for both single_b and double
+    mean_b = std_b = 0.0  # sentinels; only used when mode needs B
     if reward_mode in {"single_b", "double"}:
-        if not dual_receptor_b:
-            raise RuntimeError("DUAL_RECEPTOR_B обязателен для single_b/double режимов")
         if target_id_b not in targets:
             raise KeyError(f"Target B '{target_id_b}' не найден в normalization.yaml")
+        mean_b = float(targets[target_id_b]["mean"])
+        std_b = float(targets[target_id_b]["std"])
 
+    # dual_cfg only needed for double mode (config swap to score B)
+    dual_cfg = None
+    if reward_mode == "double":
+        if not dual_receptor_b:
+            raise RuntimeError("DUAL_RECEPTOR_B обязателен для double режима")
         config_path = Path(os.environ.get("DUAL_CONFIG", "/workspace/dual_config.json"))
         with config_path.open() as f:
             dual_cfg = json.load(f)
@@ -315,10 +327,25 @@ def _apply_dual_patch() -> None:
     DockingVina.docking = staticmethod(_rdkit_docking)
 
     def _dual_call(self: Any, *args: Any, **kwargs: Any) -> float:
-        """Score molecule against receptor A (and B when requested)."""
+        """Score molecule against primary receptor."""
         _call_stats["total"] += 1
 
-        # Score A — original receptor
+        # single_b: B is primary receptor (generator passed B as --receptor)
+        if reward_mode == "single_b":
+            score_b = _original_call(self, *args, **kwargs)
+            timed_out_b = _consume_last_docking_timed_out()
+            error_val_b = float(self.config.get("error_val", 100.0))
+            z_b, invalid_b = _capped_zscore(score_b, error_val_b, mean_b, std_b, _INVALID_Z_PENALTY)
+            if invalid_b:
+                _call_stats["invalid_b"] += 1
+                if timed_out_b:
+                    _call_stats["timeout_b"] += 1
+                _warn_error_value("b", score_b, error_val_b)
+            else:
+                _warn_large_z("b", z_b)
+            return -z_b
+
+        # single_a / double: A is primary receptor
         score_a = _original_call(self, *args, **kwargs)
         timed_out_a = _consume_last_docking_timed_out()
         error_val_a = float(self.config.get("error_val", 100.0))
@@ -335,31 +362,27 @@ def _apply_dual_patch() -> None:
         if reward_mode == "single_a":
             return -z_a
 
+        # double mode: also score B via config swap
         if dual_cfg is None:
-            raise RuntimeError("dual_cfg отсутствует при режиме single_b/double")
+            raise RuntimeError("dual_cfg отсутствует при режиме double")
 
         receptor_b = dual_cfg["receptor_b"]
         center_b = dual_cfg["center_b"]
         size_b = dual_cfg["size_b"]
 
-        mean_b = float(targets[target_id_b]["mean"])
-        std_b = float(targets[target_id_b]["std"])
+        # NOTE: mean_b/std_b are closure vars (loaded in _apply_dual_patch)
 
-        # DockingVina stores all params in self.config dict;
-        # __call__ unpacks it via DockingVina.docking(**self.config)
         cfg = self.config
         orig_receptor = cfg["receptor"]
         orig_center = cfg["box_center"]
         orig_size = cfg["box_size"]
 
-        # Score B — second receptor
         try:
             cfg["receptor"] = receptor_b
             cfg["box_center"] = [float(x) for x in center_b.split(",")]
             cfg["box_size"] = [float(x) for x in size_b.split(",")]
             score_b = _original_call(self, *args, **kwargs)
         finally:
-            # Restore original state
             cfg["receptor"] = orig_receptor
             cfg["box_center"] = orig_center
             cfg["box_size"] = orig_size
@@ -376,10 +399,6 @@ def _apply_dual_patch() -> None:
         else:
             _warn_large_z("b", z_b)
 
-        if reward_mode == "single_b":
-            return -z_b
-
-        # Combined reward (worst-case in z-space)
         return -max(z_a, z_b)
 
     DockingVina.__call__ = _dual_call
