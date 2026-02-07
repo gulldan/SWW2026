@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
+from loguru import logger
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -22,12 +24,26 @@ def load_pairs(config_dir: str | Path = "configs") -> dict[str, Any]:
     data = load_yaml(path)
     if "pairs" not in data:
         raise ValueError("pairs.yaml must contain 'pairs' key")
+    allow_non_human = os.getenv("DUALDOCKING_ALLOW_NON_HUMAN", "").lower() in ("true", "1")
+    if allow_non_human:
+        logger.warning("DUALDOCKING_ALLOW_NON_HUMAN=true — non-human targets allowed (exploratory mode)")
+
     for pair_id, pair_cfg in data["pairs"].items():
         for role in ("target_a", "target_b"):
             if role not in pair_cfg:
                 raise ValueError(f"Pair '{pair_id}' missing '{role}'")
             if "id" not in pair_cfg[role]:
                 raise ValueError(f"Pair '{pair_id}'.{role} missing 'id'")
+            if "organism" not in pair_cfg[role]:
+                raise ValueError(f"Pair '{pair_id}'.{role} missing 'organism'")
+            organism = pair_cfg[role]["organism"].strip()
+            if organism.casefold() != "homo sapiens" and not allow_non_human:
+                target_id = pair_cfg[role]["id"]
+                raise ValueError(
+                    f"Pair '{pair_id}'.{role} target '{target_id}' has organism='{organism}' "
+                    f"(non-Homo sapiens). Only human targets allowed. "
+                    f"Set DUALDOCKING_ALLOW_NON_HUMAN=true to bypass for exploratory runs."
+                )
     return data
 
 

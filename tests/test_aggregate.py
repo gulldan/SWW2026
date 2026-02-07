@@ -8,7 +8,7 @@ from scripts.aggregate import main
 
 
 def _pairs_cfg():
-    return {"pairs": {"pair1": {"target_a": {"id": "A"}, "target_b": {"id": "B"}}}}
+    return {"pairs": {"pair1": {"target_a": {"id": "A", "organism": "Homo sapiens"}, "target_b": {"id": "B", "organism": "Homo sapiens"}}}}
 
 
 def _experiment_cfg():
