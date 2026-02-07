@@ -54,6 +54,11 @@ generator:
     box_padding: 10.0        # Å
     vina_program: unidock_gpu    # "qvina02" for CPU fallback
 
+# Порог качества reward-прогона (quality gate)
+quality_gate:
+  max_invalid_fraction: 0.10
+  max_timeout_fraction: 0.05
+
 # Настройки скорера (Boltz-2)
 scorer:
   name: "Boltz-2"

@@ -75,7 +75,7 @@ def main(
 ) -> None:
     """Compute metrics and statistical comparisons."""
     from dualdocking.config import load_experiment, load_metrics, load_pairs
-    from dualdocking.fairness import validate_fairness
+    from dualdocking.fairness import validate_fairness, validate_reward_quality
     from dualdocking.statistical import (
         BootstrapResult,
         cliffs_delta,
@@ -92,9 +92,10 @@ def main(
     seeds = exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
 
     results_root_path = PROJECT_ROOT / results_root
+    qg_cfg = exp_cfg.get("quality_gate", {})
     data: dict[str, dict[str, dict[int, pd.DataFrame]]] = {}
 
-    # Fairness gate + load data
+    # Fairness gate + quality gate + load data
     for pair_id in pairs:
         thresholds = metrics_cfg.get("thresholds", {}).get(pair_id, {})
         thr_a = thresholds.get("target_a", 0.0)
@@ -114,6 +115,15 @@ def main(
                 if not fairness["budget_consistent"]:
                     logger.error("Fairness check failed for {}: {}", run_dir, fairness["issues"])
                     sys.exit(1)
+
+                reward_quality = validate_reward_quality(
+                    run_dir,
+                    max_invalid_fraction=qg_cfg.get("max_invalid_fraction", 0.10),
+                    max_timeout_fraction=qg_cfg.get("max_timeout_fraction", 0.05),
+                )
+                if not reward_quality["run_valid"]:
+                    logger.warning("Quality gate failed for {}: {}", run_dir, reward_quality["issues"])
+                    continue
 
                 df = _load_scored_csv(scored_path, thr_a, thr_b)
                 data[pair_id][mode][seed] = df

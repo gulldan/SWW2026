@@ -166,6 +166,8 @@ def main(
     if mode in {"single_b", "double"}:
         second_target_id = pair_cfg["target_b"]["id"]
 
+    qg_cfg = exp_cfg.get("quality_gate", {})
+
     gen_config = GenerationConfig(
         target_id=pair_cfg["target_a"]["id"],
         n_molecules=n_molecules or exp_cfg.get("budget", {}).get("n_molecules", 1000),
@@ -182,6 +184,8 @@ def main(
         box_padding=freedpp_cfg.get("box_padding", 10.0),
         vina_program=freedpp_cfg.get("vina_program", "unidock_gpu"),
         steps_per_epoch=steps_per_epoch or freedpp_cfg.get("steps_per_epoch", 256),
+        qg_max_invalid_fraction=qg_cfg.get("max_invalid_fraction", 0.10),
+        qg_max_timeout_fraction=qg_cfg.get("max_timeout_fraction", 0.05),
     )
 
     start = time.time()

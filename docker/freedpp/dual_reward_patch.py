@@ -108,6 +108,12 @@ def _write_reward_metadata() -> None:
         "primary_target": target_id_b if reward_mode == "single_b" else target_id_a,
         "reward_mode": reward_mode,
     }
+    max_inv = float(os.environ.get("QG_MAX_INVALID_FRACTION", "0.10"))
+    max_to = float(os.environ.get("QG_MAX_TIMEOUT_FRACTION", "0.05"))
+    inv_ok = all(metadata[f"invalid_reward_fraction_{label}"] <= max_inv for label in ("a", "b"))
+    to_ok = all(metadata[f"timeout_fraction_{label}"] <= max_to for label in ("a", "b"))
+    metadata["run_valid"] = inv_ok and to_ok
+
     try:
         _METADATA_PATH.parent.mkdir(parents=True, exist_ok=True)
         with _METADATA_PATH.open("w", encoding="utf-8") as f:

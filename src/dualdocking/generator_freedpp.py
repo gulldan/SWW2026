@@ -74,6 +74,8 @@ class GenerationConfig:
     box_padding: float = 10.0  # Å
     vina_program: str = "unidock_gpu"  # "qvina02" | "unidock" | "unidock_gpu"
     steps_per_epoch: int = 256
+    qg_max_invalid_fraction: float = 0.10
+    qg_max_timeout_fraction: float = 0.05
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +342,8 @@ def _run_freedpp(
     if config.reward_mode == "single_b":
         if pdbqt_b is None:
             raise ValueError("single_b requires receptor B (second_target_id must be set)")
-        assert center_b is not None and size_b is not None  # guarded by pdbqt_b check
+        if center_b is None or size_b is None:
+            raise ValueError("single_b requires center_b and size_b")
         args = _build_freedpp_args(config, pdbqt_b, center_b, size_b, commands)
     else:
         args = _build_freedpp_args(config, pdbqt_a, center_a, size_a, commands)
@@ -366,6 +369,10 @@ def _run_freedpp(
             f"TARGET_ID_B={config.second_target_id or ''}",
             "-e",
             "NORMALIZATION_PATH=/workspace/normalization.yaml",
+            "-e",
+            f"QG_MAX_INVALID_FRACTION={config.qg_max_invalid_fraction}",
+            "-e",
+            f"QG_MAX_TIMEOUT_FRACTION={config.qg_max_timeout_fraction}",
         ]
     )
 

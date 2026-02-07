@@ -31,12 +31,25 @@ def main(config: str, experiment_config: str, output: str) -> None:
     modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
     frames: list[pd.DataFrame] = []
 
+    from dualdocking.fairness import validate_reward_quality
+
+    qg_cfg = exp_cfg.get("quality_gate", {})
+
     for pair_id in pairs:
         for mode in modes:
             for seed in seeds:
-                path = PROJECT_ROOT / "results" / pair_id / mode / f"seed_{seed}" / "scored_joined.csv"
+                run_dir = PROJECT_ROOT / "results" / pair_id / mode / f"seed_{seed}"
+                path = run_dir / "scored_joined.csv"
                 if not path.exists():
                     logger.warning("Отсутствует: {}", path)
+                    continue
+                rq = validate_reward_quality(
+                    run_dir,
+                    max_invalid_fraction=qg_cfg.get("max_invalid_fraction", 0.10),
+                    max_timeout_fraction=qg_cfg.get("max_timeout_fraction", 0.05),
+                )
+                if not rq["run_valid"]:
+                    logger.warning("Quality gate failed, skipping {}: {}", run_dir, rq["issues"])
                     continue
                 df = pd.read_csv(path)
                 df["pair"] = pair_id

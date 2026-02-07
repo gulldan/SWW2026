@@ -612,3 +612,39 @@ class TestRewardBounds:
     def test_no_nan_in_reward(self):
         z, _ = self.mod._capped_zscore(score=-7.5, error_val=100.0, mean=-7.5, std=1.0, penalty_cap=4.0)
         assert not math.isnan(z)
+
+
+# ---------------------------------------------------------------------------
+# run_valid in metadata (ENG-03 / KVA-257)
+# ---------------------------------------------------------------------------
+
+
+class TestRunValidInMetadata:
+    """Verify _write_reward_metadata sets run_valid based on QG env thresholds."""
+
+    @pytest.fixture(autouse=True)
+    def _import(self, _patch_module, tmp_path, monkeypatch):
+        self.mod = _patch_module
+        self.tmp_path = tmp_path
+
+    def test_run_valid_in_metadata_true(self, monkeypatch):
+        """All fractions below default thresholds → run_valid=True."""
+        monkeypatch.setenv("QG_MAX_INVALID_FRACTION", "0.10")
+        monkeypatch.setenv("QG_MAX_TIMEOUT_FRACTION", "0.05")
+        self.mod._call_stats.update(
+            {"total": 100, "invalid_a": 5, "invalid_b": 3, "timeout_a": 2, "timeout_b": 1}
+        )
+        self.mod._write_reward_metadata()
+        data = json.loads(self.mod._METADATA_PATH.read_text())
+        assert data["run_valid"] is True
+
+    def test_run_valid_in_metadata_false(self, monkeypatch):
+        """Invalid fraction exceeds threshold → run_valid=False."""
+        monkeypatch.setenv("QG_MAX_INVALID_FRACTION", "0.10")
+        monkeypatch.setenv("QG_MAX_TIMEOUT_FRACTION", "0.05")
+        self.mod._call_stats.update(
+            {"total": 100, "invalid_a": 15, "invalid_b": 3, "timeout_a": 2, "timeout_b": 1}
+        )
+        self.mod._write_reward_metadata()
+        data = json.loads(self.mod._METADATA_PATH.read_text())
+        assert data["run_valid"] is False
