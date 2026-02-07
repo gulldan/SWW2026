@@ -40,7 +40,8 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── tasks.md          # Living log выполненных задач
 │   ├── selection_criteria.md
 │   ├── preregistration.md # Frozen pre-registration гипотез и decision rules (SCI-01)
-│   └── receptor_qc.md    # Receptor QC sheet per target (SCI-03)
+│   ├── receptor_qc.md    # Receptor QC sheet per target (SCI-03)
+│   └── statistical_analysis_plan.md # Frozen SAP: inference, claim rules, code mapping (SCI-08)
 ├── src/dualdocking/      # Основная библиотека
 │   ├── objectives.py     # Целевые функции (min, harmonic, weighted_sum, geometric, Tchebycheff, Pareto)
 │   ├── scorer_boltz2.py  # Скоринг Boltz-2 через CLI (subprocess + disk cache)
