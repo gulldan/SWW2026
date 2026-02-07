@@ -19,6 +19,7 @@
 | `docs/goal.md` | Operational spec | Гипотеза, метод, метрики, критерии успеха |
 | `docs/tasks.md` | Living log | Журнал выполнения и план |
 | `docs/selection_criteria.md` | Reference | Обоснование выбора пар; фактические пары берутся из `configs/pairs.yaml` |
+| `docs/preregistration.md` | Frozen | Pre-registration: hypotheses, endpoints, decision rules, SAP summary |
 | `docs/README.md` | Index | Этот файл: карта достоверности и приоритетов |
 
 ## Правило разрешения конфликтов
