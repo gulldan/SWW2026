@@ -1,6 +1,6 @@
 # План и статус
 
-Обновлено: 2026-02-06
+Обновлено: 2026-02-07
 Статус: активное выполнение
 
 ## Цель недели
@@ -43,12 +43,16 @@
   - Валидация `INVALID_Z_PENALTY > 0 && finite`, `mkdir -p` для `REWARD_METADATA_PATH`.
   - Smoke-артефакт: `docs/tasks/ENG-01_smoke.json`.
 - **ENG-06 (KVA-260)**: Inter-process lock + atomic write для cache JSON (`cache_io.py`).
+- **ENG-04 (KVA-258)**: Pareto-фронт и diversity метрики (`fairness.py`, `diversity.py`).
+- **ENG-05 (KVA-259)**: Cache key v2 — контекстно-зависимый ключ скоринга (`{target}.{ctx[:8]}.json`).
+- **ENG-10 (KVA-261)**: Organism gate — `load_pairs()` блокирует не-человеческие мишени.
+- **ENG-08 (KVA-262)**: Run manifest — lifecycle-трекинг запусков (`run_manifest.json`).
+- **KVA-263**: Docs hard-sync — синхронизация документации с кодом.
 
 ## Что в работе
 
-- Полный прогон по всем парам/сидам.
+- Полный прогон по всем парам/сидам (5 core + 3 auxiliary).
 - Финальные `report/metrics.json` и `report/stats.json` для сравнения режимов.
-- Подготовка итогового отчёта и набора кандидатов.
 
 ## Критерии завершения
 

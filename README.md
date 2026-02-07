@@ -10,7 +10,7 @@ RL-генерация, оптимизированная под worst-case цел
 
 ```
 ├── configs/              # Конфигурация эксперимента
-│   ├── pairs.yaml        # 9 пар белковых мишеней (4 non-AD + 5 AD)
+│   ├── pairs.yaml        # 9 пар белковых мишеней (5 core + 3 auxiliary + 1 blocked)
 │   ├── metrics.yaml      # Пороги хитов и определения метрик
 │   └── experiment.yaml   # Бюджет, сиды, параметры запуска (вкл. freedpp секция)
 ├── data/targets/         # Скачанные PDB-структуры и FASTA-последовательности
@@ -22,7 +22,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── entrypoint.sh     # prepare-receptor / train / sample
 │   └── dual_reward_patch.py  # Двойной reward: worst-case (max для lower-is-better)
 ├── cache/                # Кеш (в .gitignore)
-│   ├── <target_id>.json  # Кеш скоров Boltz-2 (per molecule)
+│   ├── <target>.{ctx[:8]}.json  # Кеш скоров Boltz-2 (context-segmented, cache key v2)
 │   ├── boltz_msa/        # Pre-computed MSA для offline-скоринга
 │   │   ├── <target_id>.csv           # MSA файл (копия для быстрого доступа)
 │   │   └── <target_id>/              # Полный вывод Boltz MSA warmup
@@ -41,16 +41,27 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── binding_box.py    # Извлечение binding box из PDB (лиганд / fallback)
 │   ├── chem_sanitize.py  # Валидация и дедупликация SMILES
 │   ├── statistical.py    # Иерархический bootstrap, FDR, effect sizes
-│   └── config.py         # Загрузка YAML-конфигов
+│   ├── config.py         # Загрузка YAML-конфигов (вкл. organism gate)
+│   ├── cache_io.py       # Атомарный disk I/O (fcntl + temp-and-replace)
+│   ├── run_manifest.py   # Lifecycle-трекинг запусков (run_manifest.json)
+│   ├── fairness.py       # Compute parity и fairness метрики
+│   ├── baseline.py       # Сравнение с baseline
+│   ├── latex_report.py   # Генерация LaTeX-отчёта
+│   ├── diversity.py      # Метрики химического разнообразия
+│   └── chembl_validation.py  # Валидация ChEMBL target IDs
 ├── scripts/              # CLI-скрипты
 │   ├── stage0_fetch.py       # Stage 0: единая точка входа для ВСЕХ загрузок (offline после)
 │   ├── fetch_freed_data.py    # Загрузка docker/freedpp/data/{zinc_crem.json,alert_collections.csv}
 │   ├── fetch_baseline_zinc.py # Скачивание baseline archive zinc-druglike-cano.tar.xz
+│   ├── fetch_chembl_actives.py # Загрузка активных соединений из ChEMBL
 │   ├── prepare_data_dependencies.py # One-shot подготовка data deps (FREED + baseline/parquet/sample)
 │   ├── prepare_targets.py    # Скачивание PDB, FASTA, pre-compute MSA, PDB→PDBQT
 │   ├── generate.py           # Запуск FREED++ (single_a/single_b/double)
 │   ├── score.py              # Скоринг молекул через Boltz-2
 │   ├── boltz_smoke.py        # Smoke-тест Boltz-2 (3 молекулы, --dry-run)
+│   ├── smoke_eng01.py        # Smoke-тест ENG-01 reward patch
+│   ├── rdkit_embed.py        # 3D embedding через RDKit
+│   ├── validate_redocking.py # Валидация re-docking протокола
 │   ├── aggregate.py          # Объединение результатов по парам
 │   ├── plot_results.py       # Генерация графиков сравнения
 │   ├── compute_metrics.py    # Вычисление метрик и стат. тестов
@@ -62,6 +73,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── data/             # Агрегированные данные
 │   ├── figures/          # Сгенерированные графики
 │   ├── experiment_<run_id>_<utc>.log  # Логи run_full_experiment.py
+│   ├── run_manifest_<run_id>.json     # Lifecycle-манифест запуска
 │   ├── metrics.json
 │   ├── stats.json
 │   └── summary.txt
@@ -90,7 +102,7 @@ docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 
 # Проверка
 uv run pytest
-uv run ruff check src/ scripts/ tests/
+uv run ruff check src/ scripts/ docker/
 ```
 
 ## Калибровочный набор для нормализации
@@ -221,9 +233,17 @@ uv run python scripts/generate_latex_report.py --mode full
 | PDB structures | `data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | RCSB |
 | MSA данные | `cache/boltz_msa/{target_id}.csv` | ColabFold API через Boltz |
 | Boltz checkpoints | `~/.boltz/` | Автоматически при первом запуске |
-| Scoring cache | `cache/{target_id}.json` | Результаты Boltz per molecule |
+| Scoring cache | `cache/{target}.{ctx[:8]}.json` | Результаты Boltz per molecule (context-segmented) |
 
 После `prepare_targets.py --prepare-all` весь пайплайн скоринга работает **полностью offline**.
+
+### Organism gate
+
+`load_pairs()` блокирует пары с не-человеческими мишенями (`organism != "Homo sapiens"`). Поле `organism` обязательно в `configs/pairs.yaml`. Пара COX1_COX2 заблокирована по этому критерию (COX1 PDB = Ovis aries, COX2 PDB = Mus musculus).
+
+### Run manifest
+
+Каждый запуск `run_full_experiment.py` создаёт lifecycle-манифест `report/run_manifest_{run_id}.json`, фиксирующий параметры, статус задач, таймстемпы начала/завершения и хэши конфигурации. Модуль `src/dualdocking/run_manifest.py` предоставляет API для записи и обновления манифеста.
 
 ### Конвенция скоров
 
@@ -257,7 +277,7 @@ properties:
 uv run boltz predict input.yaml \
   --out_dir cache/boltz_runs/{target_id}/{hash} \
   --model boltz2 --accelerator gpu \
-  --recycling_steps 3 --sampling_steps 200 --diffusion_samples 1 \
+  --recycling_steps 3 --sampling_steps 200 --diffusion_samples 4 \
   --sampling_steps_affinity 200 --diffusion_samples_affinity 5 --override
 
 # ONLINE (для prepare_targets.py --prepare-all):
@@ -494,7 +514,7 @@ docker image inspect dualdocking/freedpp:latest --format '{{.Id}}'
 uv run python scripts/prepare_targets.py --prepare-all
 
 # Генерация и скоринг (offline)
-for pair in CDK2_ERK2 EGFR_HER2 COX1_COX2 AChE_BChE; do
+for pair in CDK2_ERK2 AChE_BChE BACE1_GSK3B AChE_BACE1 GSK3B_CDK5 EGFR_HER2 BACE1_CDK5 AChE_MAOB; do
   for mode in single_a single_b double; do
     uv run python scripts/generate.py --pair $pair --mode $mode
     uv run python scripts/score.py --pair $pair --mode $mode
@@ -522,9 +542,14 @@ results/
 │   │   └── ...
 │   └── double/
 │       └── ...               # generated.csv, scores_A.csv, scores_B.csv, scored_joined.csv
-├── EGFR_HER2/ ...
-├── COX1_COX2/ ...
-└── AChE_BChE/ ...
+├── AChE_BChE/ ...
+├── BACE1_GSK3B/ ...
+├── AChE_BACE1/ ...
+├── GSK3B_CDK5/ ...
+├── EGFR_HER2/ ...           # auxiliary
+├── BACE1_CDK5/ ...           # auxiliary
+└── AChE_MAOB/ ...            # auxiliary
+# COX1_COX2 blocked (non-human organisms) — не генерируется
 
 report/
 ├── chapters/                  # Редактируемые главы статьи (.tex), не generated

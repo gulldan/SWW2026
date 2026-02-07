@@ -89,7 +89,7 @@ docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 ## Project Architecture
 
 ```
-src/dualdocking/        # Core library (14 modules)
+src/dualdocking/        # Core library (15 modules)
   objectives.py         #   Multi-objective functions (min, harmonic, Pareto, etc.)
   scorer_boltz2.py      #   Boltz-2 affinity scorer with disk cache
   generator_freedpp.py  #   FREED++ Docker subprocess wrapper
@@ -100,6 +100,7 @@ src/dualdocking/        # Core library (14 modules)
   chem_sanitize.py      #   SMILES validation & dedup
   baseline.py           #   Baseline comparison
   chembl_validation.py  #   ChEMBL target validation
+  run_manifest.py       #   Lifecycle tracking for experiment runs
 scripts/                # CLI entry points (stage0_fetch → run_full_experiment)
 tests/                  # pytest suite, monkeypatch-heavy
 configs/                # YAML: pairs.yaml, metrics.yaml, experiment.yaml
