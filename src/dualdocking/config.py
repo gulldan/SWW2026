@@ -36,6 +36,9 @@ def load_pairs(config_dir: str | Path = "configs") -> dict[str, Any]:
                 raise ValueError(f"Pair '{pair_id}'.{role} missing 'id'")
             if "organism" not in pair_cfg[role]:
                 raise ValueError(f"Pair '{pair_id}'.{role} missing 'organism'")
+            # Skip organism check for blocked pairs — they are excluded from analysis.
+            if pair_cfg.get("set") == "blocked":
+                continue
             organism = pair_cfg[role]["organism"].strip()
             if organism.casefold() != "homo sapiens" and not allow_non_human:
                 target_id = pair_cfg[role]["id"]

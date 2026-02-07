@@ -1,4 +1,4 @@
-version: "2.4"
+version: "2.5"
 experiment:
   name: "Dual-Target Drug Discovery"
   date: "2026-02-03"
@@ -16,16 +16,36 @@ data_sources:
 configs:
   experiment_yaml:
     path: "configs/experiment.yaml"
-    sha256: "ff7340217b885590ccc562619aa4929de06e4cbe9be511e79f9ccc30f49819ea"
+    sha256: "7da5b90cc2d5899b93eda5ff85245158febdf72172bed24372386a32bef58f9e"
   pairs_yaml:
     path: "configs/pairs.yaml"
-    sha256: "99d40f267fa8263e7181691fd7c978c9ff5b829f982a96ab9f1fb939c5bea426"
+    sha256: "5a161ac88ae12561a019c39fdfb4e7be24fc6c46cf40fed7b38a883b3d313383"
   metrics_yaml:
     path: "configs/metrics.yaml"
-    sha256: "e86e34366c47c419981f3feaf3e467840338e9e62e34b19cfa75653f0c1ef3f8"
+    sha256: "44be62c090b971b5ee2b5b1af7fb363824db370170a8db3d26f63a6718b0ccc0"
   normalization_yaml:
     path: "configs/normalization.yaml"
-    sha256: "70a01637bb0dcaa10022bd74e6808e161558b184e2c8bf86a38d896be86cb67e"
+    sha256: "3b69477db24b3b3244663980a3e4503e7da77923b3e2bf55fb1846fd35910b8b"
+
+# SCI-02: Pair freeze — locked before experiment runs.
+# All active pairs are Homo sapiens only (ENG-10 organism gate).
+# COX1_COX2 blocked (non-human PDB: Ovis aries / Mus musculus).
+pairs_freeze:
+  freeze_date: "2026-02-07"
+  human_only: true
+  organism_gate: "src/dualdocking/config.py: load_pairs()"
+  core:
+    - CDK2_ERK2    # 1HCL / 4QTA, Homo / Homo
+    - AChE_BChE    # 4EY7 / 4BDS, Homo / Homo
+    - BACE1_GSK3B  # 6EQM / 5KPK, Homo / Homo
+    - AChE_BACE1   # 4EY7 / 6EQM, Homo / Homo
+    - GSK3B_CDK5   # 5KPK / 1UNL, Homo / Homo
+  auxiliary:
+    - EGFR_HER2    # 1M17 / 3PP0, Homo / Homo
+    - BACE1_CDK5   # 6EQM / 1UNL, Homo / Homo
+    - AChE_MAOB    # 4EY7 / 2V5Z, Homo / Homo (cofactor: FAD)
+  blocked:
+    - COX1_COX2    # 1EQG / 3LN1, Ovis aries / Mus musculus
 
 primary_metric:
   source: "Boltz-2 affinity_pred_value"
