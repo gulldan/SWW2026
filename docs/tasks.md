@@ -17,6 +17,7 @@
 - **KVA-268 / SCI-04**: Redocking validation (RMSD). RMSD таблица, pass/fail threshold, `report/data/redocking_metrics.csv`.
 - **KVA-263 / ENG-09**: Docs hard-sync с кодом. README.md + docs/tasks.md синхронизированы с кодом.
 - **KVA-270 / SCI-06**: Hit-threshold calibration + sensitivity. `scripts/threshold_sensitivity.py` создан, тесты 7/7 pass, sensitivity_thresholds в metrics.yaml.
+- **KVA-271 / SCI-07**: Proxy vs Final correlation. `scripts/proxy_final_correlation.py` создан, тесты 7/7 pass. Spearman/Pearson + bootstrap CI.
 
 ## In Progress
 
@@ -24,7 +25,6 @@
 
 ## Backlog
 
-- **KVA-271 / SCI-07**: Proxy vs Final correlation (Uni-Dock reward vs Boltz-2).
 - **KVA-272 / SCI-08**: SAP — Statistical Analysis Plan submission-grade.
 - **KVA-273 / SCI-09**: Pilot matrix run (1 pair x 3 modes x 2 seeds).
 - **KVA-274 / SCI-10**: Full matrix run + claim audit.

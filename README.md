@@ -72,6 +72,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── validate_redocking.py    # SCI-04: re-docking validation (RMSD check)
 │   ├── enrichment_benchmark.py  # SCI-05: enrichment benchmark (AUROC/BEDROC per target)
 │   ├── threshold_sensitivity.py # SCI-06: hit-threshold sensitivity (T=-1,0,+1)
+│   ├── proxy_final_correlation.py # SCI-07: proxy vs final correlation (docking↔Boltz-2)
 │   ├── aggregate.py          # Объединение результатов по парам
 │   ├── plot_results.py       # Генерация графиков сравнения
 │   ├── compute_metrics.py    # Вычисление метрик и стат. тестов
@@ -644,6 +645,18 @@ uv run python scripts/enrichment_benchmark.py --skip-docking
 - `report/data/enrichment_metrics.csv` — таблица (target, AUROC, BEDROC, EF, status)
 - `report/figures/enrichment/roc_{TARGET}.png` — ROC-кривые
 - `report/figures/enrichment/enrichment_summary.png` — сводная гистограмма
+
+### SCI-07: Proxy vs Final Correlation
+
+Spearman ρ и Pearson r между UniDock docking (proxy reward) и Boltz-2 affinity (final scorer) per pair/mode/target. Молекулы из FREED++ training logs join-ятся с Boltz-2 scores по каноническому SMILES.
+
+```bash
+uv run python scripts/proxy_final_correlation.py
+```
+
+Выход:
+- `report/data/proxy_final_corr.csv` — плоская таблица (pair × mode × target × correlation)
+- `report/data/proxy_final_corr.json` — JSON со сводкой proxy suitability
 
 ### SCI-06: Threshold Sensitivity
 
