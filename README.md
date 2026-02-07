@@ -48,6 +48,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── baseline.py       # Сравнение с baseline
 │   ├── latex_report.py   # Генерация LaTeX-отчёта
 │   ├── diversity.py      # Метрики химического разнообразия
+│   ├── enrichment.py        # Docking-based enrichment metrics (AUROC, BEDROC, EF)
 │   └── chembl_validation.py  # Валидация ChEMBL target IDs
 ├── scripts/              # CLI-скрипты
 │   ├── stage0_fetch.py       # Stage 0: единая точка входа для ВСЕХ загрузок (offline после)
@@ -61,12 +62,17 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── boltz_smoke.py        # Smoke-тест Boltz-2 (3 молекулы, --dry-run)
 │   ├── smoke_eng01.py        # Smoke-тест ENG-01 reward patch
 │   ├── rdkit_embed.py        # 3D embedding через RDKit
-│   ├── validate_redocking.py # Валидация re-docking протокола
+│   ├── validate_redocking.py    # SCI-04: re-docking validation (RMSD check)
+│   ├── enrichment_benchmark.py  # SCI-05: enrichment benchmark (AUROC/BEDROC per target)
 │   ├── aggregate.py          # Объединение результатов по парам
 │   ├── plot_results.py       # Генерация графиков сравнения
 │   ├── compute_metrics.py    # Вычисление метрик и стат. тестов
 │   ├── render_molecules.py   # 2D-визуализация молекул с аннотациями
 │   └── summarize.py          # Мини-аналитика: текстовый отчёт
+├── data/enrichment/      # Enrichment benchmark artifacts
+│   ├── scores/           # Per-target active docking scores ({TARGET}_actives.csv)
+│   ├── receptors/        # Downloaded PDBs and PDBQTs for missing targets
+│   └── enrichment_results.json  # Full metadata + results
 ├── tests/                # Юнит-тесты
 ├── results/              # Результаты запусков (в .gitignore)
 ├── report/               # Артефакты итогового отчёта
@@ -386,9 +392,11 @@ uv run python scripts/stage0_fetch.py --dry-run
 ### После Stage 0: полный pipeline offline
 
 ```bash
-# Stage 0.5: Calibration (offline, нужен GPU)
+# Stage 0.5: Calibration + Validation (offline, нужен GPU)
 uv run python scripts/dock_calibration.py
 uv run python scripts/calibrate_normalization.py
+uv run python scripts/validate_redocking.py        # SCI-04
+uv run python scripts/enrichment_benchmark.py       # SCI-05
 
 # Stage 1: Generate + Score (offline)
 EXPERIMENT_RUN_ID=run01 uv run python scripts/run_full_experiment.py --resume --parallel 2
@@ -563,8 +571,13 @@ report/
 │   ├── 06_limitations.tex
 │   └── 07_conclusion.tex
 ├── data/
-│   └── all_results.parquet
+│   ├── all_results.parquet
+│   ├── redocking_metrics.csv      # SCI-04 re-docking RMSD per target
+│   └── enrichment_metrics.csv     # SCI-05 AUROC/BEDROC/EF per target
 ├── figures/
+│   ├── enrichment/
+│   │   ├── roc_{TARGET}.png           # Per-target ROC curves
+│   │   └── enrichment_summary.png     # AUROC + BEDROC bar chart
 │   ├── {pair}_molecules_single_a.png
 │   ├── {pair}_molecules_single_b.png
 │   ├── {pair}_molecules_double.png
@@ -573,6 +586,54 @@ report/
 ├── stats.json
 └── summary.txt              # Текстовый отчёт с аналитикой
 ```
+
+## Validation Pipeline (SCI-03 → SCI-05)
+
+Перед запуском экспериментов выполняется серия проверок качества docking setup:
+
+### SCI-03: Receptor QC
+
+Документирует качество каждой PDB-структуры (разрешение, организм, наличие лиганда, кофактора).
+
+### SCI-04: Re-docking Validation
+
+Валидация docking setup: со-кристаллизованный лиганд докируется обратно, RMSD ≤ 2.0 Å = pass.
+
+```bash
+uv run python scripts/validate_redocking.py
+uv run python scripts/validate_redocking.py --target-id BACE1 --dry-run
+```
+
+Выход: `data/validation/redocking_results.json`, `report/data/redocking_metrics.csv`.
+
+### SCI-05: Enrichment Benchmark
+
+Проверяет, что UniDock способен отличить ChEMBL-активные соединения от druglike декоев (MOSES).
+Для каждого таргета вычисляется AUROC, BEDROC(α=20) и EF@1%/5%.
+
+Пороги pass/fail задаются в `configs/metrics.yaml` → `enrichment_quality`:
+- AUROC > 0.6 (выше random = 0.5)
+- BEDROC(α=20) > 0.3 (значимое раннее обогащение)
+
+```bash
+# Dry run: проверить доступность данных
+uv run python scripts/enrichment_benchmark.py --dry-run
+
+# Полный запуск (Docker + GPU)
+uv run python scripts/enrichment_benchmark.py
+
+# Конкретные таргеты
+uv run python scripts/enrichment_benchmark.py --target-id CDK2 --target-id BACE1
+
+# Только метрики (без докинга, по уже имеющимся скорам)
+uv run python scripts/enrichment_benchmark.py --skip-docking
+```
+
+Выход:
+- `data/enrichment/enrichment_results.json` — полный JSON с метаданными
+- `report/data/enrichment_metrics.csv` — таблица (target, AUROC, BEDROC, EF, status)
+- `report/figures/enrichment/roc_{TARGET}.png` — ROC-кривые
+- `report/figures/enrichment/enrichment_summary.png` — сводная гистограмма
 
 ## Ключевые ссылки
 

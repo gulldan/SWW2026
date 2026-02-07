@@ -46,6 +46,22 @@ thresholds:
 enrichment:
   k_values: [10, 50, 100, 500]
 
+# Docking enrichment quality thresholds (SCI-05: enrichment benchmark).
+# Used by scripts/enrichment_benchmark.py to flag targets where UniDock
+# cannot separate ChEMBL actives from MOSES druglike decoys.
+#
+# Threshold rationale (project-specific — no literature consensus):
+#   AUROC > 0.6:  modestly above random (0.5); conservative for druglike decoys
+#   BEDROC(alpha=20) > 0.3: meaningful early enrichment; standard alpha per Truchon & Bayly 2007
+#   EF@1%: reported but NOT used as pass/fail criterion (too variable with small n)
+enrichment_quality:
+  auroc_threshold: 0.6
+  bedroc_alpha20_threshold: 0.3
+  ef_1pct_threshold: 2.0
+  alpha: 20.0
+  max_actives_per_target: 200
+  active_sampling_seed: 137
+
 # Метрики, вычисляемые для каждого запуска
 computed_metrics:
   - dual_hit_rate
