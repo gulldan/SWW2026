@@ -44,7 +44,8 @@ report/manuscript.bbl
 report/manuscript.blg
 report/manuscript.log
 report/references.bib
-
+docker/freedpp/dualdocking-freedpp.tar.zst
+.coverage
 # Secrets / credentials
 .env
 *.key
