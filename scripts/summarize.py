@@ -119,9 +119,10 @@ def _build_report(
             pair_metrics = metrics.get(pair_id, {}).get(mode, {})
             if pair_metrics:
                 hr_a = pair_metrics.get("hr_a_mean")
+                hr_b = pair_metrics.get("hr_b_mean")
                 hr_both = pair_metrics.get("hr_both_mean")
                 balance = pair_metrics.get("balance_mean")
-                lines.append(f"  Метрики: HR_A={_fmt(hr_a)}  HR_both={_fmt(hr_both)}  balance={_fmt(balance)}")
+                lines.append(f"  Метрики: HR_A={_fmt(hr_a)}  HR_B={_fmt(hr_b)}  HR_both={_fmt(hr_both)}  balance={_fmt(balance)}")
                 lines.append("")
 
             lines.append(_top_molecules_block(df_mode, name_a, name_b, primary_col=primary_col))

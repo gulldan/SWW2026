@@ -110,6 +110,8 @@ def _build_metric_rows(pairs_cfg: dict[str, Any], metrics: dict[str, Any], pair_
                 "mode": mode,
                 "hr_a_mean": data.get("hr_a_mean"),
                 "hr_a_sem": data.get("hr_a_sem"),
+                "hr_b_mean": data.get("hr_b_mean"),
+                "hr_b_sem": data.get("hr_b_sem"),
                 "hr_both_mean": data.get("hr_both_mean"),
                 "hr_both_sem": data.get("hr_both_sem"),
                 "balance_mean": data.get("balance_mean"),

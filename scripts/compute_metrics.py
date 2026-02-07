@@ -65,6 +65,7 @@ def _load_scored_csv(path: Path, thr_a: float, thr_b: float) -> pd.DataFrame:
 @click.option("--metrics-config", default="configs/metrics.yaml")
 @click.option("--output-metrics", default="report/metrics.json")
 @click.option("--output-stats", default="report/stats.json")
+@click.option("--allow-incomplete/--no-allow-incomplete", default=True, help="Allow missing pair-mode-seed combos")
 def main(
     results_root: str,
     pairs_config: str,
@@ -72,6 +73,7 @@ def main(
     metrics_config: str,
     output_metrics: str,
     output_stats: str,
+    allow_incomplete: bool,
 ) -> None:
     """Compute metrics and statistical comparisons."""
     from dualdocking.config import load_experiment, load_metrics, load_pairs
@@ -143,6 +145,7 @@ def main(
                 continue
 
             hr_a_values: list[float] = []
+            hr_b_values: list[float] = []
             hr_both_values: list[float] = []
             balance_values: list[float] = []
 
@@ -156,19 +159,25 @@ def main(
                     continue
 
                 hr_a_values.append(float(np.mean(aff_a <= thr_a)))
+                hr_b_values.append(float(np.mean(aff_b <= thr_b)))
                 hr_both_values.append(float(np.mean((aff_a <= thr_a) & (aff_b <= thr_b))))
                 balance_values.append(float(np.median(np.abs(aff_a - aff_b))))
 
             if not hr_a_values:
                 continue
 
-            mode_metrics: dict[str, float] = {
+            mode_metrics: dict[str, float | int] = {
                 "hr_a_mean": float(np.mean(hr_a_values)),
                 "hr_a_sem": _sem(hr_a_values),
+                "hr_b_mean": float(np.mean(hr_b_values)),
+                "hr_b_sem": _sem(hr_b_values),
                 "hr_both_mean": float(np.mean(hr_both_values)),
                 "hr_both_sem": _sem(hr_both_values),
                 "balance_mean": float(np.mean(balance_values)),
                 "balance_sem": _sem(balance_values),
+                "n_valid_runs": len(seed_dfs),
+                "n_expected_runs": len(seeds),
+                "missing_rate": round(1.0 - len(seed_dfs) / len(seeds), 4) if seeds else 0.0,
             }
 
             # Per-objective mean/SEM
@@ -186,6 +195,27 @@ def main(
                     mode_metrics[f"{col}_sem"] = _sem(obj_values)
 
             metrics_out[pair_id][mode] = mode_metrics
+
+    # Completeness check
+    missing_list: list[str] = []
+    n_expected = 0
+    n_valid = 0
+    for pair_id in pairs:
+        for mode in modes:
+            for seed in seeds:
+                n_expected += 1
+                if seed in data.get(pair_id, {}).get(mode, {}):
+                    n_valid += 1
+                else:
+                    missing_list.append(f"{pair_id}/{mode}/seed_{seed}")
+
+    missing_rate = 1.0 - n_valid / n_expected if n_expected else 0.0
+    if missing_list:
+        if allow_incomplete:
+            logger.warning("Missing {} run(s): {}", len(missing_list), missing_list)
+        else:
+            logger.error("Missing {} run(s) and --no-allow-incomplete set: {}", len(missing_list), missing_list)
+            sys.exit(1)
 
     # Statistical tests
     stats_out: dict[str, dict[str, dict[str, float | bool | str]]] = {}
@@ -244,6 +274,13 @@ def main(
             and abs(float(entry["cliffs_delta"])) >= 0.33
             and (float(entry["ci_lower"]) > 0 or float(entry["ci_upper"]) < 0)
         )
+
+    stats_out["_completeness"] = {
+        "n_expected": n_expected,
+        "n_valid": n_valid,
+        "missing_rate": round(missing_rate, 4),
+        "missing_runs": missing_list,
+    }
 
     out_metrics_path = PROJECT_ROOT / output_metrics
     out_stats_path = PROJECT_ROOT / output_stats

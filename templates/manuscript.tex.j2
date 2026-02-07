@@ -59,15 +59,16 @@ This section is intentionally left as a placeholder.
 \section{Quantitative Results}
 {% if metric_rows %}
 \subsection{Primary Metrics Across Pairs and Modes}
-\begin{longtable}{p{0.22\linewidth} p{0.12\linewidth} p{0.18\linewidth} p{0.18\linewidth} p{0.18\linewidth}}
+\begin{longtable}{p{0.18\linewidth} p{0.10\linewidth} p{0.15\linewidth} p{0.15\linewidth} p{0.15\linewidth} p{0.15\linewidth}}
 \toprule
-Pair & Mode & HR\_A (mean $\pm$ SEM) & HR\_both (mean $\pm$ SEM) & Balance (mean $\pm$ SEM) \\
+Pair & Mode & HR\_A (mean $\pm$ SEM) & HR\_B (mean $\pm$ SEM) & HR\_both (mean $\pm$ SEM) & Balance (mean $\pm$ SEM) \\
 \midrule
 \endhead
 {% for row in metric_rows %}
 {{ row.pair_id.replace('_', '\\_') }} &
 {{ row.mode.replace('_', '\\_') }} &
 {{ fmt(row.hr_a_mean) }} $\pm$ {{ fmt(row.hr_a_sem) }} &
+{{ fmt(row.hr_b_mean) }} $\pm$ {{ fmt(row.hr_b_sem) }} &
 {{ fmt(row.hr_both_mean) }} $\pm$ {{ fmt(row.hr_both_sem) }} &
 {{ fmt(row.balance_mean) }} $\pm$ {{ fmt(row.balance_sem) }} \\
 {% endfor %}
