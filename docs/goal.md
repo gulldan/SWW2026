@@ -40,6 +40,8 @@ Reward для FREED++ строится на **docking-скорах** `d_A, d_B` 
 Не позволяет оптимизатору «читерить», показывая отличный результат по одной мишени
 и игнорируя другую. Используется как единственная reward function в primary experiment.
 
+**Z-score нормализация:** Поскольку docking-скоры UniDock несопоставимы между таргетами (различия средних до ~2.3 kcal/mol обусловлены размером/формой кармана, см. Wang et al. 2017), в реализации RL reward используется per-target z-score: `z_X = (d_X − μ_X) / σ_X`, где `μ_X, σ_X` — среднее и стандартное отклонение docking-скоров по 1000 ZINC drug-like декоям для каждого таргета (pre-experiment калибровка, `configs/normalization.yaml`). Фактический reward: `−max(z_A, z_B)`. Это обеспечивает сопоставимость шкал и предотвращает доминирование таргета с систематически более высокими (худшими) скорами.
+
 ### Альтернативные скаляризации (sensitivity analysis only)
 
 Следующие функции **не используются в primary experiment** — только для offline анализа чувствительности reward function. Во всех формулах `d'_A, d'_B` — shifted docking-скоры: `d'_i = d_i − min(d) + ε`, где `min(d)` берётся по всем молекулам данной пары (объединённо по всем режимам), обеспечивающие положительность для функций с ограниченной областью определения.
@@ -142,12 +144,12 @@ Primary metric: `hr_both(double) − hr_both(single_x)` на core-парах (с
 
 **Sanity check (exploratory):** для каждого таргета вычисляется ранговая корреляция (Spearman ρ) между `d_X` и `a_X` на сгенерированных молекулах. Если ρ ≈ 0 на конкретном таргете, выводы по hit-rate для пар с этим таргетом интерпретируются с осторожностью.
 
-**Три линии валидации:** для усиления доверия к результатам используются три независимых источника:
+**Линии валидации:** для усиления доверия к результатам используются два независимых скорера и дополнительный индикатор правдоподобности:
 1. **UniDock docking** `d_X` — physics-based scoring (RL reward);
-2. **Boltz-2 affinity** `a_X` — learned surrogate (evaluation);
-3. **ChEMBL Tanimoto overlap** — structural similarity к известным активам (validation).
+2. **Boltz-2 affinity** `a_X` — learned surrogate (evaluation), методически ортогональный к docking;
+3. **ChEMBL Tanimoto overlap** — structural similarity к известным активам (**chemotype plausibility check**, но не независимая валидация: Boltz-2 обучен на ~750K пар из ChEMBL/BindingDB/PDBbind, поэтому высокий Tanimoto может отражать proximity к training distribution, а не истинную активность).
 
-Согласованность всех трёх линий по направлению эффекта (double > single) существенно снижает вероятность того, что наблюдаемое преимущество — артефакт одного конкретного скорера.
+Согласованность двух независимых скореров (UniDock и Boltz-2) по направлению эффекта (double > single) существенно снижает вероятность того, что наблюдаемое преимущество — артефакт одного конкретного скорера. ChEMBL overlap служит дополнительной проверкой реалистичности генерируемых хемотипов.
 
 ### Compute parity — формальные гарантии
 
@@ -159,7 +161,7 @@ seeds: [42, 137, 256, 512, 1024]  # 5 прогонов × 3 режима × N п
 generator.epochs: 200             # одинаковое число RL-эпох
 ```
 
-Различия между режимами ограничены **только** reward function от docking-скоров: `−d_A`, `−d_B`, или `−max(d_A, d_B)`.
+Различия между режимами ограничены **только** reward function: `−z_A`, `−z_B`, или `−max(z_A, z_B)` (z-score нормализованные docking-скоры, см. [Базовая](#базовая-baseline)).
 
 **Primary comparison: fixed number of generated molecules.**
 В `double` режиме каждый RL-шаг вызывает UniDock GPU дважды (по мишеням A и B), поэтому суммарное число docking-вызовов в `double` примерно вдвое больше, чем в `single`. Это сознательный trade-off: мы сравниваем **качество итогового набора молекул** при одинаковом числе сгенерированных SMILES, а не при одинаковом числе docking-вызовов.
@@ -223,10 +225,10 @@ Double-target режим считается **успешным**, если вы�
 
 ### Boltz-2 экосистема (2025)
 
-- **Boltz-2** (MIT/Recursion, 2025) — предсказание аффинности за 15–30 секунд вместо часов MD-симуляций. Победитель CASP16 affinity challenge. Корреляция Пирсона 0.66 на canonical 4-target FEP+ subset (CDK2, TYK2, JNK1, p38) из статьи, на уровне OpenFE (0.66) и ниже commercial FEP+ (0.78). Независимые бенчмарки показывают более низкие значения: PL-REX (Yesylevskyy) — mean Pearson ~0.42; DeepMirror evaluation — per-target r от 0.26 (cGAS, узкий range) до 0.81 (Mpro). Это подтверждает таргет-зависимость перформанса и мотивирует per-target Spearman ρ sanity check в данном проекте.
+- **Boltz-2** (MIT/Recursion, 2025) — предсказание аффинности за 15–30 секунд вместо часов MD-симуляций. Ретроспективно превосходит всех участников CASP16 affinity challenge (Passaro et al., 2025; Boltz-2 не участвовал в соревновании — оценка проведена post-hoc на тех же данных). Корреляция Пирсона 0.66 на canonical 4-target FEP+ subset (CDK2, TYK2, JNK1, p38) из статьи, на уровне OpenFE (0.66) и ниже commercial FEP+ (0.78); на полном 8-target OpenFE benchmark — 0.62 (MIT Jameel Clinic). Независимые бенчмарки показывают более низкие значения: PL-REX (Yesylevskyy) — mean Pearson ~0.42; DeepMirror evaluation — per-target r от 0.26 (cGAS, узкий range) до 0.81 (Mpro). Boltz-2 склонен к сжатию диапазона предсказаний (~2 kcal/mol на 75/350 таргетов Uni-FEP, Chen/Rowan 2025), что усиливает таргет-зависимость перформанса и мотивирует per-target Spearman ρ sanity check в данном проекте.
 - **BoltzGen** (bioRxiv, ноябрь 2025) — генеративная модель для дизайна нанободов, мини-байндеров и пептидов. Наномолярные хиты для 6/9 мишеней.
 - **Boltzina** (arXiv 2508.17555, 2025) — гибрид: AutoDock Vina docking poses + Boltz-2 affinity head для ускоренного виртуального скрининга. До 11.8× быстрее Boltz-2 при сохранении превосходства над Vina/GNINA по accuracy.
-- **SynFlowNet + Boltz-2** (ICLR 2025) — GFlowNet-генерация с Boltz-2 как scoring function в RL-петле (off-policy, replay buffer). Прямой прецедент использования Boltz-2 как surrogate scorer для RL-генерации молекул.
+- **SynFlowNet + Boltz-2** — в работе Boltz-2 (Passaro et al., 2025, Sec. 4/5.4) авторы демонстрируют связку с SynFlowNet (Cretu et al., ICLR 2025 Spotlight) — GFlowNet-генерация с Boltz-2 как scoring function в RL-петле (off-policy, replay buffer). Прямой прецедент использования Boltz-2 как surrogate scorer для RL-генерации молекул, хотя и от самих авторов модели.
 - **Boltz-ABFE** (Recursion, 2025) — гибрид: Boltz-2 для скрининга + ABFE для физически обоснованной валидации.
 
 ### LLM-агенты для молекулярной оптимизации (2025–2026)
@@ -244,4 +246,4 @@ Double-target режим считается **успешным**, если вы�
 
 ### Клиническая валидация
 
-- **Рентосертиб** (Nature Medicine, 2025) — первый AI-препарат в Phase 2a. Мишень и молекула найдены генеративным AI (Insilico Medicine). От идентификации мишени до кандидата — 18 месяцев.
+- **Рентосертиб** (Nature Medicine, 2025) — первый end-to-end generative-AI-discovered препарат (мишень + молекула) в Phase 2a. Мишень и молекула найдены генеративным AI (Insilico Medicine). От идентификации мишени до кандидата — 18 месяцев.

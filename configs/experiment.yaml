@@ -38,8 +38,8 @@ objectives:
 # Парето-анализ (пост-обработка, не используется как reward)
 pareto_analysis:
   enabled: true
-  ref_point_a: 1.0              # реферальная точка (хуже): 10 μM -> 1
-  ref_point_b: 1.0
+  ref_point_a: 2.0              # реферальная точка (хуже): 100 μM -> 2.0 (= T + 2)
+  ref_point_b: 2.0
 
 # Настройки генератора (FREED++)
 generator:
