@@ -71,6 +71,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── rdkit_embed.py        # 3D embedding через RDKit
 │   ├── validate_redocking.py    # SCI-04: re-docking validation (RMSD check)
 │   ├── enrichment_benchmark.py  # SCI-05: enrichment benchmark (AUROC/BEDROC per target)
+│   ├── threshold_sensitivity.py # SCI-06: hit-threshold sensitivity (T=-1,0,+1)
 │   ├── aggregate.py          # Объединение результатов по парам
 │   ├── plot_results.py       # Генерация графиков сравнения
 │   ├── compute_metrics.py    # Вычисление метрик и стат. тестов
@@ -643,6 +644,19 @@ uv run python scripts/enrichment_benchmark.py --skip-docking
 - `report/data/enrichment_metrics.csv` — таблица (target, AUROC, BEDROC, EF, status)
 - `report/figures/enrichment/roc_{TARGET}.png` — ROC-кривые
 - `report/figures/enrichment/enrichment_summary.png` — сводная гистограмма
+
+### SCI-06: Threshold Sensitivity
+
+Проверяет устойчивость primary conclusion к выбору порога хита.
+Пре-зарегистрированные пороги: T = -1.0 (100 nM), 0.0 (1 μM), +1.0 (10 μM).
+
+```bash
+uv run python scripts/threshold_sensitivity.py
+```
+
+Выход:
+- `report/data/threshold_sensitivity.csv` — плоская таблица (threshold × pair × mode)
+- `report/data/threshold_sensitivity.json` — структурированный JSON со стат-тестами и robustness summary
 
 ## Ключевые ссылки
 

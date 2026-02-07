@@ -62,6 +62,11 @@ enrichment_quality:
   max_actives_per_target: 200
   active_sampling_seed: 137
 
+# Pre-registered sensitivity thresholds (SCI-06 / KVA-270).
+# Used by scripts/threshold_sensitivity.py to sweep T_A = T_B = T.
+# Values: log10(IC50-like, μM).  -1.0 = 100 nM, 0.0 = 1 μM, 1.0 = 10 μM.
+sensitivity_thresholds: [-1.0, 0.0, 1.0]
+
 # Метрики, вычисляемые для каждого запуска
 computed_metrics:
   - dual_hit_rate
