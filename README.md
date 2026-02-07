@@ -78,7 +78,8 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── plot_results.py       # Генерация графиков сравнения
 │   ├── compute_metrics.py    # Вычисление метрик и стат. тестов
 │   ├── render_molecules.py   # 2D-визуализация молекул с аннотациями
-│   └── summarize.py          # Мини-аналитика: текстовый отчёт
+│   ├── summarize.py          # Мини-аналитика: текстовый отчёт
+│   └── run_pilot.py          # SCI-09: pilot matrix run (1 pair x 3 modes x 2 seeds)
 ├── data/enrichment/      # Enrichment benchmark artifacts
 │   ├── scores/           # Per-target active docking scores ({TARGET}_actives.csv)
 │   ├── receptors/        # Downloaded PDBs and PDBQTs for missing targets
@@ -400,6 +401,31 @@ uv run python scripts/stage0_fetch.py --dry-run
 | 7 | FASTA | UniProt | `data/targets/*.fasta` | Для MSA |
 | 8 | MSA | ColabFold API | `cache/boltz_msa/*.csv` | Для offline Boltz-2 |
 | 9 | PDB→PDBQT | Docker (local) | `data/targets/*.pdbqt` | Для UniDock GPU |
+
+### Pilot Run (SCI-09)
+
+Quick end-to-end check with 1 pair x 3 modes x 2 seeds before committing to the full matrix:
+
+```bash
+# Default: CDK2_ERK2, seeds 42+137, Stage 1+2 + artifact verification
+uv run python scripts/run_pilot.py
+
+# Dry run
+uv run python scripts/run_pilot.py --dry-run
+
+# Custom pair/seeds
+uv run python scripts/run_pilot.py --pair AChE_BChE --seeds 42,256
+
+# Verify-only (skip generation, just check existing artifacts)
+uv run python scripts/run_pilot.py --verify-only
+```
+
+`run_full_experiment.py` now also supports `--pair` and `--seeds` filters:
+
+```bash
+# Run only CDK2_ERK2 with 2 seeds
+uv run python scripts/run_full_experiment.py --pair CDK2_ERK2 --seeds 42,137 --resume --with-post
+```
 
 ### После Stage 0: полный pipeline offline
 

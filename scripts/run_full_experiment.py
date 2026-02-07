@@ -135,6 +135,18 @@ def _run_one(pair: str, mode: str, seed: int, log_path: Path, resume: bool, mf_p
 @click.option("--parallel", default=1, type=int)
 @click.option("--resume", is_flag=True, default=False)
 @click.option(
+    "--pair",
+    multiple=True,
+    default=None,
+    help="Filter to specific pair(s). Can be repeated. Default: all pairs from config.",
+)
+@click.option(
+    "--seeds",
+    "seeds_override",
+    default=None,
+    help="Comma-separated seed list override. Default: all seeds from config.",
+)
+@click.option(
     "--prepare-freed-data/--skip-prepare-freed-data",
     default=True,
     show_default=True,
@@ -168,6 +180,8 @@ def main(
     dry_run: bool,
     parallel: int,
     resume: bool,
+    pair: tuple[str, ...],
+    seeds_override: str | None,
     prepare_freed_data: bool,
     prepare_baseline: bool,
     baseline_url: str | None,
@@ -175,9 +189,17 @@ def main(
     latex_mode: str,
 ) -> None:
     exp_cfg = load_experiment(PROJECT_ROOT / "configs")
-    pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
+    all_pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
     modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
-    seeds = exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
+    all_seeds = exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
+
+    # Apply filters
+    pairs = {k: v for k, v in all_pairs.items() if k in pair} if pair else all_pairs
+    seeds = [int(s) for s in seeds_override.split(",")] if seeds_override else all_seeds
+
+    if pair and not pairs:
+        logger.error("No matching pairs found for filter: {}", pair)
+        raise SystemExit(1)
 
     run_id = os.environ.get("EXPERIMENT_RUN_ID", "adhoc")
     log_ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")

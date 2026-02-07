@@ -23,15 +23,15 @@
 ## In Progress
 
 - **KVA-269 / SCI-05**: Enrichment benchmark (actives vs decoys). AUROC, EF1%, BEDROC по мишеням. Скрипт и модуль готовы, ожидает GPU-прогон.
+- **KVA-273 / SCI-09**: Pilot matrix run (1 pair x 3 modes x 2 seeds). `scripts/run_pilot.py` создан, `run_full_experiment.py` получил `--pair`/`--seeds` фильтры, тесты 4/4 pass. Ожидает GPU-прогон.
 
 ## Backlog
 
-- **KVA-273 / SCI-09**: Pilot matrix run (1 pair x 3 modes x 2 seeds).
 - **KVA-274 / SCI-10**: Full matrix run + claim audit.
 
 ## Milestones
 
-- **KVA-275 / M1**: P0 Engineering Closed.
-- **KVA-276 / M2**: Scientific Protocol Validated.
-- **KVA-277 / M3**: Pilot Passed.
-- **KVA-278 / M4**: Submission Package Ready.
+- **KVA-275 / M1**: P0 Engineering Closed. DONE.
+- **KVA-276 / M2**: Scientific Protocol Validated. Blocked by KVA-269 (SCI-05 GPU run).
+- **KVA-277 / M3**: Pilot Passed. Blocked by M1 + M2 + KVA-273 GPU run.
+- **KVA-278 / M4**: Submission Package Ready. Blocked by M3 + KVA-274.
