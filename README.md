@@ -12,7 +12,10 @@ RL-генерация, оптимизированная под worst-case цел
 ├── configs/              # Конфигурация эксперимента
 │   ├── pairs.yaml        # 9 пар белковых мишеней (5 core + 3 auxiliary + 1 blocked)
 │   ├── metrics.yaml      # Пороги хитов и определения метрик
-│   └── experiment.yaml   # Бюджет, сиды, параметры запуска (вкл. freedpp секция)
+│   ├── experiment.yaml   # Бюджет, сиды, параметры запуска (вкл. freedpp секция)
+│   ├── calibration.yaml  # Калибровочный набор (MOSES) и параметры докинга
+│   ├── normalization.yaml # Per-target mean/std/CI из калибровки (generated)
+│   └── master_config.yaml # Freeze: версия, SHA256-хэши конфигов, data sources
 ├── data/targets/         # Скачанные PDB-структуры и FASTA-последовательности
 │   ├── <pair_id>/{A,B}/  # PDB файлы и метаданные (по парам)
 │   ├── <target_id>.fasta # Последовательности белков (UniProt)
@@ -20,7 +23,10 @@ RL-генерация, оптимизированная под worst-case цел
 ├── docker/freedpp/       # Docker-изоляция FREED++ (Python 3.10 / PyTorch 1.12 / DGL 0.9)
 │   ├── Dockerfile        # CUDA 11.8, Uni-Dock, RDKit+Meeko, патч dual reward
 │   ├── entrypoint.sh     # prepare-receptor / train / sample
-│   └── dual_reward_patch.py  # Двойной reward: worst-case (max для lower-is-better)
+│   ├── dual_reward_patch.py  # Двойной reward: worst-case (max для lower-is-better)
+│   ├── run_with_patch.py     # Запуск FREED++ с auto-apply dual reward patch
+│   ├── pdbfixer_add_h.py    # Протонирование PDB через PDBFixer
+│   └── data/                 # zinc_crem.json + alert_collections.csv (fetched)
 ├── cache/                # Кеш (в .gitignore)
 │   ├── <target>.{ctx[:8]}.json  # Кеш скоров Boltz-2 (context-segmented, cache key v2)
 │   ├── boltz_msa/        # Pre-computed MSA для offline-скоринга
@@ -31,11 +37,12 @@ RL-генерация, оптимизированная под worst-case цел
 ├── docs/                 # Проектная документация
 │   ├── README.md         # Карта достоверности документации
 │   ├── goal.md
-│   ├── tasks.md
+│   ├── tasks.md          # Living log выполненных задач
 │   ├── selection_criteria.md
-│   └── ...               # При необходимости: исследовательские заметки
+│   ├── preregistration.md # Frozen pre-registration гипотез и decision rules (SCI-01)
+│   └── receptor_qc.md    # Receptor QC sheet per target (SCI-03)
 ├── src/dualdocking/      # Основная библиотека
-│   ├── objectives.py     # Объединённые целевые функции (min, harmonic, Pareto)
+│   ├── objectives.py     # Целевые функции (min, harmonic, weighted_sum, geometric, Tchebycheff, Pareto)
 │   ├── scorer_boltz2.py  # Скоринг Boltz-2 через CLI (subprocess + disk cache)
 │   ├── generator_freedpp.py  # Обёртка генератора FREED++ (Docker subprocess)
 │   ├── binding_box.py    # Извлечение binding box из PDB (лиганд / fallback)
@@ -49,7 +56,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── latex_report.py   # Генерация LaTeX-отчёта
 │   ├── diversity.py      # Метрики химического разнообразия
 │   ├── enrichment.py        # Docking-based enrichment metrics (AUROC, BEDROC, EF)
-│   └── chembl_validation.py  # Валидация ChEMBL target IDs
+│   └── chembl_validation.py  # Валидация мишеней через ChEMBL (fetch actives + Tanimoto + enrichment)
 ├── scripts/              # CLI-скрипты
 │   ├── stage0_fetch.py       # Stage 0: единая точка входа для ВСЕХ загрузок (offline после)
 │   ├── fetch_freed_data.py    # Загрузка docker/freedpp/data/{zinc_crem.json,alert_collections.csv}
@@ -76,13 +83,14 @@ RL-генерация, оптимизированная под worst-case цел
 ├── tests/                # Юнит-тесты
 ├── results/              # Результаты запусков (в .gitignore)
 ├── report/               # Артефакты итогового отчёта
-│   ├── data/             # Агрегированные данные
-│   ├── figures/          # Сгенерированные графики
-│   ├── experiment_<run_id>_<utc>.log  # Логи run_full_experiment.py
-│   ├── run_manifest_<run_id>.json     # Lifecycle-манифест запуска
-│   ├── metrics.json
-│   ├── stats.json
-│   └── summary.txt
+│   ├── data/             # Агрегированные данные (generated)
+│   ├── figures/          # Сгенерированные графики (generated)
+│   ├── references.bib    # Библиография для LaTeX
+│   ├── experiment_<run_id>_<utc>.log  # Логи run_full_experiment.py (generated)
+│   ├── run_manifest_<run_id>.json     # Lifecycle-манифест запуска (generated)
+│   ├── metrics.json      # (generated)
+│   ├── stats.json        # (generated)
+│   └── summary.txt       # (generated)
 ```
 
 ## Установка
@@ -92,10 +100,11 @@ RL-генерация, оптимизированная под worst-case цел
 git clone <repo-url> && cd SWW2026
 
 # Создание окружения и установка (требуется uv >= 0.9)
-uv sync --extra dev
+uv sync --group dev
 
-# Установка Boltz-2 (отдельно, из-за пина scipy==1.13.1)
-uv pip install -r requirements-boltz.txt
+# Boltz-2 уже включён в pyproject.toml (boltz[cuda] via git source).
+# requirements-boltz.txt нужен только при ручной установке вне uv sync:
+# uv pip install -r requirements-boltz.txt
 
 # Prerequisites для FREED++ генератора:
 # - Docker >= 20.x
