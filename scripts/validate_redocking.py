@@ -7,15 +7,20 @@ heavy-atom RMSD between the docked and crystal poses.
 RMSD <= 2.0 A indicates the docking setup correctly reproduces the known
 binding mode -- a standard sanity check for computational docking studies.
 
+Targets from blocked pairs and apo structures (no co-crystal ligand) are
+reported with status "skipped" and excluded from pass/fail counting.
+
 Usage::
 
     uv run python scripts/validate_redocking.py
     uv run python scripts/validate_redocking.py --target-id BACE1 --target-id GSK3B
+    uv run python scripts/validate_redocking.py --include-blocked
     uv run python scripts/validate_redocking.py --dry-run
 """
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 import shutil
@@ -38,6 +43,13 @@ DOCKER_BIN = shutil.which("docker") or "docker"
 
 RMSD_THRESHOLD = 2.0  # Angstrom
 
+# Possible status values for a RedockResult.
+STATUS_PASS = "pass"  # noqa: S105  # not a password
+STATUS_FAIL = "fail"
+STATUS_SKIPPED_APO = "skipped:apo"
+STATUS_SKIPPED_BLOCKED = "skipped:blocked"
+STATUS_ERROR = "error"
+
 
 @dataclass
 class RedockResult:
@@ -53,6 +65,7 @@ class RedockResult:
     rmsd: float | None
     centroid_dist: float | None
     passed: bool
+    status: str = STATUS_ERROR
     error: str | None = None
 
 
@@ -201,8 +214,36 @@ def _result_to_dict(r: RedockResult) -> dict[str, Any]:
         "rmsd": r.rmsd,
         "centroid_dist": r.centroid_dist,
         "passed": r.passed,
+        "status": r.status,
         "error": r.error,
     }
+
+
+CSV_COLUMNS = [
+    "target_id", "pdb_id", "ligand_resname", "docking_score",
+    "rmsd", "centroid_dist", "status", "error",
+]
+
+
+def _write_csv(results: list[RedockResult], path: Path) -> None:
+    """Write results as CSV for downstream reporting."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
+        writer.writeheader()
+        for r in results:
+            row = _result_to_dict(r)
+            writer.writerow({k: row.get(k, "") for k in CSV_COLUMNS})
+
+
+def _collect_blocked_target_ids(pairs: dict[str, Any]) -> set[str]:
+    """Return target IDs belonging to blocked pairs."""
+    blocked: set[str] = set()
+    for pair_cfg in pairs.values():
+        if pair_cfg.get("set") == "blocked":
+            for role in ("target_a", "target_b"):
+                blocked.add(pair_cfg[role]["id"])
+    return blocked
 
 
 def _validate_target(
@@ -240,7 +281,8 @@ def _validate_target(
             target_id=target_id, pdb_id=pdb_id, ligand_resname="?",
             ligand_smiles="", n_crystal_atoms=0, n_docked_atoms=0,
             docking_score=None, rmsd=None, centroid_dist=None,
-            passed=False, error="No ligand found in PDB",
+            passed=False, status=STATUS_SKIPPED_APO,
+            error="No co-crystal ligand in PDB (apo structure)",
         )
 
     crystal_coords = lig_info.coords
@@ -339,6 +381,7 @@ def _validate_target(
         rmsd=rmsd_val,
         centroid_dist=cdist_val,
         passed=passed,
+        status=STATUS_PASS if passed else STATUS_FAIL,
     )
 
 
@@ -349,6 +392,8 @@ def _validate_target(
 @click.option("--gpus", default="all")
 @click.option("--rmsd-threshold", default=RMSD_THRESHOLD, type=float)
 @click.option("--output", default="data/validation/redocking_results.json")
+@click.option("--csv-output", default="report/data/redocking_metrics.csv")
+@click.option("--include-blocked", is_flag=True, help="Include targets from blocked pairs")
 @click.option("--dry-run", is_flag=True, help="Show targets without docking")
 def main(
     config: str,
@@ -357,6 +402,8 @@ def main(
     gpus: str,
     rmsd_threshold: float,
     output: str,
+    csv_output: str,
+    include_blocked: bool,
     dry_run: bool,
 ) -> None:
     """Validate docking setup by re-docking co-crystallized ligands."""
@@ -377,6 +424,7 @@ def main(
     )
 
     pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
+    blocked_ids = _collect_blocked_target_ids(pairs)
 
     targets: dict[str, dict[str, Any]] = {}
     for pair_cfg in pairs.values():
@@ -390,11 +438,12 @@ def main(
     if dry_run:
         click.echo("--- Re-docking targets (dry run) ---")
         for tid, t in sorted(targets.items()):
+            blocked = " [BLOCKED]" if tid in blocked_ids else ""
             pdb_path = _resolve_pdb_for_target(tid, t["pdb_id"])
             info = extract_ligand_info(pdb_path) if pdb_path.exists() else None
             resname = info.resname if info else "?"
             n_atoms = len(info.coords) if info else 0
-            click.echo(f"  {tid:<10} PDB={t['pdb_id']} ligand={resname} atoms={n_atoms}")
+            click.echo(f"  {tid:<10} PDB={t['pdb_id']} ligand={resname} atoms={n_atoms}{blocked}")
         return
 
     work_dir = PROJECT_ROOT / "data" / "validation" / "redocking_work"
@@ -402,36 +451,78 @@ def main(
 
     results: list[RedockResult] = []
 
+    # Emit skipped results for blocked targets.
+    for tid in sorted(blocked_ids & set(targets)):
+        t = targets[tid]
+        results.append(RedockResult(
+            target_id=tid, pdb_id=t["pdb_id"], ligand_resname="--",
+            ligand_smiles="", n_crystal_atoms=0, n_docked_atoms=0,
+            docking_score=None, rmsd=None, centroid_dist=None,
+            passed=False, status=STATUS_SKIPPED_BLOCKED,
+            error="Blocked pair (non-human species)",
+        ))
+        logger.info("[SKIP] {} — blocked pair", tid)
+
+    active_targets = {
+        k: v for k, v in targets.items()
+        if include_blocked or k not in blocked_ids
+    }
+
     runner_ctx = DockerRunner(docker_image, PROJECT_ROOT, gpus=gpus)
     with runner_ctx as runner:
-        for tid, t in sorted(targets.items()):
+        for tid, t in sorted(active_targets.items()):
             result = _validate_target(tid, t, runner, params, work_dir, rmsd_threshold)
             results.append(result)
 
-            status = "PASS" if result.passed else "FAIL"
             rmsd_str = f"{result.rmsd:.2f}" if result.rmsd is not None else "N/A"
             score_str = f"{result.docking_score:.2f}" if result.docking_score is not None else "N/A"
-            logger.info("[{}] {} ligand={} score={} RMSD={} A", status, tid, result.ligand_resname, score_str, rmsd_str)
+            logger.info("[{}] {} ligand={} score={} RMSD={} A",
+                        result.status.upper(), tid, result.ligand_resname, score_str, rmsd_str)
 
+    # Sort results by target_id for deterministic output.
+    results.sort(key=lambda r: r.target_id)
+
+    # Write JSON.
     out_path = PROJECT_ROOT / output
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps([_result_to_dict(r) for r in results], indent=2))
-    logger.info("Results saved to {}", out_path)
+    logger.info("JSON results saved to {}", out_path)
 
+    # Write CSV.
+    csv_path = PROJECT_ROOT / csv_output
+    _write_csv(results, csv_path)
+    logger.info("CSV results saved to {}", csv_path)
+
+    # --- Summary table ---
     click.echo("\n--- Re-docking Validation Summary ---")
-    click.echo(f"{'Target':<10} {'PDB':<6} {'Ligand':<8} {'Score':>8} {'RMSD':>8} {'Status':<6}")
-    click.echo("-" * 54)
+    click.echo(f"RMSD threshold: {rmsd_threshold:.1f} A")
+    click.echo(f"{'Target':<10} {'PDB':<6} {'Ligand':<8} {'Score':>8} {'RMSD':>8} {'Status':<16}")
+    click.echo("-" * 64)
     for r in results:
-        status = "PASS" if r.passed else "FAIL"
         rmsd_s = f"{r.rmsd:.2f}" if r.rmsd is not None else "N/A"
         score_s = f"{r.docking_score:.2f}" if r.docking_score is not None else "N/A"
-        click.echo(f"{r.target_id:<10} {r.pdb_id:<6} {r.ligand_resname:<8} {score_s:>8} {rmsd_s:>8} {status:<6}")
+        click.echo(f"{r.target_id:<10} {r.pdb_id:<6} {r.ligand_resname:<8} {score_s:>8} {rmsd_s:>8} {r.status:<16}")
 
-    n_pass = sum(1 for r in results if r.passed)
-    click.echo(f"\n{n_pass}/{len(results)} targets passed (RMSD <= {rmsd_threshold:.1f} A)")
+    evaluated = [r for r in results if r.status in (STATUS_PASS, STATUS_FAIL)]
+    skipped = [r for r in results if r.status.startswith("skipped")]
+    failed = [r for r in results if r.status == STATUS_FAIL]
+    errored = [r for r in results if r.status == STATUS_ERROR]
+    n_pass = sum(1 for r in evaluated if r.passed)
 
-    if n_pass < len(results):
+    click.echo(f"\n{n_pass}/{len(evaluated)} evaluated targets passed")
+    if skipped:
+        click.echo(f"{len(skipped)} skipped: {', '.join(r.target_id + ' (' + r.status + ')' for r in skipped)}")
+
+    # --- Exclusion summary for primary claims ---
+    excluded = failed + errored
+    if excluded:
+        click.echo("\n--- Targets EXCLUDED from primary claims ---")
+        for r in excluded:
+            click.echo(f"  {r.target_id} (PDB {r.pdb_id}): RMSD={r.rmsd:.2f} A" if r.rmsd is not None
+                        else f"  {r.target_id} (PDB {r.pdb_id}): {r.error}")
         sys.exit(1)
+    else:
+        click.echo("\nAll evaluated targets passed — none excluded from primary claims.")
 
 
 if __name__ == "__main__":

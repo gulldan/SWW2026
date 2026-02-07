@@ -112,3 +112,116 @@ class TestExtractLigandInfo:
         pdb_path.write_text(pdb)
 
         assert extract_ligand_info(pdb_path) is None
+
+
+class TestCollectBlockedTargetIds:
+    def test_identifies_blocked(self):
+        from scripts.validate_redocking import _collect_blocked_target_ids
+
+        pairs = {
+            "A_B": {
+                "set": "core",
+                "target_a": {"id": "A"},
+                "target_b": {"id": "B"},
+            },
+            "C_D": {
+                "set": "blocked",
+                "target_a": {"id": "C"},
+                "target_b": {"id": "D"},
+            },
+        }
+        blocked = _collect_blocked_target_ids(pairs)
+        assert blocked == {"C", "D"}
+
+    def test_no_blocked(self):
+        from scripts.validate_redocking import _collect_blocked_target_ids
+
+        pairs = {
+            "A_B": {
+                "set": "core",
+                "target_a": {"id": "A"},
+                "target_b": {"id": "B"},
+            },
+        }
+        assert _collect_blocked_target_ids(pairs) == set()
+
+
+class TestWriteCsv:
+    def test_csv_output(self, tmp_path):
+        import csv as csv_mod
+
+        from scripts.validate_redocking import (
+            STATUS_FAIL,
+            STATUS_PASS,
+            STATUS_SKIPPED_APO,
+            RedockResult,
+            _write_csv,
+        )
+
+        results = [
+            RedockResult(
+                target_id="ERK2", pdb_id="4QTA", ligand_resname="38Z",
+                ligand_smiles="CCC", n_crystal_atoms=20, n_docked_atoms=20,
+                docking_score=-8.5, rmsd=1.2, centroid_dist=0.8,
+                passed=True, status=STATUS_PASS,
+            ),
+            RedockResult(
+                target_id="CDK2", pdb_id="1HCL", ligand_resname="?",
+                ligand_smiles="", n_crystal_atoms=0, n_docked_atoms=0,
+                docking_score=None, rmsd=None, centroid_dist=None,
+                passed=False, status=STATUS_SKIPPED_APO,
+                error="No co-crystal ligand in PDB (apo structure)",
+            ),
+            RedockResult(
+                target_id="HER2", pdb_id="3PP0", ligand_resname="03Q",
+                ligand_smiles="CCC", n_crystal_atoms=25, n_docked_atoms=25,
+                docking_score=-6.0, rmsd=2.5, centroid_dist=1.9,
+                passed=False, status=STATUS_FAIL,
+            ),
+        ]
+
+        csv_path = tmp_path / "test.csv"
+        _write_csv(results, csv_path)
+
+        with csv_path.open() as f:
+            reader = list(csv_mod.DictReader(f))
+
+        assert len(reader) == 3
+        assert reader[0]["target_id"] == "ERK2"
+        assert reader[0]["status"] == STATUS_PASS
+        assert reader[1]["status"] == STATUS_SKIPPED_APO
+        assert reader[2]["status"] == STATUS_FAIL
+
+
+class TestRedockResultStatus:
+    def test_status_constants(self):
+        from scripts.validate_redocking import (
+            STATUS_ERROR,
+            STATUS_FAIL,
+            STATUS_PASS,
+            STATUS_SKIPPED_APO,
+            STATUS_SKIPPED_BLOCKED,
+        )
+
+        assert STATUS_PASS == "pass"
+        assert STATUS_FAIL == "fail"
+        assert STATUS_SKIPPED_APO == "skipped:apo"
+        assert STATUS_SKIPPED_BLOCKED == "skipped:blocked"
+        assert STATUS_ERROR == "error"
+
+    def test_result_to_dict_includes_status(self):
+        from scripts.validate_redocking import (
+            STATUS_PASS,
+            RedockResult,
+            _result_to_dict,
+        )
+
+        r = RedockResult(
+            target_id="ERK2", pdb_id="4QTA", ligand_resname="38Z",
+            ligand_smiles="CCC", n_crystal_atoms=20, n_docked_atoms=20,
+            docking_score=-8.5, rmsd=1.2, centroid_dist=0.8,
+            passed=True, status=STATUS_PASS,
+        )
+        d = _result_to_dict(r)
+        assert d["status"] == "pass"
+        assert "status" in d
