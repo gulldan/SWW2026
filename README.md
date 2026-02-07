@@ -79,7 +79,8 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── compute_metrics.py    # Вычисление метрик и стат. тестов
 │   ├── render_molecules.py   # 2D-визуализация молекул с аннотациями
 │   ├── summarize.py          # Мини-аналитика: текстовый отчёт
-│   └── run_pilot.py          # SCI-09: pilot matrix run (1 pair x 3 modes x 2 seeds)
+│   ├── run_pilot.py          # SCI-09: pilot matrix run (1 pair x 3 modes x 2 seeds)
+│   └── claim_audit.py        # SCI-10: claim traceability audit (SAP → stats.json)
 ├── data/enrichment/      # Enrichment benchmark artifacts
 │   ├── scores/           # Per-target active docking scores ({TARGET}_actives.csv)
 │   ├── receptors/        # Downloaded PDBs and PDBQTs for missing targets

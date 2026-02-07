@@ -24,10 +24,10 @@
 
 - **KVA-269 / SCI-05**: Enrichment benchmark (actives vs decoys). AUROC, EF1%, BEDROC по мишеням. Скрипт и модуль готовы, ожидает GPU-прогон.
 - **KVA-273 / SCI-09**: Pilot matrix run (1 pair x 3 modes x 2 seeds). `scripts/run_pilot.py` создан, `run_full_experiment.py` получил `--pair`/`--seeds` фильтры, тесты 4/4 pass. Ожидает GPU-прогон.
+- **KVA-274 / SCI-10**: Full matrix run + claim audit. `scripts/claim_audit.py` создан (claim traceability: SAP scenario selection, significance consistency), тесты 6/6 pass. Ожидает GPU-прогон для полной матрицы.
 
 ## Backlog
 
-- **KVA-274 / SCI-10**: Full matrix run + claim audit.
 
 ## Milestones
 
