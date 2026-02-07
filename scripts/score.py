@@ -29,11 +29,16 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 @click.option("--config", default="configs/pairs.yaml")
 @click.option("--experiment-config", default="configs/experiment.yaml", help="Experiment config for objectives")
 @click.option("--force", is_flag=True, default=False, help="Пересчитать даже если scores уже есть")
-def main(pair: str, mode: str, seed: int, config: str, experiment_config: str, force: bool) -> None:
+@click.option("--prune-cache", is_flag=True, default=False, help="Remove stale cache files before scoring")
+def main(pair: str, mode: str, seed: int, config: str, experiment_config: str, force: bool, prune_cache: bool) -> None:
     """Оценить молекулы по обеим мишеням."""
     from dualdocking.config import load_experiment, load_pairs
     from dualdocking.objectives import compute_combined, parse_objectives_config
-    from dualdocking.scorer_boltz2 import score_batch
+    from dualdocking.scorer_boltz2 import get_scoring_context_info, prune_stale_cache, score_batch
+
+    if prune_cache:
+        n = prune_stale_cache()
+        logger.info("Pruned {} stale cache file(s)", n)
 
     pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
     if pair not in pairs:
@@ -124,6 +129,15 @@ def main(pair: str, mode: str, seed: int, config: str, experiment_config: str, f
             primary_col = obj.column_name
     joined = joined.sort_values(primary_col)
     joined.to_csv(result_dir / "scored_joined.csv", index=False)
+
+    # Write scoring context metadata
+    import json as _json
+    from datetime import UTC, datetime
+
+    scoring_meta = get_scoring_context_info()
+    scoring_meta["timestamp"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    (result_dir / "scoring_context.json").write_text(_json.dumps(scoring_meta, indent=2))
+    logger.info("Scoring context -> {}", result_dir / "scoring_context.json")
 
     logger.info("Скоры сохранены в {}", result_dir)
     logger.info(

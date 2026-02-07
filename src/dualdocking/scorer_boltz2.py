@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import json
 import os
 import subprocess
@@ -51,6 +52,12 @@ _BOLTZ_CLI_ARGS_BASE: list[str] = [
 
 _ACCELERATOR: str | None = None
 
+# Scoring context hash — computed once per process
+_CONTEXT_HASH: str | None = None
+
+# Docker image for FREED++ (used for digest lookup)
+_FREEDPP_DOCKER_IMAGE = "dualdocking/freedpp:latest"
+
 
 def _resolve_accelerator() -> str:
     """Pick Boltz accelerator; GPU is required unless explicitly overridden."""
@@ -80,21 +87,184 @@ def _resolve_accelerator() -> str:
     return _ACCELERATOR
 
 
+# ---------------------------------------------------------------------------
+# Scoring context — v2 cache key
+# ---------------------------------------------------------------------------
+
+
+def _boltz_version() -> str:
+    """Return installed Boltz version with fallback to master_config.yaml."""
+    try:
+        return importlib.metadata.version("boltz")
+    except Exception:
+        logger.debug("importlib.metadata.version('boltz') failed, trying master_config.yaml")
+    try:
+        return _master_config_field("software.boltz_version")
+    except Exception:
+        logger.warning("Cannot determine Boltz version; using 'unknown'")
+        return "unknown"
+
+
+def _master_config_field(path: str) -> str:
+    """Read a dotted path from configs/master_config.yaml."""
+    import yaml
+
+    master_path = PROJECT_ROOT / "configs" / "master_config.yaml"
+    if not master_path.exists():
+        msg = f"master_config.yaml not found: {master_path}"
+        raise FileNotFoundError(msg)
+    data = yaml.safe_load(master_path.read_text())
+    value = data
+    for part in path.split("."):
+        if isinstance(value, dict):
+            value = value.get(part)
+        else:
+            value = None
+            break
+    if not value:
+        msg = f"Field '{path}' not found in master_config.yaml"
+        raise KeyError(msg)
+    return str(value)
+
+
+def _run_cmd(cmd: list[str]) -> str:
+    """Run a command, return stripped stdout or empty string on failure."""
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
+    except FileNotFoundError:
+        return ""
+    if result.returncode != 0:
+        return ""
+    return (result.stdout or result.stderr or "").strip()
+
+
+def _docker_digest() -> str:
+    """Return FREED++ Docker image digest with fallback chain."""
+    out = _run_cmd(["docker", "image", "inspect", _FREEDPP_DOCKER_IMAGE, "--format", "{{index .RepoDigests 0}}"])
+    if "@" in out:
+        return out.split("@")[-1]
+    if out:
+        return out
+    # Local builds often have no RepoDigests; fall back to image ID.
+    image_id = _run_cmd(["docker", "image", "inspect", _FREEDPP_DOCKER_IMAGE, "--format", "{{.Id}}"])
+    if image_id:
+        return image_id
+    try:
+        return _master_config_field("software.docker_image_digest")
+    except Exception:
+        logger.warning("Cannot determine Docker digest; using 'unknown'")
+        return "unknown"
+
+
+def _msa_content_hash(msa_path: Path | None) -> str:
+    """SHA256[:16] of MSA file contents, or ``'no_msa'``."""
+    if msa_path is None:
+        return "no_msa"
+    return hashlib.sha256(msa_path.read_bytes()).hexdigest()[:16]
+
+
+def _sequence_content_hash(sequence: str) -> str:
+    """SHA256[:16] of protein sequence."""
+    return hashlib.sha256(sequence.encode()).hexdigest()[:16]
+
+
+def _scoring_context_hash() -> str:
+    """Compute (and cache) the global scoring context hash."""
+    global _CONTEXT_HASH
+    if _CONTEXT_HASH is not None:
+        return _CONTEXT_HASH
+
+    boltz_ver = _boltz_version()
+    cli_args = "|".join(_BOLTZ_CLI_ARGS_BASE)
+    accelerator = os.getenv("BOLTZ_ACCELERATOR", "gpu").lower()
+    digest = _docker_digest()
+
+    blob = f"{boltz_ver}||{cli_args}||{accelerator}||{digest}".encode()
+    _CONTEXT_HASH = hashlib.sha256(blob).hexdigest()[:16]
+
+    logger.info(
+        "Scoring context: boltz={}, cli_hash={}..., accel={}, docker={}... -> ctx={}",
+        boltz_ver,
+        hashlib.sha256(cli_args.encode()).hexdigest()[:8],
+        accelerator,
+        digest[:16],
+        _CONTEXT_HASH,
+    )
+    return _CONTEXT_HASH
+
+
+def get_cache_context_hash() -> str:
+    """Public accessor for the scoring context hash."""
+    return _scoring_context_hash()
+
+
+def get_scoring_context_info() -> dict:
+    """Return all scoring context components (for metadata persistence)."""
+    boltz_ver = _boltz_version()
+    cli_args = "|".join(_BOLTZ_CLI_ARGS_BASE)
+    accelerator = os.getenv("BOLTZ_ACCELERATOR", "gpu").lower()
+    digest = _docker_digest()
+    return {
+        "cache_context_hash": get_cache_context_hash(),
+        "boltz_version": boltz_ver,
+        "docker_digest": digest,
+        "accelerator": accelerator,
+        "cli_args_hash": hashlib.sha256(cli_args.encode()).hexdigest()[:16],
+    }
+
+
+def prune_stale_cache() -> int:
+    """Remove cache files not matching the current context hash prefix.
+
+    Returns the count of removed files.
+    """
+    ctx_prefix = _scoring_context_hash()[:8]
+    removed = 0
+    for f in CACHE_DIR.glob("*.json"):
+        if f.suffix == ".lock":
+            continue
+        # Current-context files have pattern: {target_id}.{ctx[:8]}.json
+        parts = f.stem.rsplit(".", 1)
+        if len(parts) == 2 and parts[1] == ctx_prefix:
+            continue
+        # Legacy files (no context segment) or different context — remove
+        f.unlink()
+        logger.info("Pruned stale cache file: {}", f.name)
+        removed += 1
+    return removed
+
+
+# ---------------------------------------------------------------------------
+# Sequence cache + cache key helpers
+# ---------------------------------------------------------------------------
+
 # Кеш sequence в памяти (target_id -> sequence)
 _sequence_cache: dict[str, str] = {}
 
 
-def _cache_key(target_id: str, smi: str) -> str:
-    blob = f"{target_id}||{smi}".encode()
+def _cache_key(
+    target_id: str,
+    smi: str,
+    *,
+    ctx_hash: str = "",
+    seq_hash: str = "",
+    msa_hash: str = "",
+) -> str:
+    blob = f"{target_id}||{smi}||{ctx_hash}||{seq_hash}||{msa_hash}".encode()
     return hashlib.sha256(blob).hexdigest()
 
 
+def _cache_path(target_id: str) -> Path:
+    """Return context-segmented cache file path."""
+    return CACHE_DIR / f"{target_id}.{_scoring_context_hash()[:8]}.json"
+
+
 def _load_cache(target_id: str) -> dict[str, float]:
-    return load_cache(CACHE_DIR / f"{target_id}.json")
+    return load_cache(_cache_path(target_id))
 
 
 def _save_cache(target_id: str, cache: dict[str, float]) -> None:
-    save_cache(CACHE_DIR / f"{target_id}.json", cache)
+    save_cache(_cache_path(target_id), cache)
 
 
 def _load_sequence(target_id: str) -> str:
@@ -420,13 +590,18 @@ def score_batch(
         )
         raise FileNotFoundError(msg)
 
+    # Compute per-target hashes fresh (no stale data risk)
+    seq_hash = _sequence_content_hash(sequence)
+    msa_hash = _msa_content_hash(msa_path)
+    ctx = _scoring_context_hash()
+
     cache = _load_cache(target_id) if use_cache else {}
     scores: list[float] = [float("nan")] * len(smiles_list)
     to_score: list[tuple[int, str]] = []
 
     # Проверяем кеш
     for idx, smi in enumerate(smiles_list):
-        key = _cache_key(target_id, smi)
+        key = _cache_key(target_id, smi, ctx_hash=ctx, seq_hash=seq_hash, msa_hash=msa_hash)
         if key in cache:
             scores[idx] = cache[key]
         else:
@@ -462,7 +637,7 @@ def score_batch(
             s = batch_scores[i]
             scores[idx] = s
             if not np.isnan(s):
-                key = _cache_key(target_id, smi)
+                key = _cache_key(target_id, smi, ctx_hash=ctx, seq_hash=seq_hash, msa_hash=msa_hash)
                 cache[key] = s
 
         # Сохраняем кеш после каждого батча (не после каждой молекулы)

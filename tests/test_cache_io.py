@@ -294,11 +294,14 @@ def test_scorer_wrappers_use_cache_io(tmp_path: Path, monkeypatch):
     """_load_cache/_save_cache in scorer_boltz2 must delegate to cache_io."""
     import dualdocking.scorer_boltz2 as mod
     monkeypatch.setattr(mod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
 
     mod._save_cache("tgt", {"abc": -5.0, "def": -6.0})
     loaded = mod._load_cache("tgt")
     assert loaded == {"abc": -5.0, "def": -6.0}
 
     # Verify the file is on disk via cache_io.load_cache directly
-    direct = load_cache(tmp_path / "tgt.json")
+    # Cache files are now context-segmented: {target_id}.{ctx[:8]}.json
+    cache_file = mod._cache_path("tgt")
+    direct = load_cache(cache_file)
     assert direct == {"abc": -5.0, "def": -6.0}
