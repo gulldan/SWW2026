@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,6 +13,13 @@ import click
 from loguru import logger
 
 from dualdocking.config import load_experiment, load_pairs
+from dualdocking.run_manifest import (
+    finalize_manifest,
+    init_manifest,
+    manifest_path,
+    skip_task,
+    update_task,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -78,21 +86,48 @@ def _run_cmd(cmd: list[str], log_path: Path) -> None:
         _log_to_file(log_path, f"[{_ts()}] OUT: {result.stdout[-2000:]}")
 
 
-def _run_one(pair: str, mode: str, seed: int, log_path: Path, resume: bool) -> None:
+def _run_one(pair: str, mode: str, seed: int, log_path: Path, resume: bool, mf_path: Path | None = None) -> None:
     run_dir = PROJECT_ROOT / "results" / pair / mode / f"seed_{seed}"
     scored = run_dir / "scored_joined.csv"
     generated = run_dir / "generated.csv"
+    tid = f"{pair}/{mode}/seed_{seed}"
 
     if scored.exists():
         logger.info("[SKIP] {} {} seed_{} (scored_joined.csv exists)", pair, mode, seed)
+        if mf_path:
+            skip_task(mf_path, task_id=tid)
         return
 
+    # --- Generate stage ---
     if generated.exists() and resume:
         logger.info("[RESUME] {} {} seed_{} (generated.csv exists)", pair, mode, seed)
+        if mf_path:
+            update_task(mf_path, task_id=tid, stage="generate", status="skipped")
     else:
-        _run_cmd(_command_generate(pair, mode, seed), log_path)
+        if mf_path:
+            update_task(mf_path, task_id=tid, stage="generate", status="running")
+        t0 = time.monotonic()
+        try:
+            _run_cmd(_command_generate(pair, mode, seed), log_path)
+        except RuntimeError as exc:
+            if mf_path:
+                update_task(mf_path, task_id=tid, stage="generate", status="failed", error=str(exc))
+            raise
+        if mf_path:
+            update_task(mf_path, task_id=tid, stage="generate", status="completed", duration_seconds=time.monotonic() - t0)
 
-    _run_cmd(_command_score(pair, mode, seed), log_path)
+    # --- Score stage ---
+    if mf_path:
+        update_task(mf_path, task_id=tid, stage="score", status="running")
+    t0 = time.monotonic()
+    try:
+        _run_cmd(_command_score(pair, mode, seed), log_path)
+    except RuntimeError as exc:
+        if mf_path:
+            update_task(mf_path, task_id=tid, stage="score", status="failed", error=str(exc))
+        raise
+    if mf_path:
+        update_task(mf_path, task_id=tid, stage="score", status="completed", duration_seconds=time.monotonic() - t0)
 
 
 @click.command()
@@ -169,26 +204,47 @@ def main(
                 click.echo(" ".join(cmd))
         return
 
+    # Initialize run manifest
+    results_dir = PROJECT_ROOT / "results"
+    mf_path = manifest_path(results_dir, run_id)
+    init_manifest(
+        mf_path,
+        run_id=run_id,
+        config_dir=PROJECT_ROOT / "configs",
+        tasks=tasks,
+        parallel=parallel,
+        resume=resume,
+    )
+
     for cmd in prep_cmds:
         _run_cmd(cmd, log_path)
 
+    run_failed = False
     if parallel <= 1:
         for pair_id, mode, seed in tasks:
-            _run_one(pair_id, mode, seed, log_path, resume)
+            try:
+                _run_one(pair_id, mode, seed, log_path, resume, mf_path)
+            except RuntimeError:
+                run_failed = True
     else:
         with ThreadPoolExecutor(max_workers=parallel) as executor:
-            futures = [executor.submit(_run_one, pair_id, mode, seed, log_path, resume) for pair_id, mode, seed in tasks]
+            futures = [executor.submit(_run_one, pair_id, mode, seed, log_path, resume, mf_path) for pair_id, mode, seed in tasks]
             for future in as_completed(futures):
-                future.result()
+                try:
+                    future.result()
+                except RuntimeError:
+                    run_failed = True
 
     if not with_post:
         _log_to_file(log_path, f"[{_ts()}] POST-SKIP (stage1 only)")
+        finalize_manifest(mf_path, status="failed" if run_failed else "completed")
         return
 
     _log_to_file(log_path, f"[{_ts()}] POST-START")
     for cmd in _post_commands(latex_mode):
         _run_cmd(cmd, log_path)
     _log_to_file(log_path, f"[{_ts()}] POST-DONE")
+    finalize_manifest(mf_path, status="failed" if run_failed else "completed")
 
 
 if __name__ == "__main__":
