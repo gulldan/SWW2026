@@ -4,7 +4,7 @@
 |-------|-------|
 | **Date** | 2026-02-07 |
 | **Status** | FROZEN |
-| **Freeze commit** | `__FREEZE_HASH__` |
+| **Freeze commit** | `f2eceb2` |
 
 ---
 
