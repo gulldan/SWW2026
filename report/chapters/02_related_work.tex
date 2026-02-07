@@ -1,12 +1,263 @@
-Базовый генератор --- FREED++ (fragment-based RL) из экосистемы FFREED.
-В текущем репозитории upstream reward path адаптирован под Uni-Dock с подготовкой
-лигандов через RDKit+Meeko для устойчивого воспроизведения.
+% ===========================================================================
+%  Chapter 2: Related Work
+%  Dual-Target RL Molecular Generation — Workshop Report
+% ===========================================================================
 
-Для финального скоринга используется Boltz-2 через CLI, что позволяет работать с
-единой схемой структуры+аффинности. Этот шаг выполняется после генерации и не
-подменяет training reward внутри FREED++.
+This section surveys six areas of prior work that motivate and contextualize our
+dual-target reinforcement-learning pipeline: multi-target drug design
+(Section~\ref{sec:rw:mtdd}), de~novo generation with RL
+(Section~\ref{sec:rw:rlgen}), multi-objective optimization
+(Section~\ref{sec:rw:moo}), docking-based scoring
+(Section~\ref{sec:rw:docking}), learned affinity prediction
+(Section~\ref{sec:rw:boltz2}), and clinical validation of AI-designed
+therapeutics (Section~\ref{sec:rw:clinical}).
 
-Многоцелевая оптимизация в литературе обычно сравнивается между скаляризациями
-(\emph{worst-case}, гармоническое/геометрическое среднее, взвешенные формы)
-и Парето-подходами. В данной работе основной фокус --- строгий baseline-сравнительный
-эксперимент между \texttt{single\_a}, \texttt{single\_b} и \texttt{double}.
+% ---------------------------------------------------------------------------
+\subsection{Multi-Target Drug Design and Polypharmacology}
+\label{sec:rw:mtdd}
+% ---------------------------------------------------------------------------
+
+Complex diseases rarely arise from single-gene perturbations.
+Alzheimer's disease (AD), for instance, involves amyloid precursor processing
+(BACE1), tau phosphorylation cascades (GSK3$\beta$, CDK5), and
+cholinergic deficit (AChE, BChE), motivating simultaneous modulation of
+multiple targets~\citep{bolognesi2013polypharmacology}.
+Polypharmacology---the deliberate design of ligands that engage two or more
+targets---offers potential advantages over combination therapy: simplified
+pharmacokinetics, reduced drug--drug interactions, and a single
+ADMET profile to optimize~\citep{stern2022multitarget}.
+Clinical precedents include ladostigil, a dual AChE/MAO-B inhibitor
+developed for AD~\citep{weinreb2012cholinesterase}, and donepezil--memantine
+fixed-dose combinations.
+
+The computational challenge is non-trivial: binding sites of target pairs
+such as BACE1/GSK3$\beta$---where GSK3$\beta$ directly regulates BACE1
+expression~\citep{ly2013gsk3b}---share little structural homology, so
+optimizing affinity to one pocket often degrades binding to the other.
+Notably, \citet{jiang2020notopterol} identified Notopterol as a natural
+dual BACE1/GSK3$\beta$ inhibitor via traditional screening; our work
+instead uses RL-based generation to explore the joint chemical space
+systematically.
+
+% ---------------------------------------------------------------------------
+\subsection{De Novo Molecular Generation with Reinforcement Learning}
+\label{sec:rw:rlgen}
+% ---------------------------------------------------------------------------
+
+\paragraph{Fragment-based RL.}
+FREED~\citep{yang2021freed} introduced a fragment-attachment MDP where an
+agent iteratively selects molecular fragments to extend a growing molecule,
+receiving a docking-score reward.
+FREED++~\citep{telepov2023freedpp} provided a thorough reproduction and
+improvement: explorative experience replay, reward shaping, and stabilized
+training yielded consistent gains on standard benchmarks.
+Our pipeline adopts FREED++ as the base generator.
+In \texttt{double} mode, we monkey-patch the reward computation to call
+UniDock on both targets per RL step, combining scores via a worst-case
+scalarization ($R = -\max(d_A, d_B)$) before returning the reward signal
+to the agent.  This is, to our knowledge, the first dual-target extension
+of FREED++.
+
+\paragraph{SMILES-based RL.}
+REINVENT~4~\citep{loeffler2024reinvent4} is the current release of the
+AstraZeneca generative platform, supporting de~novo, R-group, linker,
+and Mol2Mol modes with a modular scoring stack.
+It uses a DAP (Difference between Agent and Prior) loss and supports
+curriculum learning.
+ADMETrix~\citep{mourdoukoutas2025admetrix} extends REINVENT with 27 ADMET
+and 10 physicochemical predictors via the ADMET-AI model, demonstrating
+that RL agents can optimize pharmacological profiles beyond single
+binding scores.
+While REINVENT employs weighted-sum scalarization for multi-objective
+tasks, our design deliberately avoids this choice to isolate the
+dual-target effect under a single, fixed architecture.
+
+\paragraph{Synthesis-aware generation.}
+A recent line of work constrains generation to synthetically accessible
+molecules.
+SynFlowNet~\citep{cretu2025synflownet} applies GFlowNets in a
+reaction-template space, jointly producing molecules and synthesis
+routes.
+SynGFN~\citep{kim2025syngfn} introduces hierarchical pre-trained policies
+over cascaded simulated reactions.
+RxnFlow~\citep{lee2025rxnflow} scales to 1.2\,M building blocks and 71
+reaction templates, achieving state-of-the-art mean Vina scores
+($-8.85$\,kcal/mol on CrossDocked2020).
+These approaches are complementary to ours: our focus is the
+dual-target reward signal rather than synthetic feasibility, though
+combining both is a promising future direction.
+
+% ---------------------------------------------------------------------------
+\subsection{Multi-Objective Optimization in Molecular Design}
+\label{sec:rw:moo}
+% ---------------------------------------------------------------------------
+
+Multi-objective molecular optimization seeks to balance competing
+properties---binding affinity to multiple targets, synthetic accessibility,
+ADMET constraints---that cannot be collapsed into a single scalar without
+loss of information.
+\citet{fromer2023moo} provide a comprehensive taxonomy of approaches,
+distinguishing \emph{scalarization} methods (which reduce the problem to
+a single objective) from \emph{Pareto-based} methods (which maintain a
+population on the Pareto front).
+
+\paragraph{Scalarization.}
+Weighted sums are the simplest and most widely used
+approach~\citep{loeffler2024reinvent4, liu2023drugexv3}; however, they
+can only recover convex regions of the Pareto front.
+Tchebycheff decomposition~\citep{zhang2007moead} overcomes this limitation
+and is used in DrugEx~v3~\citep{liu2023drugexv3}.
+Our primary reward, $\max(d_A, d_B)$ (worst-case), is a special case of
+Tchebycheff with equal weights and a zero reference point: it penalizes
+molecules that sacrifice one target for the other, providing a
+conservative lower bound on dual-target quality.
+
+\paragraph{Pareto-based methods.}
+DrugEx~v2~\citep{liu2021drugex} pioneered Pareto-ranked RL for
+polypharmacological design, using non-dominated sorting within a
+population-based policy.
+ParetoDrug~\citep{paretodrug2024} combines Pareto MCTS with a pre-trained
+autoregressive model, using a ParetoPUCT criterion to balance exploration
+and exploitation.
+PMMG~\citep{pmmg2025} extends Pareto MCTS to seven simultaneous
+objectives (dual EGFR/HER2 affinity, QED, SA, and toxicity), achieving
+51.65\% success rate---2.5$\times$ higher than prior work.
+CMOMO~\citep{cmomo2025} introduces dynamic constraints in a two-stage
+framework, doubling the success rate for GSK3$\beta$ inhibitors.
+ScaRL-P~\citep{wang2024scarlp} applies clustered Pareto RL with
+per-objective critics.
+
+\paragraph{Quality metrics.}
+The \emph{hypervolume indicator} measures the volume of objective space
+dominated by a Pareto front, providing a single scalar that captures both
+convergence and diversity~\citep{verhellen2022hypervolume}.
+HMAMP~\citep{wang2025hmamp} uses hypervolume-driven search for
+antimicrobial peptide design; we adopt the hypervolume as a secondary
+endpoint (Section~5).
+
+\paragraph{Our positioning.}
+We restrict the primary experiment to a single scalarization
+($\max(d_A, d_B)$) rather than employing Pareto-based methods.  This isolates the effect of \emph{dual-target RL generation}
+under controlled conditions: identical generator (FREED++), identical
+molecular budget, and identical reward architecture, varying only the
+number of targets.  Pareto and hypervolume alternatives are evaluated
+offline as sensitivity analyses.
+
+% ---------------------------------------------------------------------------
+\subsection{Docking-Based Scoring Functions}
+\label{sec:rw:docking}
+% ---------------------------------------------------------------------------
+
+AutoDock Vina~\citep{trott2010vina} remains the most widely used
+open-source docking program, employing an empirical scoring function
+that combines steric, hydrophobic, and hydrogen-bond terms with an
+iterated local search optimizer.
+The CASF-2016 benchmark~\citep{su2019casf2016} reported Vina's scoring
+power as Pearson $r = 0.604$ and ranking power as Spearman
+$\rho = 0.528$---competitive among classical scoring functions but far
+from perfect.
+
+UniDock~\citep{yu2023unidock} ports the Vina scoring function to GPU,
+achieving up to 1000$\times$ speedup over CPU Vina while preserving
+identical scoring semantics.
+This makes UniDock practical as an RL reward: each molecule can be
+docked in milliseconds, enabling the thousands of evaluations required
+per RL epoch.
+Our pipeline uses UniDock GPU (\texttt{unidock\_gpu}) as the docking
+backend for both single- and dual-target reward computation.
+
+\paragraph{Known limitations.}
+Docking scores are approximate: they neglect explicit solvation,
+protein flexibility, and entropic contributions.
+PoseX~\citep{posex2025} demonstrated that on certain targets, Vina-family
+scoring functions perform near-randomly for virtual screening hit
+identification.
+Performance is target-dependent: some pockets are well-suited to
+empirical scoring, while others require more sophisticated methods.
+These limitations motivate our use of an orthogonal evaluation
+surrogate (Boltz-2, Section~\ref{sec:rw:boltz2}) and our per-target
+Spearman $\rho$ sanity check between docking scores $d_X$ and
+learned affinities $a_X$.
+
+% ---------------------------------------------------------------------------
+\subsection{Learned Affinity Prediction: Boltz-2}
+\label{sec:rw:boltz2}
+% ---------------------------------------------------------------------------
+
+Boltz-2~\citep{passaro2025boltz2} is a unified biomolecular prediction
+model that extends a structure-prediction backbone (PairFormer) with
+binding-likelihood and affinity-prediction heads.
+The affinity module is trained on approximately 750\,K compound--target
+pairs drawn from ChEMBL, BindingDB, and PDBbind, spanning Ki, Kd,
+IC$_{50}$, and EC$_{50}$ assay types.
+The training loss combines Huber regression on absolute values with
+pairwise intra-assay differences, encouraging consistent ranking
+within each assay context.
+The output is $\log_{10}(\text{IC}_{50}\text{-like},\;\mu\text{M})$,
+where lower values indicate stronger predicted binding; notably, this
+is \emph{not} pIC$_{50}$ (which is $-\log_{10}$).
+
+\paragraph{Performance.}
+On the authors' four-target FEP+ validation subset (CDK2, TYK2, JNK1,
+p38), Boltz-2 achieves Pearson $r = 0.66$, comparable to OpenFE and
+below commercial FEP+ ($r = 0.78$).
+Independent evaluations report more modest correlations: the PL-REX
+benchmark (Yesylevskyy) yields mean $r \approx 0.42$, while DeepMirror
+per-target evaluations range from $r = 0.26$ (cGAS, narrow activity
+range) to $r = 0.81$ (Mpro).
+These results underscore target-dependent performance and motivate our
+per-target Spearman $\rho$ sanity check.
+
+\paragraph{Limitations.}
+The affinity module does not explicitly model cofactors, ions, or
+multimeric binding partners; predictions for cofactor-containing pockets
+(e.g., MAO-B with FAD) are unreliable.
+The predicted values span a compressed range (typically
+$-2$ to $+3$ log units) relative to experimental data, and a
+$\sim$40\% false-positive rate at stringent thresholds has been
+reported.
+We therefore use Boltz-2 exclusively as an \emph{evaluation surrogate}
+for relative comparison between generation strategies, never as a
+training reward, and interpret hit-rate differences rather than
+absolute predicted IC$_{50}$ values.
+
+\paragraph{Ecosystem.}
+Several recent tools build on Boltz-2.
+Boltzina~\citep{furui2025boltzina} combines AutoDock Vina docking poses
+with the Boltz-2 affinity head, achieving up to 11.8$\times$ speedup
+over full Boltz-2 inference.
+Most relevant to our work, SynFlowNet~\citep{cretu2025synflownet}
+uses Boltz-2 as a scoring function within a GFlowNet RL loop
+(off-policy, with replay buffer), providing a direct precedent for
+Boltz-2 as an RL scoring surrogate in molecular generation.
+Our pipeline differs in that Boltz-2 is used post-hoc for evaluation
+rather than as the RL reward, avoiding potential mode collapse
+toward Boltz-2-specific artifacts.
+
+% ---------------------------------------------------------------------------
+\subsection{Clinical Validation of AI-Generated Therapeutics}
+\label{sec:rw:clinical}
+% ---------------------------------------------------------------------------
+
+While computational molecular design has a long history, recent clinical
+milestones demonstrate that AI-generated molecules can reach the clinic.
+Rentosertib~\citep{xu2025rentosertib}, a TNIK inhibitor for idiopathic
+pulmonary fibrosis, was designed end-to-end using AI: PandaOmics
+identified the target, Chemistry42 generated the molecule, and the
+program progressed from target identification to preclinical candidate
+in 18 months.
+In a Phase~2a randomized trial (NCT05938920), rentosertib improved FVC
+by $+98.4$\,mL versus $-20.3$\,mL for placebo, providing the first
+clinical evidence that an AI-designed molecule can achieve efficacy
+in humans~\citep{xu2025rentosertib}.
+
+In the polypharmacology domain, POLYGON~\citep{ren2024polygon}
+generated 32 synthesized dual MEK1/mTOR compounds, with the majority
+showing $>$50\% inhibition of both targets at 10\,$\mu$M.
+Automated multi-target ligand design via chemical language
+models~\citep{zhang2024clm} produced 12 synthesized compounds across
+six target pairs.
+These experimental validations, while still pre-clinical, demonstrate
+that multi-target generative design can yield physically real,
+biologically active molecules, motivating further computational
+investigation of dual-target RL strategies.

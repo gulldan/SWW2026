@@ -17,6 +17,25 @@ Fairness controls:
 
 Any interrupted run is resumed only if required artifacts are missing; otherwise it is skipped.
 
+\textbf{Compute parity.} All three modes (\texttt{single\_a}, \texttt{single\_b},
+\texttt{double}) share identical parameters: molecule budget (1000 per run),
+seed set ([42, 137, 256, 512, 1024]), RL epochs (200), and chemical-space
+constraints. The only difference between modes is the reward function
+(from UniDock docking scores $d_A, d_B$): $-d_A$, $-d_B$, or $-\max(d_A, d_B)$.
+Evaluation uses Boltz-2 affinity $a_A, a_B$ (orthogonal to the RL reward).
+
+\textbf{Docking calls trade-off.} In \texttt{double} mode each RL step invokes
+UniDock GPU twice (targets A and B), so total docking calls $\approx 2\times$
+those of \texttt{single}. The primary comparison uses \emph{fixed molecule count}
+(1000). A sensitivity baseline doubles the RL epochs for single modes
+(\texttt{epochs: 400}), equalizing the training-time docking budget rather
+than merely sampling more molecules from the same policy.
+
+\textbf{Core vs.\ auxiliary.} Primary hypothesis tests are conducted on the
+pre-registered \emph{core set} (5~pairs); auxiliary pairs are used for
+robustness/sensitivity analysis only and do not contribute to the primary
+statistical comparison.
+
 \subsection*{Key comparisons}
 
 \begin{itemize}

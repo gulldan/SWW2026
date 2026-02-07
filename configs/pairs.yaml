@@ -2,8 +2,13 @@
 # Каждая пара определяет две мишени (A и B) с их PDB-структурами и метаданными.
 #
 # Обоснование выбора: см. docs/selection_criteria.md
+# Факторный дизайн и core/auxiliary: см. docs/selection_criteria.md#факторный-дизайн-эксперимента
 #
-# Пары 1-4: non-AD контроль
+# set: core    — primary hypothesis test (5 пар)
+# set: auxiliary — robustness/sensitivity analysis (3 пары)
+# set: blocked — excluded from production runs (1 пара)
+#
+# Пары 1-4: non-AD контроль + AD-homo bridge
 # Пары 5-9: AD-специфичные (гетерогенные мишени)
 
 pairs:
@@ -12,6 +17,7 @@ pairs:
   CDK2_ERK2:
     description: "Селективность киназ - CDK2 vs ERK2 (обе Ser/Thr киназы, схожие ATP-связывающие карманы)"
     boltz2_status: "ok"
+    set: "core"
     target_a:
       id: CDK2
       name: "Циклин-зависимая киназа 2"
@@ -30,6 +36,7 @@ pairs:
   EGFR_HER2:
     description: "Двойное ингибирование EGFR/HER2 - актуально для НМРЛ и рака молочной железы"
     boltz2_status: "ok"
+    set: "auxiliary"
     target_a:
       id: EGFR
       name: "Рецептор эпидермального фактора роста"
@@ -48,6 +55,7 @@ pairs:
   COX1_COX2:
     description: "Селективность циклооксигеназ - COX-1 vs COX-2, классический dual-target дизайн НПВС"
     boltz2_status: "warning_cofactor_heme"
+    set: "blocked"
     target_a:
       id: COX1
       name: "Простагландин G/H синтаза 1 (COX-1)"
@@ -60,12 +68,13 @@ pairs:
       name: "Простагландин G/H синтаза 2 (COX-2)"
       uniprot: P35354
       pdb_id: 3LN1
-      organism: "Homo sapiens"
+      organism: "Mus musculus"
       binding_site: "Активный сайт циклооксигеназы"
 
   AChE_BChE:
     description: "Двойное ингибирование холинэстераз - multi-target стратегия при болезни Альцгеймера"
     boltz2_status: "ok"
+    set: "core"
     target_a:
       id: AChE
       name: "Ацетилхолинэстераза"
@@ -84,8 +93,9 @@ pairs:
   # --- AD-специфичные пары (гетерогенные мишени) ---
 
   BACE1_GSK3B:
-    description: "Лучшая AD-пара: β-секретаза (amyloid) + GSK3β (tau) — разные семейства, валидированная in vivo связь (Ly 2013, Notopterol)"
+    description: "Лучшая AD-пара: β-секретаза (amyloid) + GSK3β (tau) — разные семейства, валидированная in vivo связь (Ly 2013, Jiang 2020 Notopterol)"
     boltz2_status: "ok"
+    set: "core"
     target_a:
       id: BACE1
       name: "β-секретаза 1 (BACE1)"
@@ -104,6 +114,7 @@ pairs:
   AChE_BACE1:
     description: "Классическая AD dual-target пара: AChE (холинергическая) + BACE1 (amyloid) — максимальные данные в ChEMBL (3524 dual-compound записей)"
     boltz2_status: "ok"
+    set: "core"
     target_a:
       id: AChE
       name: "Ацетилхолинэстераза"
@@ -122,6 +133,7 @@ pairs:
   GSK3B_CDK5:
     description: "Оптимальная по compute AD-пара: dual tau-киназы — GSK3β (Ser396/Ser404) + CDK5 (Ser202/Thr205, AT8), наименьший суммарный размер (~642 остатка)"
     boltz2_status: "ok"
+    set: "core"
     target_a:
       id: GSK3B
       name: "Гликоген-синтаза киназа 3β"
@@ -140,6 +152,7 @@ pairs:
   BACE1_CDK5:
     description: "Оригинальная AD-пара: amyloid (BACE1) × tau (CDK5) — p25/CDK5 регулирует BACE1, менее изученная комбинация"
     boltz2_status: "ok"
+    set: "auxiliary"
     target_a:
       id: BACE1
       name: "β-секретаза 1 (BACE1)"
@@ -158,6 +171,7 @@ pairs:
   AChE_MAOB:
     description: "AD-пара с клиническим прецедентом (ladostigil Phase II): AChE + MAO-B. ВНИМАНИЕ: MAO-B содержит ковалентный FAD — Boltz-2 affinity ненадёжен"
     boltz2_status: "warning_cofactor_fad"
+    set: "auxiliary"
     target_a:
       id: AChE
       name: "Ацетилхолинэстераза"

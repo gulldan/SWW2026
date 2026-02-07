@@ -1,12 +1,19 @@
+В проекте используются два типа скоров: docking-скоры $d_A, d_B$ (UniDock GPU, kcal/mol)
+служат \textbf{RL reward} для генерации, а Boltz-2 affinity $a_A, a_B$ ($\log_{10}$\,(IC50-like), $\mu$M;
+обучена на смеси Ki/Kd/IC50/EC50)
+--- \textbf{ортогональная evaluation surrogate}. Два скорера не смешиваются;
+$a_X$ интерпретируется как ранжирующая метрика, а не калиброванный IC50.
+
 Генерация выполняется в трёх режимах:
-\texttt{single\_a}, \texttt{single\_b}, \texttt{double}.
-Для \texttt{double} используется worst-case reward на z-нормированных прокси-скорах.
+\texttt{single\_a} (reward $= -d_A$), \texttt{single\_b} (reward $= -d_B$),
+\texttt{double} (reward $= -\max(d_A, d_B)$).
 Reward backend --- UniDock GPU (\texttt{unidock\_gpu}), GPU-ускоренный докинг,
 CLI-совместимый с AutoDock Vina.
 
-Скоринг выполняется скриптом \texttt{scripts/score.py} по двум мишеням пары с записью
-\texttt{scored\_joined.csv}. Далее метрики и статистика рассчитываются в
-\texttt{scripts/compute\_metrics.py} с bootstrap-процедурами и поправкой на множественные сравнения.
+Скоринг выполняется скриптом \texttt{scripts/score.py}: Boltz-2 оценивает каждую
+сгенерированную молекулу по двум мишеням пары с записью \texttt{scored\_joined.csv}.
+Далее метрики (hit-rate по $a_A, a_B$) и статистика рассчитываются в
+\texttt{scripts/compute\_metrics.py} с двухуровневым bootstrap и поправкой на множественные сравнения.
 
 Оркестрация разделена на два этапа:
 \begin{enumerate}
@@ -16,28 +23,37 @@ CLI-совместимый с AutoDock Vina.
 
 \subsection*{Reward function для double-режима}
 
-Ключевой design choice --- как FREED++ комбинирует $DS_A$ и $DS_B$ в один reward.
-Baseline стратегия: $R = -\max(z_A, z_B)$ (worst-case в z-пространстве).
-Гарантирует активность к обоим таргетам, но жёсткая.
+Ключевой design choice --- как FREED++ комбинирует $d_A$ и $d_B$ в один reward.
 
-Альтернативная стратегия: $R = -(z_A + z_B)$ (сумма z-скоров).
-Компенсирует: хороший $z_A$ + плохой $z_B$ = средний reward.
-Ближайший прецедент: SFG-Drug (MDPI 2025) --- dual MEK1/mTOR, использовали сумму DS.
+\textbf{Primary experiment:} $R = -\max(d_A, d_B)$ (worst-case).
+Молекула оценивается по худшему docking-скору; гарантирует активность к обоим таргетам.
 
-Сравнение двух стратегий --- бонусный результат, показывающий чувствительность
-генерации к выбору reward function.
+\textbf{Sensitivity analysis (offline):} $R = -(d_A + d_B)$ (сумма) и другие
+скаляризации (geometric, harmonic, Chebyshev) пересчитываются по уже сгенерированным
+молекулам. Ближайший прецедент суммы: SFG-Drug (MDPI 2025) --- dual MEK1/mTOR.
 
 \subsection*{Категории пар}
 
-Эксперимент включает 9 пар мишеней, разделённых на категории:
+Эксперимент включает 9 пар мишеней (8 активных, 1 заблокированная),
+классифицированных по трём осям: \emph{disease context} (AD / Non-AD),
+\emph{structural relation} (Homo / Hetero) и \emph{cofactor presence} (Clean / Present).
+Пары разделены на заранее зафиксированные множества:
+
 \begin{itemize}
-\item \textbf{Non-AD контроль} (4 пары): CDK2\_ERK2, EGFR\_HER2, COX1\_COX2, AChE\_BChE ---
-  гомологичные мишени с высоким сходством binding pocket.
-\item \textbf{AD-гетерогенные} (5 пар): BACE1\_GSK3B, AChE\_BACE1, GSK3B\_CDK5,
-  BACE1\_CDK5, AChE\_MAOB --- мишени из разных белковых семейств, специфичные для болезни Альцгеймера.
+\item \textbf{Core set} (5 пар) --- основная проверка гипотезы:
+  CDK2\_ERK2 (Non-AD, Homo), AChE\_BChE (AD, Homo),
+  BACE1\_GSK3B, AChE\_BACE1, GSK3B\_CDK5 (AD, Hetero).
+  Все без кофакторов; Boltz-2 affinity валиден.
+\item \textbf{Auxiliary set} (3 пары) --- robustness и sensitivity:
+  EGFR\_HER2 (второй Homo-контроль), BACE1\_CDK5 (замена tau-киназы),
+  AChE\_MAOB (cofactor-sensitive: FAD removed in receptor prep, Boltz-2 binary only).
+\item \textbf{Blocked}: COX1\_COX2 (non-human PDB: COX1 Ovis aries, COX2 Mus musculus).
 \end{itemize}
 
 Гомологичные пары (AChE\_BChE, CDK2\_ERK2) служат ``лёгким'' тестом --- высокое сходство
 карманов облегчает dual generation. Гетерогенные AD-пары (BACE1\_GSK3B, GSK3B\_CDK5) ---
 ``жёсткий'' тест, проверяющий способность \texttt{double} режима находить dual-active
 молекулы для структурно различных мишеней.
+
+Деление core/auxiliary зафиксировано до начала экспериментов; primary statistical
+tests проводятся только на core set (подробнее: \texttt{docs/selection\_criteria.md}).

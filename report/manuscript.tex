@@ -4,6 +4,7 @@
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
+\usepackage{amsmath}
 \usepackage{natbib}
 \usepackage{hyperref}
 \usepackage{xcolor}
@@ -44,74 +45,49 @@ with multiple-testing control.
 
 \section{ Introduction }
 
-Проект проверяет гипотезу: оптимизация генерации молекул одновременно под две мишени
-(\texttt{double}) увеличивает вероятность dual-hit относительно однобелковых режимов
-\texttt{single\_a} и \texttt{single\_b}.
+This project tests the hypothesis that optimizing molecular generation
+simultaneously for two targets (\texttt{double}) increases the probability
+of dual-hit discovery relative to single-target modes
+\texttt{single\_a} and \texttt{single\_b}.
 
-Эксперимент строится как воспроизводимый пайплайн:
-подготовка таргетов, генерация FREED++, скоринг Boltz-2, агрегирование, статистика,
-визуализация и отчёт.
+The experiment is structured as a reproducible pipeline:
+target preparation, FREED++ generation, Boltz-2 scoring, aggregation,
+statistical testing, visualization, and reporting.
 
-Ключевой принцип дизайна эксперимента --- честное сравнение режимов при одинаковом
-бюджете молекул, фиксированных сидах и одинаковых правилах hit-оценки.
+The key design principle is fair comparison of modes under identical
+molecular budgets, fixed seeds, and uniform hit-evaluation rules.
 
 
 
 \section{ Related Work }
 
-Базовый генератор --- FREED++ (fragment-based RL) из экосистемы FFREED.
-В текущем репозитории upstream reward path адаптирован под Uni-Dock с подготовкой
-лигандов через RDKit+Meeko для устойчивого воспроизведения.
-
-Для финального скоринга используется Boltz-2 через CLI, что позволяет работать с
-единой схемой структуры+аффинности. Этот шаг выполняется после генерации и не
-подменяет training reward внутри FREED++.
-
-Многоцелевая оптимизация в литературе обычно сравнивается между скаляризациями
-(\emph{worst-case}, гармоническое/геометрическое среднее, взвешенные формы)
-и Парето-подходами. В данной работе основной фокус --- строгий baseline-сравнительный
-эксперимент между \texttt{single\_a}, \texttt{single\_b} и \texttt{double}.
+\input{chapters/02_related_work}
 
 
 
 \section{ Methods }
 
-Генерация выполняется в трёх режимах:
-\texttt{single\_a}, \texttt{single\_b}, \texttt{double}.
-Для \texttt{double} используется worst-case reward на z-нормированных прокси-скорах.
+Generation is performed in three modes:
+\texttt{single\_a}, \texttt{single\_b}, and \texttt{double}.
+For \texttt{double}, the reward is $R = -\max(d_A, d_B)$ (worst-case docking score).
 
-Скоринг выполняется скриптом \texttt{scripts/score.py} по двум мишеням пары с записью
-\texttt{scored\_joined.csv}. Далее метрики и статистика рассчитываются в
-\texttt{scripts/compute\_metrics.py} с bootstrap-процедурами и поправкой на множественные сравнения.
+Scoring is performed by \texttt{scripts/score.py}, which evaluates each generated
+molecule against both targets of the pair, producing
+\texttt{scored\_joined.csv}. Metrics and statistical tests are computed by
+\texttt{scripts/compute\_metrics.py} using two-level bootstrap with
+multiple-comparison correction.
 
-Оркестрация разделена на два этапа:
+Orchestration is split into two stages:
 \begin{enumerate}
-\item Stage 1: \texttt{scripts/run\_full\_experiment.py} (generate + score).
-\item Stage 2: \texttt{scripts/run\_post\_pipeline.py} (aggregate, metrics, plots, render, summary, LaTeX).
+\item Stage~1: \texttt{scripts/run\_full\_experiment.py} (generate + score).
+\item Stage~2: \texttt{scripts/run\_post\_pipeline.py} (aggregate, metrics, plots, render, summary, \LaTeX).
 \end{enumerate}
 
 
 
 \section{ Experimental Protocol and Fairness Controls }
 
-All experiments are executed under a two-stage orchestration model.
-
-\textbf{Stage 1} (\texttt{scripts/run\_full\_experiment.py}) performs generation and
-scoring for each pair, mode, and seed.
-
-\textbf{Stage 2} (\texttt{scripts/run\_post\_pipeline.py}) performs aggregation,
-metric computation, statistical testing, figure generation, and manuscript assembly.
-
-Fairness controls:
-\begin{itemize}
-\item identical seed set across modes;
-\item identical molecule budget per run;
-\item identical hit thresholds per pair from \texttt{configs/metrics.yaml};
-\item identical score convention (lower is better);
-\item run-level metadata and timestamped logs for traceability.
-\end{itemize}
-
-Any interrupted run is resumed only if required artifacts are missing; otherwise it is skipped.
+\input{chapters/04_experimental_protocol}
 
 
 
@@ -137,21 +113,7 @@ backfilling with extrapolations.
 
 \section{ Limitations }
 
-Current limitations:
-\begin{itemize}
-\item computational cost remains high for full multi-pair, multi-seed runs;
-\item final external scorer latency constrains rapid iteration;
-\item conclusions depend on selected target pairs and may not generalize
-to all polypharmacology regimes.
-\end{itemize}
-
-Methodological limitations:
-\begin{itemize}
-\item reward shaping and normalization choices can bias search trajectories;
-\item docking-driven objectives remain proxy objectives rather than direct wet-lab endpoints.
-\end{itemize}
-
-These limitations are tracked to prevent over-claiming and to guide future protocol upgrades.
+\input{chapters/06_limitations}
 
 
 
@@ -192,16 +154,16 @@ No figures available. Run \texttt{scripts/plot\_results.py} and \texttt{scripts/
 \begin{itemize}
 \item Master config version: \texttt{ 2.4 }
 
-\item Docker image digest: \texttt{ sha256:84621724917265ea8f72445ced88af441730b45342b4613f4355ed5663c71d4a }
+\item Docker image digest:\\ {\footnotesize\texttt{sha256:84621724917265ea8f72445ced88af441730b45342b4613f4355ed5663c71d4a}}
 \item Boltz version: \texttt{ 2.2.1 }
-\item Docking program/version: \texttt{ unidock_gpu } / \texttt{ Uni-Dock v1.1.3 }
+\item Docking program/version: \texttt{ unidock\_gpu } / \texttt{ Uni-Dock v1.1.3 }
 \end{itemize}
 
 \subsection{Data Snapshot}
 
 \begin{itemize}
-\item Calibration set: \texttt{ data/calibration/zinc_druglike_calibration_1000_v2024.smi }
-\item Baseline set: \texttt{ data/baseline/zinc_druglike_baseline_1000_seed42.smi }
+\item Calibration set: \texttt{ data/calibration/zinc\_druglike\_calibration\_1000\_v2024.smi }
+\item Baseline set: \texttt{ data/baseline/zinc\_druglike\_baseline\_1000\_seed42.smi }
 \end{itemize}
 
 \appendix
@@ -210,7 +172,7 @@ No figures available. Run \texttt{scripts/plot\_results.py} and \texttt{scripts/
 No summary excerpt available. Run \texttt{scripts/summarize.py}.
 
 
-\bibliographystyle{plain}
+\bibliographystyle{plainnat}
 \bibliography{references}
 
 \end{document}

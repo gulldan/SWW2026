@@ -39,13 +39,33 @@ significantly faster than CPU-based alternatives (QuickVina2), the underlying sc
 function remains an approximation of binding free energy.
 \end{itemize}
 
+Surrogate mismatch limitations:
+\begin{itemize}
+\item \textbf{Training vs.\ evaluation metric:} FREED++ optimizes UniDock docking
+scores $d_A, d_B$ (physics-based), while the primary evaluation metric is Boltz-2
+affinity $a_A, a_B$ (learned surrogate). There is no guarantee that improving $d$
+consistently improves $a$; the correlation is target-dependent. Per-target Spearman
+$\rho(d_X, a_X)$ is computed as a sanity check; where $\rho \approx 0$, hit-rate
+conclusions are flagged with additional caution.
+\item \textbf{Boltz-2 calibration:} Boltz-2 affinity was trained on a mixture of
+assay types (Ki, Kd, IC50, EC50, etc.) and should be interpreted as an IC50-like
+\emph{ranking} surrogate, not a globally calibrated IC50 predictor. The fixed
+threshold $T=0$ (1\,$\mu$M) is an empirical cutoff; target-specific calibration is
+not performed. All hit-rate comparisons are \emph{relative} (double vs.\ single
+under the same surrogate). Independent benchmarks show significant target-dependent
+variability: PL-REX reports mean Pearson $r \approx 0.42$ (vs.\ 0.66 on the
+canonical 4-target FEP+ subset from the original paper); DeepMirror per-target
+evaluations range from $r = 0.26$ (cGAS) to $r = 0.81$ (Mpro). This motivates
+the per-target Spearman $\rho(d_X, a_X)$ sanity check in our protocol.
+\end{itemize}
+
 Reward function limitations:
 \begin{itemize}
-\item \textbf{Reward function choice:} the choice of $R = \max(z_A, z_B)$ (worst-case)
-versus $R = z_A + z_B$ (sum) versus $R = \min(z_A, z_B)$ influences the characteristics
+\item \textbf{Reward function choice:} the choice of $R = -\max(d_A, d_B)$ (worst-case)
+versus $R = -(d_A + d_B)$ (sum) influences the characteristics
 of generated molecules. Different strategies introduce different biases toward balanced
-vs.\ single-target-dominant solutions. The experiment compares at least two strategies
-to assess sensitivity.
+vs.\ single-target-dominant solutions. The primary experiment uses worst-case only;
+alternative scalarizations are evaluated offline as sensitivity analysis.
 \end{itemize}
 
 Validation limitations:
@@ -53,6 +73,25 @@ Validation limitations:
 \item \textbf{No wet-lab validation:} all results are computational. Molecules optimized
 for docking scores may not be real inhibitors. Experimental IC\textsubscript{50}
 confirmation is beyond the scope of this workshop.
+\end{itemize}
+
+Statistical design limitations:
+\begin{itemize}
+\item \textbf{Shared targets across pairs:} several targets (AChE, BACE1, GSK3B) appear in
+multiple pairs. Consequently, the 9~pairs (8~active) do not constitute 9~independent
+observations. Primary statistical tests are conducted on the pre-registered
+\emph{core set} (5~pairs, where target overlap is minimized), while auxiliary
+pairs serve as within-target sensitivity analyses rather than additional
+independent replicates.
+\item \textbf{Core vs.\ auxiliary designation:} the core/auxiliary split was fixed
+\emph{before} any generation runs to prevent cherry-picking. Results on auxiliary
+pairs are reported for transparency but do not contribute to the primary hypothesis test.
+\item \textbf{Bootstrap power at $m=5$ clusters:} the two-level bootstrap resamples
+over 5~RL seeds (clusters) at level~1. With only 5~clusters the bootstrap distribution
+is coarse-grained; confidence intervals and $p$-values should be interpreted with
+caution. The primary evidence for the effect rests on \emph{effect size} (Cliff's
+delta) and \emph{cross-pair consistency} ($\geq$3/5 core pairs), not on
+$p$-values alone.
 \end{itemize}
 
 These limitations are tracked to prevent over-claiming and to guide future protocol upgrades.

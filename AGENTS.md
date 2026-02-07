@@ -1,0 +1,172 @@
+# AGENTS.md
+
+## Scientific Rigor — READ FIRST
+
+This is a **scientific research repository** (computational chemistry / drug discovery). Every action must meet academic standards.
+
+### Critical & Destructive Analysis
+
+- **Default posture: skepticism.** Do not accept claims, metrics, or design choices at face value. Actively look for flaws, confounders, and alternative explanations.
+- When reviewing or writing code, docs, or configs — ask: *"What could make this result wrong?"* Check for data leakage, selection bias, overfitting to the evaluation surrogate, and violation of statistical assumptions.
+- If a limitation is found, **document it explicitly** (in `docs/`, `report/chapters/06_limitations.tex`, or inline comments) rather than silently working around it.
+- Challenge thresholds, sample sizes, and effect-size interpretations. m=5 bootstrap seeds is a known weakness — never present it as statistically robust without the caveat.
+
+### Citation Requirement
+
+- **Every empirical claim must be backed by a peer-reviewed source** (journal article, peer-reviewed conference, or well-established preprint with >50 citations).
+- When adding or modifying claims in `report/`, `docs/goal.md`, or `docs/selection_criteria.md`, verify the citation exists in `report/references.bib` and the stated facts match the source.
+- Use MCP tools (PubMed, bioRxiv, ChEMBL, HuggingFace papers) to **verify facts at the source** — do not rely on memory or parametric knowledge for numbers, author lists, or conclusions.
+- If a claim cannot be substantiated, flag it with `% TODO: citation needed` in LaTeX or `<!-- TODO: citation needed -->` in Markdown.
+- Distinguish clearly between: (a) established facts with citations, (b) methodological choices with justification, and (c) assumptions that remain unvalidated.
+
+### Document Synchronization
+
+All documents describe the **same experiment** and must stay consistent. When changing any parameter, threshold, pair list, or design decision:
+
+| Change in...            | Must also update...                                                              |
+|-------------------------|----------------------------------------------------------------------------------|
+| `configs/pairs.yaml`    | `docs/selection_criteria.md`, `report/chapters/04_experimental_protocol.tex`     |
+| `configs/metrics.yaml`  | `docs/goal.md` (thresholds), `report/chapters/04_experimental_protocol.tex`      |
+| `configs/experiment.yaml` | `docs/goal.md`, `report/chapters/03_methods_notes.tex`                         |
+| `src/dualdocking/*.py`  | Corresponding `tests/test_*.py`, `docs/goal.md` if behavior changes             |
+| `docs/goal.md`          | `report/chapters/` (methods, protocol, limitations), `README.md`                |
+| `report/references.bib` | All `\cite{}` in `report/chapters/*.tex`                                         |
+
+**Before finishing any task**, verify cross-document consistency for the entities you touched. If you change a number in one place and the same number appears elsewhere, update all occurrences or flag the discrepancy.
+
+### `docs/goal.md` — Protected Master Document
+
+`docs/goal.md` is the **single source of truth** for the entire project. It defines:
+
+- Hypothesis and research question
+- Notation (`d_A`/`d_B`, `a_A`/`a_B`)
+- Endpoint hierarchy (primary, secondary, sensitivity)
+- Success criteria (≥3/5 core pairs, Cliff's delta > −0.47)
+- Compute parity constraints
+- Statistical analysis plan (two-level bootstrap, FDR)
+
+**This file is READ-ONLY without explicit user permission.** Do not edit, rewrite, or reformat `docs/goal.md` — even to fix typos or formatting. If you find an inconsistency between `docs/goal.md` and another document, the other document is wrong. Ask the user before proposing changes to `goal.md`.
+
+All other documents (`report/`, `docs/selection_criteria.md`, `README.md`, `configs/`) must conform to `docs/goal.md`, not the other way around.
+
+### Source Priority (conflicts → higher wins)
+
+1. **`docs/goal.md`** — supreme authority: hypothesis, endpoints, success criteria, notation. **Read-only without user approval.**
+2. `configs/*.yaml` — ground truth for runtime parameters (must agree with goal.md)
+3. `src/dualdocking/` — ground truth for computation logic (must implement what goal.md specifies)
+4. `docs/selection_criteria.md` — ground truth for pair selection rationale
+5. `report/chapters/*.tex` — narrative must reflect the above, never contradict
+6. `README.md` — operational guide, may simplify but must not misrepresent
+
+---
+
+## Build & Test Commands
+
+```bash
+# Install dependencies
+uv sync --extra dev
+uv pip install -r requirements-boltz.txt
+
+# Run full test suite (220 tests, ~7 min)
+uv run pytest tests/ -v
+
+# Run a single test file
+uv run pytest tests/test_objectives.py -v
+
+# Linting (must pass with zero warnings)
+uv run ruff check src/ scripts/ docker/
+
+# Type checking (must pass with zero errors)
+uv run ty check src/
+
+# Auto-format
+uv run ruff format src/ scripts/
+
+# Docker build (FREED++ generator)
+docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
+```
+
+## Project Architecture
+
+```
+src/dualdocking/        # Core library (14 modules)
+  objectives.py         #   Multi-objective functions (min, harmonic, Pareto, etc.)
+  scorer_boltz2.py      #   Boltz-2 affinity scorer with disk cache
+  generator_freedpp.py  #   FREED++ Docker subprocess wrapper
+  cache_io.py           #   Atomic disk I/O (fcntl + temp-and-replace)
+  config.py             #   YAML config loading & validation
+  statistical.py        #   Bootstrap, FDR, Cliff's delta
+  binding_box.py        #   PDB binding site extraction
+  chem_sanitize.py      #   SMILES validation & dedup
+  baseline.py           #   Baseline comparison
+  chembl_validation.py  #   ChEMBL target validation
+scripts/                # CLI entry points (stage0_fetch → run_full_experiment)
+tests/                  # pytest suite, monkeypatch-heavy
+configs/                # YAML: pairs.yaml, metrics.yaml, experiment.yaml
+docker/freedpp/         # Dockerfile + dual_reward_patch.py monkey-patch
+data/                   # Runtime data (gitignored): targets/, calibration/, baseline/
+cache/                  # Boltz-2 score cache (gitignored), keyed by context hash
+results/                # Experiment outputs (gitignored)
+report/                 # LaTeX manuscript (chapters/, figures/, references.bib)
+docs/                   # goal.md (spec), selection_criteria.md, tasks.md
+```
+
+### Data Flow
+
+Stage 0 (fetch) → Generation (FREED++, 3 modes × 5 pairs × 5 seeds) → Scoring (Boltz-2) → Aggregation → Metrics → Report
+
+## Code Style & Conventions
+
+- **Python 3.12**, package manager `uv`, build system `hatchling`
+- **Ruff**: `select = ["ALL"]` with curated ignores, line-length 130, Google docstrings, double quotes
+- **Type checker**: `ty` in strict mode (`src/` only; tests and scripts excluded)
+- **lower_is_better = True everywhere** — docking scores are negative (more negative = better binding). Utility = −score.
+- All objective functions convert scores to utilities before aggregation
+- Tchebycheff is the exception: works directly in score-space (abs is symmetric)
+
+### Naming
+
+- `d_A`, `d_B` — UniDock docking scores (kcal/mol, RL reward signal)
+- `a_A`, `a_B` — Boltz-2 affinity predictions (log10 IC50-like μM, evaluation surrogate)
+- Target pairs: `CDK2_ERK2`, `AChE_BChE`, etc. — see `configs/pairs.yaml`
+- Sets: `core` (5 pairs, primary analysis), `auxiliary` (3), `blocked` (1, COX1_COX2)
+
+### Cache System
+
+Boltz-2 scores use a disk cache segmented by target: `cache/{target}.{ctx[:8]}.json`
+
+- Cache key v2: `SHA256(target || smi || ctx_hash || seq_hash || msa_hash)`
+- Context hash includes: Boltz version, CLI args, accelerator, Docker digest
+- I/O: `fcntl.flock` for locking, atomic write via temp file + `os.replace`
+- Module-level `_CONTEXT_HASH` is lazily cached; tests must reset it via `monkeypatch.setattr(mod, "_CONTEXT_HASH", None)`
+
+## Testing Patterns
+
+- Tests use `monkeypatch` extensively to override module-level paths (`CACHE_DIR`, `DATA_DIR`)
+- **FakeDockingVina**: real class with `_scores: list[float]` for integration tests through `_dual_call`
+- **dual_reward_patch**: auto-applies on import — tests must mock `ffreed` BEFORE import and clean `sys.modules` AFTER
+- `load_pairs()` validates schema (requires `target_a.id`, `target_b.id`) — test fixtures must provide full structure
+- Harmonic/geometric means use shift for positive-domain requirement
+
+## Gotchas
+
+- `_build_freedpp_args` signature: `(config, pdbqt_a, center_a, size_a, commands)` — no workspace param
+- `INVALID_Z_PENALTY` is validated `> 0 && finite` at module load; negative values would invert reward
+- `REWARD_METADATA_PATH` needs `mkdir(parents=True)` — custom paths may have non-existent parents
+- `pareto_mask` uses O(n log n) lexsort + sweep; handles ties with `−sb` tiebreak
+- Boltz-2 output is `log10(IC50 in μM)`, NOT pIC50
+
+## Security & Boundaries
+
+- **Never commit** `data/`, `cache/`, `results/`, `.env`, or credential files (all gitignored)
+- Docker container runs as non-root; GPU passthrough via `--gpus all`
+- `cache_io.py` uses `fcntl.flock` — safe for concurrent single-machine access, NOT for NFS
+- External API calls (ChEMBL, PDB) are only in `scripts/` and `chembl_validation.py`, never in core library
+
+## Experiment Design (Context for Changes)
+
+- **Hypothesis**: RL with worst-case dual-target reward (`max(d_A, d_B)`) produces higher dual hit-rates than single-target baselines
+- **Success criteria**: Cliff's delta > −0.47 on ≥3/5 core pairs
+- **Bootstrap**: m=5 seeds (acknowledged limitation; primary evidence is effect size + cross-pair consistency)
+- **Thresholds**: `T_A = T_B = 0.0` (1 μM) fixed pre-experiment in `configs/metrics.yaml`
+- **Scalarizations**: only `max(d_A, d_B)` in primary analysis; others are offline sensitivity

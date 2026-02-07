@@ -1,41 +1,44 @@
 # Конфигурация метрик для dual-target оценки.
 #
-# Определение хита: молекула является "хитом", если её скор <= порога.
-# Конвенция скоров в пайплайне: log10(IC50, μM), меньше = лучше.
+# Определение хита: молекула является "хитом", если Boltz-2 affinity <= порога.
+# Скоры a_A, a_B: Boltz-2 affinity_pred_value, log10(IC50-like, μM), меньше = лучше.
+# NB: Boltz-2 обучен на смеси Ki/Kd/IC50/EC50; значения — ranking surrogate, не калиброванный IC50.
+# Пороги T_A, T_B: фиксированные, 0.0 = 1 μM для всех пар.
 # Примеры: 1 μM -> 0.0, 100 nM -> -1.0, 10 μM -> 1.0
 
 hit_definition:
   convention: "lower_is_better"
-  rule: "score_A <= threshold_A AND score_B <= threshold_B"
+  rule: "a_A <= T_A AND a_B <= T_B"
 
 thresholds:
-  # --- Non-AD контроль ---
-  CDK2_ERK2:
+  # --- Core (5 pairs) ---
+  CDK2_ERK2:           # Non-AD, Homo
     target_a: 0.0    # 1 μM
     target_b: 0.0
-  EGFR_HER2:
+  AChE_BChE:           # AD, Homo
     target_a: 0.0
     target_b: 0.0
-  COX1_COX2:
+  BACE1_GSK3B:         # AD, Hetero
     target_a: 0.0
     target_b: 0.0
-  AChE_BChE:
+  AChE_BACE1:          # AD, Hetero
     target_a: 0.0
     target_b: 0.0
-  # --- AD-специфичные пары ---
-  BACE1_GSK3B:
+  GSK3B_CDK5:          # AD, Hetero
     target_a: 0.0
     target_b: 0.0
-  AChE_BACE1:
+  # --- Auxiliary (3 pairs) ---
+  EGFR_HER2:           # Non-AD, Homo
     target_a: 0.0
     target_b: 0.0
-  GSK3B_CDK5:
+  BACE1_CDK5:          # AD, Hetero
     target_a: 0.0
     target_b: 0.0
-  BACE1_CDK5:
+  AChE_MAOB:           # AD, Hetero, cofactor-sensitive
     target_a: 0.0
     target_b: 0.0
-  AChE_MAOB:
+  # --- Blocked ---
+  COX1_COX2:           # non-human PDB
     target_a: 0.0
     target_b: 0.0
 
