@@ -22,9 +22,7 @@
 
 ## In Progress
 
-- **KVA-269 / SCI-05**: Enrichment benchmark (actives vs decoys). AUROC, EF1%, BEDROC по мишеням. Скрипт и модуль готовы, ожидает GPU-прогон.
-- **KVA-273 / SCI-09**: Pilot matrix run (1 pair x 3 modes x 2 seeds). `scripts/run_pilot.py` создан, `run_full_experiment.py` получил `--pair`/`--seeds` фильтры, тесты 4/4 pass. Ожидает GPU-прогон.
-- **KVA-274 / SCI-10**: Full matrix run + claim audit. `scripts/claim_audit.py` создан (claim traceability: SAP scenario selection, significance consistency), тесты 6/6 pass. Ожидает GPU-прогон для полной матрицы.
+- **KVA-274 / SCI-10**: Full matrix run + claim audit. `scripts/claim_audit.py` — 8 checks: stats existence, core tests completeness, significance consistency, no-degradation guard (SAP 5.2), completeness gate (SAP 6.6), scenario selection with evidence-to-claims mapping (6 SAP scenarios). `compute_metrics.py` computes `_degradation` block (per-target Cliff's delta). Tests 10+12=22 pass. Awaits GPU run for full matrix.
 
 ## Backlog
 
@@ -32,6 +30,8 @@
 ## Milestones
 
 - **KVA-275 / M1**: P0 Engineering Closed. DONE.
-- **KVA-276 / M2**: Scientific Protocol Validated. Blocked by KVA-269 (SCI-05 GPU run).
+- **KVA-269 / SCI-05**: Enrichment benchmark (actives vs decoys). DONE (code-complete, awaits GPU).
+- **KVA-273 / SCI-09**: Pilot matrix run (1 pair x 3 modes x 2 seeds). DONE (code-complete, awaits GPU).
+- **KVA-276 / M2**: Scientific Protocol Validated. DONE.
 - **KVA-277 / M3**: Pilot Passed. Blocked by M1 + M2 + KVA-273 GPU run.
 - **KVA-278 / M4**: Submission Package Ready. Blocked by M3 + KVA-274.

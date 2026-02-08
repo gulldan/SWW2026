@@ -46,9 +46,7 @@ def _load_scored_csv(path: Path) -> pd.DataFrame:
         if "smiles" in df.columns:
             from dualdocking.chem_sanitize import canonicalize
 
-            df["smiles_canonical"] = [
-                canonicalize(s) or "" for s in df["smiles"].astype(str).tolist()
-            ]
+            df["smiles_canonical"] = [canonicalize(s) or "" for s in df["smiles"].astype(str).tolist()]
         else:
             raise ValueError(f"smiles_canonical missing in {path}")
     df = df[df["smiles_canonical"].astype(str).str.len() > 0]
@@ -103,9 +101,7 @@ def main(
     qg_cfg = exp_cfg.get("quality_gate", {})
 
     # Read sensitivity thresholds from config or use pre-registered defaults
-    sensitivity_thresholds: list[float] = metrics_cfg.get(
-        "sensitivity_thresholds", DEFAULT_THRESHOLDS
-    )
+    sensitivity_thresholds: list[float] = metrics_cfg.get("sensitivity_thresholds", DEFAULT_THRESHOLDS)
     logger.info("Sensitivity thresholds: {}", sensitivity_thresholds)
 
     results_root_path = PROJECT_ROOT / results_root
@@ -165,6 +161,7 @@ def main(
         def _make_metric_fn(threshold: float) -> Callable[[pd.DataFrame], float]:
             def _fn(frame: pd.DataFrame) -> float:
                 return _compute_hr_both(frame, threshold)
+
             return _fn
 
         metric_fn = _make_metric_fn(thr)
@@ -203,8 +200,11 @@ def main(
                     continue
 
                 result = hierarchical_bootstrap_test(
-                    group_ctrl, group_treat, metric_fn,
-                    n_bootstrap=10000, rng_seed=42,
+                    group_ctrl,
+                    group_treat,
+                    metric_fn,
+                    n_bootstrap=10000,
+                    rng_seed=42,
                 )
                 vals_ctrl = [metric_fn(df) for df in group_ctrl]
                 vals_treat = [metric_fn(df) for df in group_treat]
@@ -241,14 +241,16 @@ def main(
         # Flatten to CSV rows
         for pair_id, pair_data in json_out["results"][thr_key].items():
             for mode, m in pair_data.get("metrics", {}).items():
-                rows.append({
-                    "threshold": thr,
-                    "pair": pair_id,
-                    "mode": mode,
-                    "hr_both_mean": m["hr_both_mean"],
-                    "hr_both_sem": m["hr_both_sem"],
-                    "n_seeds": m["n_seeds"],
-                })
+                rows.append(
+                    {
+                        "threshold": thr,
+                        "pair": pair_id,
+                        "mode": mode,
+                        "hr_both_mean": m["hr_both_mean"],
+                        "hr_both_sem": m["hr_both_sem"],
+                        "n_seeds": m["n_seeds"],
+                    }
+                )
             for test_id, s in pair_data.get("stats", {}).items():
                 # Find the matching row for mode=double to annotate
                 for r in rows:
@@ -298,7 +300,10 @@ def main(
         status = "PASS" if s["passes_success_criterion"] else "FAIL"
         logger.info(
             "T={}: {}/{} core pairs significant [{}]",
-            thr_key, s["n_core_significant"], s["n_core_total"], status,
+            thr_key,
+            s["n_core_significant"],
+            s["n_core_total"],
+            status,
         )
 
 

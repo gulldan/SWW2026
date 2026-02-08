@@ -26,6 +26,7 @@ class LigandInfo:
     resseq: str
     coords: NDArray  # (N, 3) heavy-atom coordinates
 
+
 # HETATM-записи, которые НЕ являются лигандами
 _EXCLUDED_RESNAMES: set[str] = {
     # Вода

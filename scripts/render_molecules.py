@@ -202,9 +202,7 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
             df_mode = df_pair[df_pair["mode"] == mode].nsmallest(top_n, sort_col)
             if not df_mode.empty:
                 frames.append(df_mode.assign(label=mode))
-        df_top = (
-            pd.concat(frames).sort_values(sort_col, ascending=True).reset_index(drop=True) if frames else pd.DataFrame()
-        )
+        df_top = pd.concat(frames).sort_values(sort_col, ascending=True).reset_index(drop=True) if frames else pd.DataFrame()
 
         if not df_top.empty:
             _render_grid(

@@ -5,9 +5,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import scripts.compute_metrics as mod
 import yaml
 from click.testing import CliRunner
+
+import scripts.compute_metrics as mod
 from scripts.compute_metrics import main
 
 
@@ -341,3 +342,39 @@ def test_n_valid_runs_in_output(tmp_path, monkeypatch):
     assert comp["n_valid"] == 12  # 3 missing (one per mode)
     assert comp["missing_rate"] == 0.2
     assert len(comp["missing_runs"]) == 3
+
+
+def test_degradation_guard_in_stats(tmp_path, monkeypatch):
+    """_degradation block in stats.json contains per-target Cliff's delta."""
+    _setup_full(tmp_path, monkeypatch)
+    result = _invoke()
+    assert result.exit_code == 0, result.output
+
+    stats = json.loads((tmp_path / "report" / "stats.json").read_text())
+    assert "_degradation" in stats
+    deg = stats["_degradation"]
+    assert "pair1" in deg
+
+    pair_deg = deg["pair1"]
+    assert "hr_a_double_vs_single_a" in pair_deg
+    assert "hr_b_double_vs_single_b" in pair_deg
+
+    for check in pair_deg.values():
+        assert "cliffs_delta" in check
+        assert "degraded" in check
+        assert isinstance(check["cliffs_delta"], float)
+        assert isinstance(check["degraded"], bool)
+
+
+def test_is_hit_a_b_columns_created(tmp_path, monkeypatch):
+    """_load_scored_csv adds is_hit_a and is_hit_b columns."""
+    _setup_full(tmp_path, monkeypatch)
+    result = _invoke()
+    assert result.exit_code == 0, result.output
+
+    # Verify by reading a scored CSV and checking the load function
+    run_dir = tmp_path / "results" / "pair1" / "double" / "seed_1"
+    df = mod._load_scored_csv(run_dir / "scored_joined.csv", 0.0, 0.0)
+    assert "is_hit_a" in df.columns
+    assert "is_hit_b" in df.columns
+    assert "is_hit_both" in df.columns

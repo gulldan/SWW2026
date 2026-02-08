@@ -142,21 +142,13 @@ def validate_reward_quality(
             fracs[out_key] = float(val)
 
     if fracs["invalid_fraction_a"] > max_invalid_fraction:
-        issues.append(
-            f"invalid_reward_fraction_a={fracs['invalid_fraction_a']:.3f} > {max_invalid_fraction}"
-        )
+        issues.append(f"invalid_reward_fraction_a={fracs['invalid_fraction_a']:.3f} > {max_invalid_fraction}")
     if fracs["invalid_fraction_b"] > max_invalid_fraction:
-        issues.append(
-            f"invalid_reward_fraction_b={fracs['invalid_fraction_b']:.3f} > {max_invalid_fraction}"
-        )
+        issues.append(f"invalid_reward_fraction_b={fracs['invalid_fraction_b']:.3f} > {max_invalid_fraction}")
     if fracs["timeout_fraction_a"] > max_timeout_fraction:
-        issues.append(
-            f"timeout_fraction_a={fracs['timeout_fraction_a']:.3f} > {max_timeout_fraction}"
-        )
+        issues.append(f"timeout_fraction_a={fracs['timeout_fraction_a']:.3f} > {max_timeout_fraction}")
     if fracs["timeout_fraction_b"] > max_timeout_fraction:
-        issues.append(
-            f"timeout_fraction_b={fracs['timeout_fraction_b']:.3f} > {max_timeout_fraction}"
-        )
+        issues.append(f"timeout_fraction_b={fracs['timeout_fraction_b']:.3f} > {max_timeout_fraction}")
 
     return {
         "run_valid": len(issues) == 0,

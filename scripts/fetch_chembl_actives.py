@@ -119,9 +119,7 @@ def main(
     click.echo(f"{'Pair':<20} {'A':>8} {'B':>8} {'Dual':>8}")
     click.echo("-" * 48)
     for pair_id, info in sorted(summary.items()):
-        click.echo(
-            f"{pair_id:<20} {info['actives_a']:>8} {info['actives_b']:>8} {info['dual_actives']:>8}"
-        )
+        click.echo(f"{pair_id:<20} {info['actives_a']:>8} {info['actives_b']:>8} {info['dual_actives']:>8}")
 
 
 if __name__ == "__main__":

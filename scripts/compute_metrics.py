@@ -46,10 +46,14 @@ def _load_scored_csv(path: Path, thr_a: float, thr_b: float) -> pd.DataFrame:
         else:
             raise ValueError(f"smiles_canonical missing in {path}")
 
-    # is_hit_both
+    # Per-target hit flags + dual hit
+    aff_a = df["affinity_a"].to_numpy()
+    aff_b = df["affinity_b"].to_numpy()
+    if "is_hit_a" not in df.columns:
+        df["is_hit_a"] = aff_a <= thr_a
+    if "is_hit_b" not in df.columns:
+        df["is_hit_b"] = aff_b <= thr_b
     if "is_hit_both" not in df.columns:
-        aff_a = df["affinity_a"].to_numpy()
-        aff_b = df["affinity_b"].to_numpy()
         df["is_hit_both"] = (aff_a <= thr_a) & (aff_b <= thr_b)
 
     # Deduplicate by canonical smiles
@@ -222,6 +226,12 @@ def main(
     p_values: list[float] = []
     index: list[tuple[str, str]] = []
 
+    def _metric_hr_a(df: pd.DataFrame) -> float:
+        return float(df["is_hit_a"].mean()) if not df.empty else float("nan")
+
+    def _metric_hr_b(df: pd.DataFrame) -> float:
+        return float(df["is_hit_b"].mean()) if not df.empty else float("nan")
+
     def _metric_hr_both(df: pd.DataFrame) -> float:
         return float(df["is_hit_both"].mean()) if not df.empty else float("nan")
 
@@ -274,6 +284,40 @@ def main(
             and abs(float(entry["cliffs_delta"])) >= 0.33
             and (float(entry["ci_lower"]) > 0 or float(entry["ci_upper"]) < 0)
         )
+
+    # Degradation guard (SAP Section 5.2)
+    # Check per-target hit-rate: double must not degrade vs corresponding single.
+    # Threshold: Cliff's delta > -0.47 (below large-effect boundary).
+    no_degradation_thr = -0.47
+    degradation_out: dict[str, dict[str, dict[str, float | bool]]] = {}
+    for pair_id in pairs:
+        group_double = list(data.get(pair_id, {}).get("double", {}).values())
+        group_single_a = list(data.get(pair_id, {}).get("single_a", {}).values())
+        group_single_b = list(data.get(pair_id, {}).get("single_b", {}).values())
+
+        pair_deg: dict[str, dict[str, float | bool]] = {}
+        if group_double and group_single_a:
+            vals_double = [_metric_hr_a(df) for df in group_double]
+            vals_single = [_metric_hr_a(df) for df in group_single_a]
+            delta = cliffs_delta(vals_double, vals_single)
+            pair_deg["hr_a_double_vs_single_a"] = {
+                "cliffs_delta": delta,
+                "degraded": delta <= no_degradation_thr,
+            }
+
+        if group_double and group_single_b:
+            vals_double = [_metric_hr_b(df) for df in group_double]
+            vals_single = [_metric_hr_b(df) for df in group_single_b]
+            delta = cliffs_delta(vals_double, vals_single)
+            pair_deg["hr_b_double_vs_single_b"] = {
+                "cliffs_delta": delta,
+                "degraded": delta <= no_degradation_thr,
+            }
+
+        if pair_deg:
+            degradation_out[pair_id] = pair_deg
+
+    stats_out["_degradation"] = degradation_out
 
     stats_out["_completeness"] = {
         "n_expected": n_expected,

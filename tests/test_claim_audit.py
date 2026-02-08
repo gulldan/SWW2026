@@ -2,8 +2,9 @@
 
 import json
 
-import scripts.claim_audit as mod
 from click.testing import CliRunner
+
+import scripts.claim_audit as mod
 from scripts.claim_audit import main
 
 
@@ -11,6 +12,8 @@ def _make_stats(
     *,
     n_significant: int = 5,
     flip_reported: str | None = None,
+    degradation: dict | None = None,
+    missing_rate: float = 0.0,
 ) -> dict:
     """Build a stats.json with controllable significance."""
     stats: dict = {}
@@ -35,7 +38,27 @@ def _make_stats(
                 "ci_upper": 0.10 if sig else 0.05,
                 "significant": reported,
             }
-    stats["_completeness"] = {"n_expected": 75, "n_valid": 75, "missing_rate": 0.0}
+
+    # Degradation block (SAP 5.2)
+    if degradation is not None:
+        stats["_degradation"] = degradation
+    else:
+        # Default: no degradation on any pair
+        deg: dict = {}
+        for pair in pairs:
+            deg[pair] = {
+                "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+                "hr_b_double_vs_single_b": {"cliffs_delta": 0.2, "degraded": False},
+            }
+        stats["_degradation"] = deg
+
+    n_expected = 75
+    n_valid = round(n_expected * (1.0 - missing_rate))
+    stats["_completeness"] = {
+        "n_expected": n_expected,
+        "n_valid": n_valid,
+        "missing_rate": missing_rate,
+    }
     return stats
 
 
@@ -54,12 +77,14 @@ def _make_sensitivity(*, all_pass: bool = True) -> dict:
     }
 
 
-def _setup(tmp_path, monkeypatch, *, n_significant=5, sensitivity_pass=True, flip_reported=None):
+def _setup(tmp_path, monkeypatch, *, n_significant=5, sensitivity_pass=True,
+           flip_reported=None, degradation=None, missing_rate=0.0):
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     report = tmp_path / "report"
     report.mkdir(parents=True, exist_ok=True)
     (report / "stats.json").write_text(json.dumps(_make_stats(
-        n_significant=n_significant, flip_reported=flip_reported
+        n_significant=n_significant, flip_reported=flip_reported,
+        degradation=degradation, missing_rate=missing_rate,
     )))
     (report / "metrics.json").write_text(json.dumps(_make_metrics()))
     (report / "data").mkdir(parents=True, exist_ok=True)
@@ -69,7 +94,7 @@ def _setup(tmp_path, monkeypatch, *, n_significant=5, sensitivity_pass=True, fli
 
 
 def test_full_success(tmp_path, monkeypatch):
-    """5/5 significant + threshold robust → 6.1_full_success."""
+    """5/5 significant + threshold robust + no degradation -> 6.1_full_success."""
     _setup(tmp_path, monkeypatch, n_significant=5, sensitivity_pass=True)
     runner = CliRunner()
     result = runner.invoke(main, [])
@@ -77,20 +102,24 @@ def test_full_success(tmp_path, monkeypatch):
     audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
     assert audit["pass"] is True
     assert audit["claim_scenario"] == "6.1_full_success"
+    assert audit["degradation_warning"] is None
+    assert audit["evidence_map"] is not None
+    assert "report/stats.json" in audit["evidence_map"]["evidence"][0]["artifact"]
 
 
 def test_partial_success(tmp_path, monkeypatch):
-    """3/5 significant but not threshold robust → 6.2_partial_success."""
+    """3/5 significant but not threshold robust -> 6.2_partial_success."""
     _setup(tmp_path, monkeypatch, n_significant=3, sensitivity_pass=False)
     runner = CliRunner()
     result = runner.invoke(main, [])
     assert result.exit_code == 0, result.output
     audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
     assert audit["claim_scenario"] == "6.2_partial_success"
+    assert audit["evidence_map"] is not None
 
 
 def test_no_evidence(tmp_path, monkeypatch):
-    """0/5 significant → 6.5_no_evidence."""
+    """0/5 significant -> 6.5_no_evidence."""
     _setup(tmp_path, monkeypatch, n_significant=0)
     runner = CliRunner()
     result = runner.invoke(main, [])
@@ -100,7 +129,7 @@ def test_no_evidence(tmp_path, monkeypatch):
 
 
 def test_significance_mismatch_detected(tmp_path, monkeypatch):
-    """Flipped significance flag → audit detects mismatch."""
+    """Flipped significance flag -> audit detects mismatch."""
     _setup(tmp_path, monkeypatch, n_significant=5, flip_reported="CDK2_ERK2/H1a")
     runner = CliRunner()
     result = runner.invoke(main, ["--no-strict"])
@@ -111,7 +140,7 @@ def test_significance_mismatch_detected(tmp_path, monkeypatch):
 
 
 def test_missing_stats_strict(tmp_path, monkeypatch):
-    """Missing stats.json in strict mode → exit 1."""
+    """Missing stats.json in strict mode -> exit 1."""
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     (tmp_path / "report").mkdir(parents=True, exist_ok=True)
     (tmp_path / "report" / "data").mkdir(parents=True, exist_ok=True)
@@ -121,7 +150,7 @@ def test_missing_stats_strict(tmp_path, monkeypatch):
 
 
 def test_weak_evidence(tmp_path, monkeypatch):
-    """2/5 significant but 3+ positive direction → 6.3_weak_evidence."""
+    """2/5 significant but 3+ positive direction -> 6.3_weak_evidence."""
     _setup(tmp_path, monkeypatch, n_significant=2)
     # Patch stats to have 3+ positive direction
     stats_path = tmp_path / "report" / "stats.json"
@@ -135,3 +164,86 @@ def test_weak_evidence(tmp_path, monkeypatch):
     assert result.exit_code == 0
     audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
     assert audit["claim_scenario"] == "6.3_weak_evidence"
+
+
+def test_degradation_detected(tmp_path, monkeypatch):
+    """Per-target degradation -> 6.4 warning appended, audit fails."""
+    degradation = {
+        "CDK2_ERK2": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": -0.6, "degraded": True},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+        "AChE_BChE": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.2, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.3, "degraded": False},
+        },
+        "BACE1_GSK3B": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+        "AChE_BACE1": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+        "GSK3B_CDK5": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+    }
+    _setup(tmp_path, monkeypatch, n_significant=5, degradation=degradation)
+    runner = CliRunner()
+    result = runner.invoke(main, ["--no-strict"])
+    assert result.exit_code == 0
+    audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
+    assert audit["pass"] is False
+    assert audit["degradation_warning"] is not None
+    assert audit["degradation_warning"]["scenario"] == "6.4_degradation_detected"
+    assert any("CDK2_ERK2" in p for p in audit["degradation_warning"]["pairs"])
+    assert any("Degradation" in i for i in audit["issues"])
+    # Primary scenario still determined (6.4 is addendum)
+    assert audit["claim_scenario"] == "6.1_full_success"
+
+
+def test_insufficient_data(tmp_path, monkeypatch):
+    """Missing rate > 20% -> 6.6_insufficient_data overrides everything."""
+    _setup(tmp_path, monkeypatch, n_significant=5, missing_rate=0.30)
+    runner = CliRunner()
+    result = runner.invoke(main, ["--no-strict"])
+    assert result.exit_code == 0
+    audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
+    assert audit["claim_scenario"] == "6.6_insufficient_data"
+    assert audit["evidence_map"] is not None
+    assert any("Missing data rate" in i for i in audit["issues"])
+    check = next(c for c in audit["checks"] if c["name"] == "completeness_gate")
+    assert check["pass"] is False
+
+
+def test_no_degradation_block_still_passes(tmp_path, monkeypatch):
+    """When _degradation is missing from stats.json, guard passes (backward compat)."""
+    _setup(tmp_path, monkeypatch, n_significant=5)
+    stats_path = tmp_path / "report" / "stats.json"
+    stats = json.loads(stats_path.read_text())
+    del stats["_degradation"]
+    stats_path.write_text(json.dumps(stats))
+
+    runner = CliRunner()
+    result = runner.invoke(main, [])
+    assert result.exit_code == 0
+    audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
+    check = next(c for c in audit["checks"] if c["name"] == "no_degradation_guard")
+    assert check["pass"] is True
+
+
+def test_evidence_map_populated(tmp_path, monkeypatch):
+    """Evidence map links claim scenario to artifacts and SAP sections."""
+    _setup(tmp_path, monkeypatch, n_significant=0)
+    runner = CliRunner()
+    result = runner.invoke(main, [])
+    assert result.exit_code == 0
+    audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
+    assert audit["claim_scenario"] == "6.5_no_evidence"
+    emap = audit["evidence_map"]
+    assert emap is not None
+    assert "claim_template" in emap
+    assert "evidence" in emap
+    assert "sap_sections" in emap

@@ -117,11 +117,7 @@ def _build_metric_rows(pairs_cfg: dict[str, Any], metrics: dict[str, Any], pair_
                 "balance_mean": data.get("balance_mean"),
                 "balance_sem": data.get("balance_sem"),
             }
-            row.update({
-                key: val
-                for key, val in data.items()
-                if key.startswith("combined_") and key.endswith(("_mean", "_sem"))
-            })
+            row.update({key: val for key, val in data.items() if key.startswith("combined_") and key.endswith(("_mean", "_sem"))})
             rows.append(row)
     return rows
 

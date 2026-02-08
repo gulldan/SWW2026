@@ -190,13 +190,15 @@ def main(
                 if len(merged) < 3:
                     continue
 
-                seed_results.append({
-                    "seed": seed,
-                    "n_boltz": len(boltz_df),
-                    "n_docking": len(docking_df),
-                    "n_joined": len(merged),
-                    "merged": merged,
-                })
+                seed_results.append(
+                    {
+                        "seed": seed,
+                        "n_boltz": len(boltz_df),
+                        "n_docking": len(docking_df),
+                        "n_joined": len(merged),
+                        "merged": merged,
+                    }
+                )
 
             if not seed_results:
                 if total_boltz > 0:
@@ -243,22 +245,24 @@ def main(
                 }
                 pair_mode_stats["targets"][target_label] = target_stats
 
-                rows.append({
-                    "pair": pair_id,
-                    "mode": mode,
-                    "target": target_label,
-                    "n": len(x),
-                    "spearman_rho": spearman_rho,
-                    "spearman_ci_lo": sp_ci_lo,
-                    "spearman_ci_hi": sp_ci_hi,
-                    "pearson_r": pearson_r,
-                    "pearson_ci_lo": pe_ci_lo,
-                    "pearson_ci_hi": pe_ci_hi,
-                    "n_boltz": total_boltz,
-                    "n_docking": total_docking,
-                    "n_joined": total_joined,
-                    "join_rate": total_joined / total_boltz if total_boltz > 0 else 0.0,
-                })
+                rows.append(
+                    {
+                        "pair": pair_id,
+                        "mode": mode,
+                        "target": target_label,
+                        "n": len(x),
+                        "spearman_rho": spearman_rho,
+                        "spearman_ci_lo": sp_ci_lo,
+                        "spearman_ci_hi": sp_ci_hi,
+                        "pearson_r": pearson_r,
+                        "pearson_ci_lo": pe_ci_lo,
+                        "pearson_ci_hi": pe_ci_hi,
+                        "n_boltz": total_boltz,
+                        "n_docking": total_docking,
+                        "n_joined": total_joined,
+                        "join_rate": total_joined / total_boltz if total_boltz > 0 else 0.0,
+                    }
+                )
 
             json_out["pairs"][pair_id][mode] = pair_mode_stats
 

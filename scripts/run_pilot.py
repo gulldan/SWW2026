@@ -92,12 +92,16 @@ def main(
 
         # Build args for run_full_experiment
         args = [
-            "--pair", pair,
-            "--seeds", seeds,
+            "--pair",
+            pair,
+            "--seeds",
+            seeds,
             "--resume",
             "--with-post",
-            "--latex-mode", latex_mode,
-            "--parallel", str(parallel),
+            "--latex-mode",
+            latex_mode,
+            "--parallel",
+            str(parallel),
         ]
         if dry_run:
             args.append("--dry-run")

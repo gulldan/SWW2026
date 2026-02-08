@@ -220,8 +220,14 @@ def _result_to_dict(r: RedockResult) -> dict[str, Any]:
 
 
 CSV_COLUMNS = [
-    "target_id", "pdb_id", "ligand_resname", "docking_score",
-    "rmsd", "centroid_dist", "status", "error",
+    "target_id",
+    "pdb_id",
+    "ligand_resname",
+    "docking_score",
+    "rmsd",
+    "centroid_dist",
+    "status",
+    "error",
 ]
 
 
@@ -269,19 +275,33 @@ def _validate_target(
 
     if not pdb_path.exists():
         return RedockResult(
-            target_id=target_id, pdb_id=pdb_id, ligand_resname="?",
-            ligand_smiles="", n_crystal_atoms=0, n_docked_atoms=0,
-            docking_score=None, rmsd=None, centroid_dist=None,
-            passed=False, error=f"PDB not found: {pdb_path}",
+            target_id=target_id,
+            pdb_id=pdb_id,
+            ligand_resname="?",
+            ligand_smiles="",
+            n_crystal_atoms=0,
+            n_docked_atoms=0,
+            docking_score=None,
+            rmsd=None,
+            centroid_dist=None,
+            passed=False,
+            error=f"PDB not found: {pdb_path}",
         )
 
     lig_info = extract_ligand_info(pdb_path)
     if lig_info is None:
         return RedockResult(
-            target_id=target_id, pdb_id=pdb_id, ligand_resname="?",
-            ligand_smiles="", n_crystal_atoms=0, n_docked_atoms=0,
-            docking_score=None, rmsd=None, centroid_dist=None,
-            passed=False, status=STATUS_SKIPPED_APO,
+            target_id=target_id,
+            pdb_id=pdb_id,
+            ligand_resname="?",
+            ligand_smiles="",
+            n_crystal_atoms=0,
+            n_docked_atoms=0,
+            docking_score=None,
+            rmsd=None,
+            centroid_dist=None,
+            passed=False,
+            status=STATUS_SKIPPED_APO,
             error="No co-crystal ligand in PDB (apo structure)",
         )
 
@@ -291,10 +311,17 @@ def _validate_target(
     smiles = fetch_ligand_smiles(resname)
     if smiles is None:
         return RedockResult(
-            target_id=target_id, pdb_id=pdb_id, ligand_resname=resname,
-            ligand_smiles="", n_crystal_atoms=len(crystal_coords), n_docked_atoms=0,
-            docking_score=None, rmsd=None, centroid_dist=None,
-            passed=False, error=f"Could not fetch SMILES for ligand {resname}",
+            target_id=target_id,
+            pdb_id=pdb_id,
+            ligand_resname=resname,
+            ligand_smiles="",
+            n_crystal_atoms=len(crystal_coords),
+            n_docked_atoms=0,
+            docking_score=None,
+            rmsd=None,
+            centroid_dist=None,
+            passed=False,
+            error=f"Could not fetch SMILES for ligand {resname}",
         )
 
     target_work = work_dir / target_id
@@ -309,22 +336,41 @@ def _validate_target(
         _ensure_receptor_pdbqt(runner, pdb_path, receptor_path, timeout=params.timeout_seconds)
     except Exception as exc:
         return RedockResult(
-            target_id=target_id, pdb_id=pdb_id, ligand_resname=resname,
-            ligand_smiles=smiles, n_crystal_atoms=len(crystal_coords), n_docked_atoms=0,
-            docking_score=None, rmsd=None, centroid_dist=None,
-            passed=False, error=f"Receptor prep failed: {exc}",
+            target_id=target_id,
+            pdb_id=pdb_id,
+            ligand_resname=resname,
+            ligand_smiles=smiles,
+            n_crystal_atoms=len(crystal_coords),
+            n_docked_atoms=0,
+            docking_score=None,
+            rmsd=None,
+            centroid_dist=None,
+            passed=False,
+            error=f"Receptor prep failed: {exc}",
         )
 
     ok, err = _ensure_ligand_pdbqt(
-        runner, smiles, sdf_path, ligand_path,
-        timeout=params.timeout_seconds, seed=42, overwrite=True,
+        runner,
+        smiles,
+        sdf_path,
+        ligand_path,
+        timeout=params.timeout_seconds,
+        seed=42,
+        overwrite=True,
     )
     if not ok:
         return RedockResult(
-            target_id=target_id, pdb_id=pdb_id, ligand_resname=resname,
-            ligand_smiles=smiles, n_crystal_atoms=len(crystal_coords), n_docked_atoms=0,
-            docking_score=None, rmsd=None, centroid_dist=None,
-            passed=False, error=f"Ligand prep failed: {err}",
+            target_id=target_id,
+            pdb_id=pdb_id,
+            ligand_resname=resname,
+            ligand_smiles=smiles,
+            n_crystal_atoms=len(crystal_coords),
+            n_docked_atoms=0,
+            docking_score=None,
+            rmsd=None,
+            centroid_dist=None,
+            passed=False,
+            error=f"Ligand prep failed: {err}",
         )
 
     center_str, size_str = extract_binding_box(pdb_path, padding=params.box_padding)
@@ -333,16 +379,31 @@ def _validate_target(
 
     try:
         batch_scores = _dock_batch_unidock(
-            runner, "unidock", receptor_path, [ligand_path],
-            center, size, params, output_dir,
-            batch_id=0, seed=42, timeout=params.timeout_seconds,
+            runner,
+            "unidock",
+            receptor_path,
+            [ligand_path],
+            center,
+            size,
+            params,
+            output_dir,
+            batch_id=0,
+            seed=42,
+            timeout=params.timeout_seconds,
         )
     except Exception as exc:
         return RedockResult(
-            target_id=target_id, pdb_id=pdb_id, ligand_resname=resname,
-            ligand_smiles=smiles, n_crystal_atoms=len(crystal_coords), n_docked_atoms=0,
-            docking_score=None, rmsd=None, centroid_dist=None,
-            passed=False, error=f"Docking failed: {exc}",
+            target_id=target_id,
+            pdb_id=pdb_id,
+            ligand_resname=resname,
+            ligand_smiles=smiles,
+            n_crystal_atoms=len(crystal_coords),
+            n_docked_atoms=0,
+            docking_score=None,
+            rmsd=None,
+            centroid_dist=None,
+            passed=False,
+            error=f"Docking failed: {exc}",
         )
 
     docking_score = batch_scores.get(ligand_path)
@@ -364,7 +425,9 @@ def _validate_target(
         else:
             logger.warning(
                 "Atom count mismatch for {}: crystal={} docked={}; using centroid distance",
-                target_id, len(crystal_coords), len(docked_coords),
+                target_id,
+                len(crystal_coords),
+                len(docked_coords),
             )
             rmsd_val = cdist_val
 
@@ -454,19 +517,25 @@ def main(
     # Emit skipped results for blocked targets.
     for tid in sorted(blocked_ids & set(targets)):
         t = targets[tid]
-        results.append(RedockResult(
-            target_id=tid, pdb_id=t["pdb_id"], ligand_resname="--",
-            ligand_smiles="", n_crystal_atoms=0, n_docked_atoms=0,
-            docking_score=None, rmsd=None, centroid_dist=None,
-            passed=False, status=STATUS_SKIPPED_BLOCKED,
-            error="Blocked pair (non-human species)",
-        ))
+        results.append(
+            RedockResult(
+                target_id=tid,
+                pdb_id=t["pdb_id"],
+                ligand_resname="--",
+                ligand_smiles="",
+                n_crystal_atoms=0,
+                n_docked_atoms=0,
+                docking_score=None,
+                rmsd=None,
+                centroid_dist=None,
+                passed=False,
+                status=STATUS_SKIPPED_BLOCKED,
+                error="Blocked pair (non-human species)",
+            )
+        )
         logger.info("[SKIP] {} — blocked pair", tid)
 
-    active_targets = {
-        k: v for k, v in targets.items()
-        if include_blocked or k not in blocked_ids
-    }
+    active_targets = {k: v for k, v in targets.items() if include_blocked or k not in blocked_ids}
 
     runner_ctx = DockerRunner(docker_image, PROJECT_ROOT, gpus=gpus)
     with runner_ctx as runner:
@@ -476,8 +545,9 @@ def main(
 
             rmsd_str = f"{result.rmsd:.2f}" if result.rmsd is not None else "N/A"
             score_str = f"{result.docking_score:.2f}" if result.docking_score is not None else "N/A"
-            logger.info("[{}] {} ligand={} score={} RMSD={} A",
-                        result.status.upper(), tid, result.ligand_resname, score_str, rmsd_str)
+            logger.info(
+                "[{}] {} ligand={} score={} RMSD={} A", result.status.upper(), tid, result.ligand_resname, score_str, rmsd_str
+            )
 
     # Sort results by target_id for deterministic output.
     results.sort(key=lambda r: r.target_id)
@@ -518,8 +588,11 @@ def main(
     if excluded:
         click.echo("\n--- Targets EXCLUDED from primary claims ---")
         for r in excluded:
-            click.echo(f"  {r.target_id} (PDB {r.pdb_id}): RMSD={r.rmsd:.2f} A" if r.rmsd is not None
-                        else f"  {r.target_id} (PDB {r.pdb_id}): {r.error}")
+            click.echo(
+                f"  {r.target_id} (PDB {r.pdb_id}): RMSD={r.rmsd:.2f} A"
+                if r.rmsd is not None
+                else f"  {r.target_id} (PDB {r.pdb_id}): {r.error}"
+            )
         sys.exit(1)
     else:
         click.echo("\nAll evaluated targets passed — none excluded from primary claims.")

@@ -335,7 +335,9 @@ manual computation steps required.
 | 4.3.1 Cliff's delta | `src/dualdocking/statistical.py:125-136` | `cliffs_delta()` |
 | 4.3.2 Cohen's d | `src/dualdocking/statistical.py:139-154` | `cohens_d()` |
 | 4.4 Significance rule | `scripts/compute_metrics.py:272-276` | Conjunctive criterion |
+| 5.2 No-degradation guard | `scripts/compute_metrics.py:291-316` | Degradation Cliff's delta |
 | 5.3 Threshold sensitivity | `scripts/threshold_sensitivity.py` | Full script |
+| 6.x Claim audit | `scripts/claim_audit.py` | Full script |
 | Proxy-final correlation | `scripts/proxy_final_correlation.py` | Full script |
 
 ### Output Artifacts
@@ -346,6 +348,8 @@ manual computation steps required.
 | Statistical tests | `report/stats.json` | Bootstrap results, effect sizes, FDR p-values |
 | Threshold sensitivity | `report/data/threshold_sensitivity.json` | Per-threshold robustness |
 | Proxy correlation | `report/data/proxy_final_corr.json` | Docking-Boltz-2 Spearman/Pearson |
+| Degradation guard | `report/stats.json: _degradation` | Per-target Cliff's delta, pass/fail |
+| Claim audit | `report/data/claim_audit.json` | Traceability, scenario selection, evidence map |
 
 ## 8. Reproducibility
 

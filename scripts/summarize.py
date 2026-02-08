@@ -41,9 +41,7 @@ def _score_distribution_block(scores: pd.Series, label: str) -> str:
     )
 
 
-def _top_molecules_block(
-    df: pd.DataFrame, name_a: str, name_b: str, n: int = 3, primary_col: str = "combined_min"
-) -> str:
+def _top_molecules_block(df: pd.DataFrame, name_a: str, name_b: str, n: int = 3, primary_col: str = "combined_min") -> str:
     if df.empty:
         return "  Нет молекул для топа\n"
     sort_col = primary_col if primary_col in df.columns else "combined_min"
@@ -185,8 +183,14 @@ def main(
     primary = next((obj.column_name for obj in objectives if obj.is_primary), "combined_min")
 
     report = _build_report(
-        df, metrics, stats, pairs_cfg, thresholds_cfg, modes,
-        objective_columns=obj_columns, primary_col=primary,
+        df,
+        metrics,
+        stats,
+        pairs_cfg,
+        thresholds_cfg,
+        modes,
+        objective_columns=obj_columns,
+        primary_col=primary,
     )
 
     out_path = PROJECT_ROOT / output

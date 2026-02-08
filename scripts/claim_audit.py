@@ -3,11 +3,14 @@
 Verifies that all primary claims in the manuscript are traceable to
 statistical outputs. Checks:
 
-1. Every core pair has H1a + H1b results in stats.json
-2. Significance decisions match SAP criteria (Section 4.4)
-3. Success criterion evaluation (>= 3/5 core significant)
-4. No-degradation guard check
-5. Claim language selection matches outcome
+1. stats.json exists
+2. Every core pair has H1a + H1b results in stats.json
+3. Significance decisions match SAP criteria (Section 4.4)
+4. Success criterion evaluation (>= 3/5 core significant)
+5. No-degradation guard (SAP Section 5.2)
+6. Completeness / missing-data guard (SAP Section 6.6)
+7. Claim language selection matches outcome
+8. Evidence-to-claims traceability mapping
 
 Outputs:
   - report/data/claim_audit.json (structured audit trail)
@@ -34,6 +37,88 @@ SIGNIFICANCE_CRITERIA = {
 }
 NO_DEGRADATION_THRESHOLD = -0.47
 SUCCESS_MIN_PAIRS = 3
+MISSING_DATA_THRESHOLD = 0.20
+
+# SAP Section 6: evidence mapping from claim scenarios to supporting artifacts.
+EVIDENCE_MAP: dict[str, dict] = {
+    "6.1_full_success": {
+        "claim_template": (
+            "Double-target RL generation with worst-case scalarization produces a "
+            "significantly higher dual hit-rate than single-target baselines on "
+            "{n_sig}/5 core target pairs (BH-adjusted p < 0.05, |Cliff's delta| >= 0.33), "
+            "with no per-target degradation. The effect is robust across hit-rate "
+            "thresholds (100 nM, 1 uM, 10 uM)."
+        ),
+        "evidence": [
+            {"artifact": "report/stats.json", "fields": ["H1a", "H1b"], "purpose": "bootstrap p-values + effect sizes"},
+            {"artifact": "report/metrics.json", "fields": ["hr_both_mean"], "purpose": "per-mode hit-rates"},
+            {"artifact": "report/data/threshold_sensitivity.json", "purpose": "robustness across thresholds"},
+            {"artifact": "report/stats.json:_degradation", "purpose": "no per-target degradation"},
+        ],
+        "sap_sections": ["4.4", "5.1", "5.2", "5.3"],
+        "manuscript_sections": ["Quantitative Results", "Figures"],
+    },
+    "6.2_partial_success": {
+        "claim_template": (
+            "Double-target RL generation improves dual hit-rate on {n_sig}/5 core pairs "
+            "at the primary threshold (T = 0.0, 1 uM), but the effect is sensitive "
+            "to threshold choice."
+        ),
+        "evidence": [
+            {"artifact": "report/stats.json", "fields": ["H1a", "H1b"], "purpose": "bootstrap p-values + effect sizes"},
+            {"artifact": "report/metrics.json", "fields": ["hr_both_mean"], "purpose": "per-mode hit-rates"},
+            {"artifact": "report/data/threshold_sensitivity.json", "purpose": "sensitivity failure documentation"},
+        ],
+        "sap_sections": ["4.4", "5.1", "5.3"],
+        "manuscript_sections": ["Quantitative Results", "Limitations"],
+    },
+    "6.3_weak_evidence": {
+        "claim_template": (
+            "A consistent directional advantage for double-target RL is observed on "
+            "{n_pos}/5 core pairs, but the effect size is negligible-to-small "
+            "and does not meet the pre-registered practical significance threshold."
+        ),
+        "evidence": [
+            {"artifact": "report/stats.json", "fields": ["H1a", "H1b"], "purpose": "observed differences and effect sizes"},
+            {"artifact": "report/metrics.json", "fields": ["hr_both_mean"], "purpose": "per-mode hit-rates"},
+        ],
+        "sap_sections": ["4.4", "5.1"],
+        "manuscript_sections": ["Quantitative Results", "Conclusion and Next Steps"],
+    },
+    "6.4_degradation_detected": {
+        "claim_template": (
+            "Double-target RL incurs a per-target hit-rate penalty on pair(s) {pairs} "
+            "(Cliff's delta <= -0.47, large negative effect)."
+        ),
+        "evidence": [
+            {"artifact": "report/stats.json:_degradation", "purpose": "per-target Cliff's delta"},
+            {"artifact": "report/metrics.json", "fields": ["hr_a_mean", "hr_b_mean"], "purpose": "per-target hit-rates"},
+        ],
+        "sap_sections": ["5.2", "6.4"],
+        "manuscript_sections": ["Limitations"],
+    },
+    "6.5_no_evidence": {
+        "claim_template": (
+            "No evidence that double-target RL improves dual hit-rate: only {n_pos}/5 core pairs show positive direction."
+        ),
+        "evidence": [
+            {"artifact": "report/stats.json", "fields": ["H1a", "H1b"], "purpose": "observed differences"},
+        ],
+        "sap_sections": ["5.1"],
+        "manuscript_sections": ["Conclusion and Next Steps"],
+    },
+    "6.6_insufficient_data": {
+        "claim_template": (
+            "Analysis inconclusive due to missing data ({missing_rate}% of expected "
+            "runs unavailable). Results are reported descriptively only."
+        ),
+        "evidence": [
+            {"artifact": "report/stats.json:_completeness", "purpose": "missing-run inventory"},
+        ],
+        "sap_sections": ["6.6"],
+        "manuscript_sections": ["Limitations"],
+    },
+}
 
 
 def _check_significance(entry: dict) -> tuple[bool, list[str]]:
@@ -80,6 +165,8 @@ def main(
         "checks": [],
         "pass": True,
         "claim_scenario": None,
+        "degradation_warning": None,
+        "evidence_map": None,
         "summary": {},
     }
     all_issues: list[str] = []
@@ -134,17 +221,46 @@ def main(
         audit["summary"]["pair_significant"] = pair_significant
         audit["summary"]["success_criterion_met"] = n_significant >= SUCCESS_MIN_PAIRS
 
-        # --- Check 4: Determine claim scenario (SAP Section 6) ---
-        if n_significant >= SUCCESS_MIN_PAIRS:
+        # --- Check 4: No-degradation guard (SAP Section 5.2) ---
+        degradation = stats.get("_degradation", {})
+        degraded_pairs: list[str] = []
+        for pair_id in CORE_PAIRS:
+            pair_deg = degradation.get(pair_id, {})
+            for check_name, check_data in pair_deg.items():
+                if check_data.get("degraded", False):
+                    delta = check_data.get("cliffs_delta", float("nan"))
+                    degraded_pairs.append(f"{pair_id}/{check_name} (delta={delta:.3f})")
+
+        if degraded_pairs:
+            all_issues.extend([f"Degradation: {d}" for d in degraded_pairs])
+            audit["checks"].append({"name": "no_degradation_guard", "pass": False, "degraded": degraded_pairs})
+        else:
+            audit["checks"].append({"name": "no_degradation_guard", "pass": True})
+
+        audit["summary"]["degraded_pairs"] = degraded_pairs
+
+        # --- Check 5: Completeness / missing data (SAP Section 6.6) ---
+        completeness = stats.get("_completeness", {})
+        missing_rate = completeness.get("missing_rate", 0.0)
+        audit["summary"]["missing_rate"] = missing_rate
+
+        if missing_rate > MISSING_DATA_THRESHOLD:
+            all_issues.append(f"Missing data rate {missing_rate:.1%} exceeds {MISSING_DATA_THRESHOLD:.0%} threshold")
+            audit["checks"].append({"name": "completeness_gate", "pass": False, "missing_rate": missing_rate})
+        else:
+            audit["checks"].append({"name": "completeness_gate", "pass": True, "missing_rate": missing_rate})
+
+        # --- Check 6: Determine claim scenario (SAP Section 6) ---
+        # 6.6 overrides everything if data is insufficient
+        if missing_rate > MISSING_DATA_THRESHOLD:
+            audit["claim_scenario"] = "6.6_insufficient_data"
+        elif n_significant >= SUCCESS_MIN_PAIRS:
             # Check threshold robustness
             threshold_robust = False
             if sensitivity_path.exists():
                 sens = json.loads(sensitivity_path.read_text())
                 robustness = sens.get("robustness_summary", {})
-                threshold_robust = all(
-                    v.get("passes_success_criterion", False)
-                    for v in robustness.values()
-                )
+                threshold_robust = all(v.get("passes_success_criterion", False) for v in robustness.values())
             audit["summary"]["threshold_robust"] = threshold_robust
 
             if threshold_robust:
@@ -152,27 +268,43 @@ def main(
             else:
                 audit["claim_scenario"] = "6.2_partial_success"
         else:
-            # Check if positive direction at least
-            n_positive = sum(1 for pair_id in CORE_PAIRS
-                             if stats.get(pair_id, {}).get("H1a", {}).get("observed_diff", 0) > 0
-                             or stats.get(pair_id, {}).get("H1b", {}).get("observed_diff", 0) > 0)
+            n_positive = sum(
+                1
+                for pair_id in CORE_PAIRS
+                if stats.get(pair_id, {}).get("H1a", {}).get("observed_diff", 0) > 0
+                or stats.get(pair_id, {}).get("H1b", {}).get("observed_diff", 0) > 0
+            )
             if n_positive >= SUCCESS_MIN_PAIRS:
                 audit["claim_scenario"] = "6.3_weak_evidence"
             else:
                 audit["claim_scenario"] = "6.5_no_evidence"
 
         audit["summary"]["n_positive_direction"] = sum(
-            1 for pair_id in CORE_PAIRS
+            1
+            for pair_id in CORE_PAIRS
             if stats.get(pair_id, {}).get("H1a", {}).get("observed_diff", 0) > 0
             or stats.get(pair_id, {}).get("H1b", {}).get("observed_diff", 0) > 0
         )
 
-    # --- Check 5: metrics.json exists ---
+        # 6.4 is an addendum — appended to any scenario when degradation is found
+        if degraded_pairs:
+            audit["degradation_warning"] = {
+                "scenario": "6.4_degradation_detected",
+                "pairs": degraded_pairs,
+                "note": "Appended to primary claim per SAP Section 6.4",
+            }
+
+    # --- Check 7: metrics.json exists ---
     if not metrics_path.exists():
         all_issues.append("metrics.json not found")
         audit["checks"].append({"name": "metrics_exists", "pass": False})
     else:
         audit["checks"].append({"name": "metrics_exists", "pass": True})
+
+    # --- Evidence traceability mapping ---
+    scenario = audit.get("claim_scenario")
+    if scenario and scenario in EVIDENCE_MAP:
+        audit["evidence_map"] = EVIDENCE_MAP[scenario]
 
     # --- Final verdict ---
     audit["pass"] = len(all_issues) == 0

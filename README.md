@@ -80,7 +80,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── render_molecules.py   # 2D-визуализация молекул с аннотациями
 │   ├── summarize.py          # Мини-аналитика: текстовый отчёт
 │   ├── run_pilot.py          # SCI-09: pilot matrix run (1 pair x 3 modes x 2 seeds)
-│   └── claim_audit.py        # SCI-10: claim traceability audit (SAP → stats.json)
+│   └── claim_audit.py        # SCI-10: claim traceability audit (8 checks, evidence mapping)
 ├── data/enrichment/      # Enrichment benchmark artifacts
 │   ├── scores/           # Per-target active docking scores ({TARGET}_actives.csv)
 │   ├── receptors/        # Downloaded PDBs and PDBQTs for missing targets
@@ -621,9 +621,10 @@ report/
 │   ├── {pair}_molecules_single_b.png
 │   ├── {pair}_molecules_double.png
 │   └── {pair}_molecules_top_hits.png
-├── metrics.json
-├── stats.json
-└── summary.txt              # Текстовый отчёт с аналитикой
+├── metrics.json              # hr_a/hr_b/hr_both/balance per pair/mode
+├── stats.json                # Bootstrap tests, FDR, _degradation guard, _completeness
+├── data/claim_audit.json     # Claim traceability audit trail + evidence map
+└── summary.txt               # Текстовый отчёт с аналитикой
 ```
 
 ## Validation Pipeline (SCI-03 → SCI-05)
@@ -685,6 +686,23 @@ uv run python scripts/proxy_final_correlation.py
 Выход:
 - `report/data/proxy_final_corr.csv` — плоская таблица (pair × mode × target × correlation)
 - `report/data/proxy_final_corr.json` — JSON со сводкой proxy suitability
+
+### SCI-10: Claim Traceability Audit
+
+Верифицирует, что все primary claims traceable к статистическим артефактам.
+8 проверок: наличие stats/metrics, полнота H1a/H1b, re-derivation significance (SAP 4.4),
+no-degradation guard (SAP 5.2), completeness gate (SAP 6.6), scenario selection (6 SAP scenarios),
+evidence-to-claims mapping (artifact → SAP section → manuscript section).
+
+```bash
+# Полный аудит (strict: exit 1 при проблемах)
+uv run python scripts/claim_audit.py
+
+# Non-strict (только отчёт)
+uv run python scripts/claim_audit.py --no-strict
+```
+
+Выход: `report/data/claim_audit.json` — структурированный аудит с `evidence_map`, `degradation_warning`, `claim_scenario`.
 
 ### SCI-06: Threshold Sensitivity
 

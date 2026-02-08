@@ -188,8 +188,7 @@ def init_manifest(
     """
     git = _git_info()
     config_hashes = {
-        name: _sha256_file(config_dir / name)
-        for name in ("pairs.yaml", "experiment.yaml", "metrics.yaml", "normalization.yaml")
+        name: _sha256_file(config_dir / name) for name in ("pairs.yaml", "experiment.yaml", "metrics.yaml", "normalization.yaml")
     }
 
     task_entries = [

@@ -186,8 +186,12 @@ def _dock_smiles_list(
         sdf_path = ligands_dir / f"active_{idx:05d}.sdf"
         lig_path = ligands_dir / f"active_{idx:05d}.pdbqt"
         ok, err = _ensure_ligand_pdbqt(
-            runner, smi, sdf_path, lig_path,
-            timeout=params.timeout_seconds, seed=seed + idx,
+            runner,
+            smi,
+            sdf_path,
+            lig_path,
+            timeout=params.timeout_seconds,
+            seed=seed + idx,
         )
         if not ok:
             prep_failures += 1
@@ -203,15 +207,21 @@ def _dock_smiles_list(
     use_batch = "unidock" in Path(binary).name.lower()
 
     if use_batch:
-        for batch_id, start in enumerate(
-            tqdm(range(0, len(ligand_paths), batch_size), desc="Dock", unit="batch")
-        ):
+        for batch_id, start in enumerate(tqdm(range(0, len(ligand_paths), batch_size), desc="Dock", unit="batch")):
             batch = ligand_paths[start : start + batch_size]
             try:
                 batch_scores = _dock_batch_unidock(
-                    runner, binary, receptor_path, batch, center, size,
-                    params, output_dir, batch_id=batch_id,
-                    seed=seed + start, timeout=params.timeout_seconds,
+                    runner,
+                    binary,
+                    receptor_path,
+                    batch,
+                    center,
+                    size,
+                    params,
+                    output_dir,
+                    batch_id=batch_id,
+                    seed=seed + start,
+                    timeout=params.timeout_seconds,
                 )
             except Exception as exc:
                 dock_failures += len(batch)
@@ -232,8 +242,15 @@ def _dock_smiles_list(
             out_path = output_dir / f"active_{idx:05d}.pdbqt"
             try:
                 score = _dock_ligand(
-                    runner, binary, receptor_path, lig_path,
-                    center, size, params, log_path, out_path,
+                    runner,
+                    binary,
+                    receptor_path,
+                    lig_path,
+                    center,
+                    size,
+                    params,
+                    log_path,
+                    out_path,
                 )
                 scores.append(score)
             except Exception as exc:
@@ -380,8 +397,16 @@ def _load_or_dock_decoys(  # noqa: PLR0913
 
     work_dir = PROJECT_ROOT / "data" / "enrichment" / "work" / tid / "decoys"
     scores, _n_fail = _dock_smiles_list(
-        runner, binary, receptor_path, center, size,
-        sample, params, work_dir, seed, batch_size,
+        runner,
+        binary,
+        receptor_path,
+        center,
+        size,
+        sample,
+        params,
+        work_dir,
+        seed,
+        batch_size,
     )
 
     decoy_scores_path.parent.mkdir(parents=True, exist_ok=True)
@@ -441,15 +466,23 @@ def _load_or_dock_actives(  # noqa: PLR0913
 
     work_dir = PROJECT_ROOT / "data" / "enrichment" / "work" / tid / "actives"
     scores, _n_fail = _dock_smiles_list(
-        runner, binary, receptor_path, center, size,
-        active_smiles, params, work_dir, seed, batch_size,
+        runner,
+        binary,
+        receptor_path,
+        center,
+        size,
+        active_smiles,
+        params,
+        work_dir,
+        seed,
+        batch_size,
     )
 
     success_rate = len(scores) / len(active_smiles) if active_smiles else 0
     if success_rate < 0.80:
         logger.warning("Active docking success rate {:.1%} < 80% for {}", success_rate, tid)
 
-    _save_active_scores(scores, active_smiles[:len(scores)], active_scores_path)
+    _save_active_scores(scores, active_smiles[: len(scores)], active_scores_path)
     logger.info("Saved {} active scores for {}", len(scores), tid)
     return scores
 
@@ -458,10 +491,7 @@ def _print_summary(results: list[Any], auroc_threshold: float, bedroc_threshold:
     """Print enrichment benchmark summary table."""
     click.echo("\n--- Enrichment Benchmark Summary ---")
     click.echo(f"Thresholds: AUROC>{auroc_threshold}, BEDROC(α={alpha:.0f})>{bedroc_threshold}")
-    click.echo(
-        f"{'Target':<10} {'n_act':>6} {'n_dec':>6} {'AUROC':>7} {'BEDROC':>7} "
-        f"{'EF@1%':>7} {'EF@5%':>7} {'Status':<16}"
-    )
+    click.echo(f"{'Target':<10} {'n_act':>6} {'n_dec':>6} {'AUROC':>7} {'BEDROC':>7} {'EF@1%':>7} {'EF@5%':>7} {'Status':<16}")
     click.echo("-" * 76)
     for r in results:
         show_metrics = r.status not in ("error", "skipped:blocked")
@@ -470,8 +500,7 @@ def _print_summary(results: list[Any], auroc_threshold: float, bedroc_threshold:
         ef1_s = f"{r.ef_1pct:.1f}" if show_metrics else "N/A"
         ef5_s = f"{r.ef_5pct:.1f}" if show_metrics else "N/A"
         click.echo(
-            f"{r.target_id:<10} {r.n_actives:>6} {r.n_decoys:>6} {auroc_s:>7} "
-            f"{bedroc_s:>7} {ef1_s:>7} {ef5_s:>7} {r.status:<16}"
+            f"{r.target_id:<10} {r.n_actives:>6} {r.n_decoys:>6} {auroc_s:>7} {bedroc_s:>7} {ef1_s:>7} {ef5_s:>7} {r.status:<16}"
         )
 
     evaluated = [r for r in results if r.status in ("pass", "fail")]
@@ -553,9 +582,18 @@ def main(  # noqa: PLR0913
     receptors_dir.mkdir(parents=True, exist_ok=True)
 
     if dry_run:
-        _dry_run_report(all_target_ids, blocked_ids, target_pdb_map, chembl_dir,
-                        calibration_scores_dir, scores_dir, max_actives, seed,
-                        auroc_threshold, bedroc_threshold)
+        _dry_run_report(
+            all_target_ids,
+            blocked_ids,
+            target_pdb_map,
+            chembl_dir,
+            calibration_scores_dir,
+            scores_dir,
+            max_actives,
+            seed,
+            auroc_threshold,
+            bedroc_threshold,
+        )
         return
 
     from dock_calibration import DockerRunner, DockingParams
@@ -572,41 +610,67 @@ def main(  # noqa: PLR0913
 
     results: list[EnrichmentResult] = []
     for tid in sorted(blocked_ids & set(all_target_ids)):
-        results.append(EnrichmentResult(
-            target_id=tid, n_actives=0, n_decoys=0,
-            auroc=0.0, bedroc_alpha20=0.0, ef_1pct=0.0, ef_5pct=0.0,
-            passed=False, status="skipped:blocked",
-            error="Blocked pair (non-human species)",
-        ))
+        results.append(
+            EnrichmentResult(
+                target_id=tid,
+                n_actives=0,
+                n_decoys=0,
+                auroc=0.0,
+                bedroc_alpha20=0.0,
+                ef_1pct=0.0,
+                ef_5pct=0.0,
+                passed=False,
+                status="skipped:blocked",
+                error="Blocked pair (non-human species)",
+            )
+        )
         logger.info("[SKIP] {} — blocked pair", tid)
 
     active_targets = [t for t in all_target_ids if t not in blocked_ids]
     need_docker = not skip_docking and any(
-        not (scores_dir / f"{tid}_actives.csv").exists()
-        or not (calibration_scores_dir / f"{tid}.csv").exists()
+        not (scores_dir / f"{tid}_actives.csv").exists() or not (calibration_scores_dir / f"{tid}.csv").exists()
         for tid in active_targets
     )
 
     if need_docker:
         from dualdocking.generator_freedpp import _ensure_docker_image
+
         _ensure_docker_image(docker_image)
 
     runner_ctx: Any = DockerRunner(docker_image, PROJECT_ROOT, gpus=gpus) if need_docker else nullcontext(None)
     with runner_ctx as runner:
         for tid in active_targets:
             result = _process_target(
-                tid, target_pdb_map, runner, binary, params, cal_cfg, seed, batch_size,
-                max_actives, alpha, auroc_threshold, bedroc_threshold,
-                chembl_dir, scores_dir, receptors_dir, calibration_scores_dir,
-                figures_path, skip_docking,
-                compute_auroc, compute_bedroc, compute_enrichment_factor,
-                compute_roc_curve, EnrichmentResult,
+                tid,
+                target_pdb_map,
+                runner,
+                binary,
+                params,
+                cal_cfg,
+                seed,
+                batch_size,
+                max_actives,
+                alpha,
+                auroc_threshold,
+                bedroc_threshold,
+                chembl_dir,
+                scores_dir,
+                receptors_dir,
+                calibration_scores_dir,
+                figures_path,
+                skip_docking,
+                compute_auroc,
+                compute_bedroc,
+                compute_enrichment_factor,
+                compute_roc_curve,
+                EnrichmentResult,
             )
             results.append(result)
 
     results.sort(key=lambda r: r.target_id)
-    _write_outputs(results, target_pdb_map, output, csv_output, figures_path, seed,
-                   max_actives, auroc_threshold, bedroc_threshold, alpha)
+    _write_outputs(
+        results, target_pdb_map, output, csv_output, figures_path, seed, max_actives, auroc_threshold, bedroc_threshold, alpha
+    )
     _print_summary(results, auroc_threshold, bedroc_threshold, alpha)
 
 
@@ -674,9 +738,16 @@ def _process_target(  # noqa: PLR0913
     """Process a single target: load/dock scores, compute metrics."""
     pdb_id = target_pdb_map.get(tid, TARGET_PDB_MAP.get(tid, ""))
     err_result = lambda msg: result_cls(  # noqa: E731
-        target_id=tid, n_actives=0, n_decoys=0,
-        auroc=0.0, bedroc_alpha20=0.0, ef_1pct=0.0, ef_5pct=0.0,
-        passed=False, status="error", error=msg,
+        target_id=tid,
+        n_actives=0,
+        n_decoys=0,
+        auroc=0.0,
+        bedroc_alpha20=0.0,
+        ef_1pct=0.0,
+        ef_5pct=0.0,
+        passed=False,
+        status="error",
+        error=msg,
     )
     if not pdb_id:
         return err_result(f"No PDB ID for target {tid}")
@@ -684,8 +755,17 @@ def _process_target(  # noqa: PLR0913
     logger.info("Processing target {}", tid)
 
     decoy_result = _load_or_dock_decoys(
-        tid, pdb_id, runner, binary, params, cal_cfg, seed, batch_size,
-        receptors_dir, calibration_scores_dir, skip_docking,
+        tid,
+        pdb_id,
+        runner,
+        binary,
+        params,
+        cal_cfg,
+        seed,
+        batch_size,
+        receptors_dir,
+        calibration_scores_dir,
+        skip_docking,
     )
     if isinstance(decoy_result, str):
         return err_result(decoy_result)
@@ -694,21 +774,44 @@ def _process_target(  # noqa: PLR0913
         return err_result(f"No decoy scores available for {tid}")
 
     active_result = _load_or_dock_actives(
-        tid, pdb_id, runner, binary, params, seed, batch_size,
-        max_actives, chembl_dir, scores_dir, receptors_dir, skip_docking,
+        tid,
+        pdb_id,
+        runner,
+        binary,
+        params,
+        seed,
+        batch_size,
+        max_actives,
+        chembl_dir,
+        scores_dir,
+        receptors_dir,
+        skip_docking,
     )
     if isinstance(active_result, str):
         return result_cls(
-            target_id=tid, n_actives=0, n_decoys=len(decoy_scores),
-            auroc=0.0, bedroc_alpha20=0.0, ef_1pct=0.0, ef_5pct=0.0,
-            passed=False, status="error", error=active_result,
+            target_id=tid,
+            n_actives=0,
+            n_decoys=len(decoy_scores),
+            auroc=0.0,
+            bedroc_alpha20=0.0,
+            ef_1pct=0.0,
+            ef_5pct=0.0,
+            passed=False,
+            status="error",
+            error=active_result,
         )
     active_scores = active_result
     if len(active_scores) < 20:
         return result_cls(
-            target_id=tid, n_actives=len(active_scores), n_decoys=len(decoy_scores),
-            auroc=0.0, bedroc_alpha20=0.0, ef_1pct=0.0, ef_5pct=0.0,
-            passed=False, status="error",
+            target_id=tid,
+            n_actives=len(active_scores),
+            n_decoys=len(decoy_scores),
+            auroc=0.0,
+            bedroc_alpha20=0.0,
+            ef_1pct=0.0,
+            ef_5pct=0.0,
+            passed=False,
+            status="error",
             error=f"Too few valid active scores ({len(active_scores)} < 20)",
         )
 
@@ -723,9 +826,16 @@ def _process_target(  # noqa: PLR0913
         fpr, tpr = compute_roc_fn(all_scores, labels, lower_is_better=True)
     except Exception as exc:
         return result_cls(
-            target_id=tid, n_actives=len(active_scores), n_decoys=len(decoy_scores),
-            auroc=0.0, bedroc_alpha20=0.0, ef_1pct=0.0, ef_5pct=0.0,
-            passed=False, status="error", error=f"Metric computation failed: {exc}",
+            target_id=tid,
+            n_actives=len(active_scores),
+            n_decoys=len(decoy_scores),
+            auroc=0.0,
+            bedroc_alpha20=0.0,
+            ef_1pct=0.0,
+            ef_5pct=0.0,
+            passed=False,
+            status="error",
+            error=f"Metric computation failed: {exc}",
         )
 
     passed = auroc >= auroc_threshold and bedroc >= bedroc_threshold
@@ -733,14 +843,26 @@ def _process_target(  # noqa: PLR0913
 
     logger.info(
         "[{}] {} AUROC={:.3f} BEDROC={:.3f} EF@1%={:.1f} (n_act={}, n_dec={})",
-        status.upper(), tid, auroc, bedroc, ef_1, len(active_scores), len(decoy_scores),
+        status.upper(),
+        tid,
+        auroc,
+        bedroc,
+        ef_1,
+        len(active_scores),
+        len(decoy_scores),
     )
     _make_roc_figure(fpr, tpr, auroc, tid, figures_path / f"roc_{tid}.png")
 
     return result_cls(
-        target_id=tid, n_actives=len(active_scores), n_decoys=len(decoy_scores),
-        auroc=auroc, bedroc_alpha20=bedroc, ef_1pct=ef_1, ef_5pct=ef_5,
-        passed=passed, status=status,
+        target_id=tid,
+        n_actives=len(active_scores),
+        n_decoys=len(decoy_scores),
+        auroc=auroc,
+        bedroc_alpha20=bedroc,
+        ef_1pct=ef_1,
+        ef_5pct=ef_5,
+        passed=passed,
+        status=status,
     )
 
 
@@ -784,7 +906,8 @@ def _write_outputs(
 
     _make_summary_figure(
         [asdict(r) for r in results],
-        auroc_threshold, bedroc_threshold,
+        auroc_threshold,
+        bedroc_threshold,
         figures_path / "enrichment_summary.png",
     )
 
