@@ -217,10 +217,6 @@ def main(
         else:
             audit["checks"].append({"name": "significance_consistency", "pass": True})
 
-        audit["summary"]["n_core_significant"] = n_significant
-        audit["summary"]["pair_significant"] = pair_significant
-        audit["summary"]["success_criterion_met"] = n_significant >= SUCCESS_MIN_PAIRS
-
         # --- Check 4: No-degradation guard (SAP Section 5.2) ---
         degradation = stats.get("_degradation", {})
         degraded_pairs: list[str] = []
@@ -238,6 +234,18 @@ def main(
             audit["checks"].append({"name": "no_degradation_guard", "pass": True})
 
         audit["summary"]["degraded_pairs"] = degraded_pairs
+
+        # Exclude degraded pairs from success count (SAP 5.2)
+        degraded_pair_ids = {dp.split("/")[0] for dp in degraded_pairs}
+        for pair_id in degraded_pair_ids:
+            if pair_significant.get(pair_id, False):
+                pair_significant[pair_id] = False
+                n_significant -= 1
+
+        audit["summary"]["n_core_significant"] = n_significant
+        audit["summary"]["pair_significant"] = pair_significant
+        audit["summary"]["success_criterion_met"] = n_significant >= SUCCESS_MIN_PAIRS
+        audit["summary"]["degraded_excluded"] = sorted(degraded_pair_ids)
 
         # --- Check 5: Completeness / missing data (SAP Section 6.6) ---
         completeness = stats.get("_completeness", {})

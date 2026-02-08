@@ -366,6 +366,81 @@ def test_degradation_guard_in_stats(tmp_path, monkeypatch):
         assert isinstance(check["degraded"], bool)
 
 
+def test_fdr_scope_primary_only(tmp_path, monkeypatch):
+    """FDR correction only applies to primary family (H1a/H1b core pairs, SAP 4.2)."""
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+
+    # Two pairs: one core, one auxiliary
+    pairs_cfg = {
+        "pairs": {
+            "core_pair": {
+                "set": "core",
+                "target_a": {"id": "A", "organism": "Homo sapiens"},
+                "target_b": {"id": "B", "organism": "Homo sapiens"},
+            },
+            "aux_pair": {
+                "set": "auxiliary",
+                "target_a": {"id": "C", "organism": "Homo sapiens"},
+                "target_b": {"id": "D", "organism": "Homo sapiens"},
+            },
+        }
+    }
+    (tmp_path / "configs").mkdir()
+    (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(pairs_cfg))
+    (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(_experiment_cfg()))
+    (tmp_path / "configs" / "metrics.yaml").write_text(yaml.dump({
+        "thresholds": {
+            "core_pair": {"target_a": 0.0, "target_b": 0.0},
+            "aux_pair": {"target_a": 0.0, "target_b": 0.0},
+        }
+    }))
+
+    rng = np.random.default_rng(42)
+    for pair_id in ("core_pair", "aux_pair"):
+        for mode in ("single_a", "single_b", "double"):
+            for seed in [1, 2, 3, 4, 5]:
+                run_dir = tmp_path / "results" / pair_id / mode / f"seed_{seed}"
+                _write_run(run_dir, rng)
+
+    import dualdocking.fairness as fairness_mod
+
+    monkeypatch.setattr(fairness_mod, "validate_fairness", lambda _: {"budget_consistent": True, "issues": []})
+    monkeypatch.setattr(
+        fairness_mod,
+        "validate_reward_quality",
+        lambda *_args, **_kwargs: {"run_valid": True, "issues": []},
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, [
+        "--results-root", "results",
+        "--pairs-config", "configs/pairs.yaml",
+        "--experiment-config", "configs/experiment.yaml",
+        "--metrics-config", "configs/metrics.yaml",
+    ])
+    assert result.exit_code == 0, result.output
+
+    stats = json.loads((tmp_path / "report" / "stats.json").read_text())
+
+    # Core pair H1a/H1b: must have p_value_adjusted (FDR-corrected float)
+    for test_id in ("H1a", "H1b"):
+        entry = stats["core_pair"][test_id]
+        assert entry["p_value_adjusted"] is not None, f"core {test_id} should be FDR-corrected"
+        assert isinstance(entry["p_value_adjusted"], float)
+
+    # Core pair H2a/H2b: must NOT be FDR-corrected (secondary, not in primary family)
+    for test_id in ("H2a", "H2b"):
+        entry = stats["core_pair"][test_id]
+        assert entry["p_value_adjusted"] is None, f"core {test_id} should not be in primary FDR family"
+        assert entry["significant"] is False
+
+    # Auxiliary pair: all tests must NOT be FDR-corrected
+    for test_id in ("H1a", "H1b", "H2a", "H2b"):
+        entry = stats["aux_pair"][test_id]
+        assert entry["p_value_adjusted"] is None, f"aux {test_id} should not be FDR-corrected"
+        assert entry["significant"] is False
+
+
 def test_is_hit_a_b_columns_created(tmp_path, monkeypatch):
     """_load_scored_csv adds is_hit_a and is_hit_b columns."""
     _setup_full(tmp_path, monkeypatch)

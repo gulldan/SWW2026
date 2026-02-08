@@ -168,7 +168,7 @@ Implementation: `src/dualdocking/statistical.py:39-96`
 
 Implementation: `src/dualdocking/statistical.py:99-122` (`fdr_correction()`).
 
-Applied in: `compute_metrics.py:267-276`.
+Applied in: `compute_metrics.py:282-301` (primary family FDR + secondary/auxiliary marking).
 
 ### 4.3 Effect Sizes
 

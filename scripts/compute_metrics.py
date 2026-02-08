@@ -221,10 +221,13 @@ def main(
             logger.error("Missing {} run(s) and --no-allow-incomplete set: {}", len(missing_list), missing_list)
             sys.exit(1)
 
+    # Identify core pairs for FDR scope (SAP 4.2: primary family = H1a+H1b core only)
+    core_pair_ids = {pid for pid, cfg in pairs.items() if cfg.get("set", "core") == "core"}
+
     # Statistical tests
     stats_out: dict[str, dict[str, dict[str, float | bool | str]]] = {}
-    p_values: list[float] = []
-    index: list[tuple[str, str]] = []
+    primary_p_values: list[float] = []
+    primary_index: list[tuple[str, str]] = []
 
     def _metric_hr_a(df: pd.DataFrame) -> float:
         return float(df["is_hit_a"].mean()) if not df.empty else float("nan")
@@ -271,12 +274,14 @@ def main(
                 "ci_upper": result.ci_upper,
             }
 
-            p_values.append(result.p_value)
-            index.append((pair_id, test_id))
+            is_primary = pair_id in core_pair_ids and test_id in ("H1a", "H1b")
+            if is_primary:
+                primary_p_values.append(result.p_value)
+                primary_index.append((pair_id, test_id))
 
-    # FDR correction
-    p_adj = fdr_correction(p_values, alpha=0.05)
-    for (pair_id, test_id), p_value_adj in zip(index, p_adj, strict=False):
+    # FDR correction — primary family only (SAP 4.2: core pairs × H1a/H1b)
+    primary_p_adj = fdr_correction(primary_p_values, alpha=0.05)
+    for (pair_id, test_id), p_value_adj in zip(primary_index, primary_p_adj, strict=False):
         entry = stats_out[pair_id][test_id]
         entry["p_value_adjusted"] = p_value_adj
         entry["significant"] = (
@@ -284,6 +289,16 @@ def main(
             and abs(float(entry["cliffs_delta"])) >= 0.33
             and (float(entry["ci_lower"]) > 0 or float(entry["ci_upper"]) < 0)
         )
+
+    # Secondary / auxiliary tests: not in primary FDR family per SAP 4.2
+    for pair_id in pairs:
+        for test_id in ("H1a", "H1b", "H2a", "H2b"):
+            entry = stats_out.get(pair_id, {}).get(test_id)
+            if entry is None:
+                continue
+            if "p_value_adjusted" not in entry:
+                entry["p_value_adjusted"] = None
+                entry["significant"] = False
 
     # Degradation guard (SAP Section 5.2)
     # Check per-target hit-rate: double must not degrade vs corresponding single.

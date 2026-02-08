@@ -200,6 +200,10 @@ def test_degradation_detected(tmp_path, monkeypatch):
     assert audit["degradation_warning"]["scenario"] == "6.4_degradation_detected"
     assert any("CDK2_ERK2" in p for p in audit["degradation_warning"]["pairs"])
     assert any("Degradation" in i for i in audit["issues"])
+    # CDK2_ERK2 excluded from success count (SAP 5.2): 5 - 1 = 4, still >= 3
+    assert audit["summary"]["n_core_significant"] == 4
+    assert audit["summary"]["success_criterion_met"] is True
+    assert "CDK2_ERK2" in audit["summary"]["degraded_excluded"]
     # Primary scenario still determined (6.4 is addendum)
     assert audit["claim_scenario"] == "6.1_full_success"
 
@@ -232,6 +236,44 @@ def test_no_degradation_block_still_passes(tmp_path, monkeypatch):
     audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
     check = next(c for c in audit["checks"] if c["name"] == "no_degradation_guard")
     assert check["pass"] is True
+
+
+def test_degradation_excludes_from_success_count(tmp_path, monkeypatch):
+    """Degradation exclusion flips outcome: 3/5 sig - 1 degraded = 2/5 -> no longer success."""
+    degradation = {
+        "CDK2_ERK2": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": -0.6, "degraded": True},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+        "AChE_BChE": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.2, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.3, "degraded": False},
+        },
+        "BACE1_GSK3B": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+        "AChE_BACE1": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+        "GSK3B_CDK5": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+    }
+    # 3 significant, CDK2_ERK2 is one of them AND degraded -> excluded -> 2/5
+    _setup(tmp_path, monkeypatch, n_significant=3, degradation=degradation)
+    runner = CliRunner()
+    result = runner.invoke(main, ["--no-strict"])
+    assert result.exit_code == 0
+    audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
+    # CDK2_ERK2 excluded: 3 - 1 = 2 significant, below threshold of 3
+    assert audit["summary"]["n_core_significant"] == 2
+    assert audit["summary"]["success_criterion_met"] is False
+    assert "CDK2_ERK2" in audit["summary"]["degraded_excluded"]
+    # Scenario should reflect the reduced count (not 6.1/6.2)
+    assert audit["claim_scenario"] in ("6.3_weak_evidence", "6.5_no_evidence")
 
 
 def test_evidence_map_populated(tmp_path, monkeypatch):
