@@ -45,7 +45,7 @@ pareto_analysis:
 generator:
   name: "FREED++"
   freedpp:
-    epochs: 200
+    epochs: 10
     num_sub_proc: 0            # 0 = auto-detect: 12 for 4090/24GB, 24 for H100/80GB
     starting_smile: "c1([*:1])c([*:2])ccc([*:3])c1"
     docker_image: "dualdocking/freedpp:latest"

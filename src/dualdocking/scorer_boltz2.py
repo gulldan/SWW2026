@@ -31,7 +31,7 @@ MSA_CACHE_DIR = CACHE_DIR / "boltz_msa"
 BOLTZ_TIMEOUT = 600  # секунд на одну молекулу
 BOLTZ_BATCH_TIMEOUT = 3600  # секунд на батч
 MAX_LIGAND_ATOMS = 128
-_DEFAULT_BATCH_SIZE = 16  # молекул за один вызов boltz predict
+_DEFAULT_BATCH_SIZE = 64  # молекул за один вызов boltz predict (internal batch=1, safe on any VRAM)
 
 
 def _auto_batch_size() -> int:
@@ -45,9 +45,9 @@ def _auto_batch_size() -> int:
         if torch.cuda.is_available():
             vram_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
             if vram_gb >= 48:  # H100 80 GB / A100 40–80 GB
-                return 32
+                return 128
             if vram_gb >= 20:  # RTX 4090 24 GB / A5000 24 GB
-                return 16
+                return 64
     except Exception:
         logger.debug("GPU detection failed for batch size, using default={}", _DEFAULT_BATCH_SIZE)
     return _DEFAULT_BATCH_SIZE
