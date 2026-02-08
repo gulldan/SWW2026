@@ -7,7 +7,6 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
     "pandas>=2.1",
-    "polars>=1.0",
     "pyarrow>=14.0",
     "pyyaml>=6.0",
     "rdkit>=2024.3.1",
@@ -28,6 +27,7 @@ dev = [
     "ruff>=0.9",
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "pytest-xdist>=3.0",
     "ty",
     "pre-commit>=3.6",
 ]
@@ -141,7 +141,7 @@ line-ending = "auto"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
-addopts = "-v --cov=src --cov-report=term-missing"
+addopts = "-v"
 pythonpath = [".", "src"]
 markers = [
     "integration: marks tests as integration tests",
@@ -189,4 +189,4 @@ warn_return_any = true
 warn_unused_configs = true
 
 [tool.uv.sources]
-boltz = { git = "https://github.com/jwohlwend/boltz.git" }
+boltz = { git = "https://github.com/jwohlwend/boltz.git", rev = "cb04aeccdd480fd4db707f0bbafde538397fa2ac" }

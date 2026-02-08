@@ -66,7 +66,7 @@ class GenerationConfig:
 
     # FREED++-специфичные
     epochs: int = 200
-    num_sub_proc: int = 12
+    num_sub_proc: int = 0  # 0 = auto-detect based on GPU VRAM
     starting_smile: str = "c1([*:1])c([*:2])ccc([*:3])c1"
     use_cache: bool = True
     docker_image: str = DEFAULT_DOCKER_IMAGE
@@ -81,6 +81,26 @@ class GenerationConfig:
 # ---------------------------------------------------------------------------
 # Docker image management
 # ---------------------------------------------------------------------------
+
+
+def _auto_num_sub_proc() -> int:
+    """Pick num_sub_proc based on GPU VRAM; override via FREEDPP_NUM_SUB_PROC env var."""
+    env = os.getenv("FREEDPP_NUM_SUB_PROC")
+    if env is not None:
+        return int(env)
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            vram_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
+            if vram_gb >= 48:  # H100 80 GB / A100
+                return 24
+            if vram_gb >= 20:  # RTX 4090 24 GB
+                return 12
+            return 8  # smaller GPUs
+    except Exception:
+        logger.debug("GPU detection failed for num_sub_proc, using default=12")
+    return 12  # safe default
 
 
 def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
@@ -280,6 +300,8 @@ def _build_freedpp_args(
     commands: str = "train,sample",
 ) -> list[str]:
     """Собрать аргументы CLI для main.py FREED++."""
+    num_sub_proc = config.num_sub_proc if config.num_sub_proc > 0 else _auto_num_sub_proc()
+    logger.debug("FREED++ num_sub_proc={} (config={}, auto={})", num_sub_proc, config.num_sub_proc, config.num_sub_proc == 0)
     return [
         "--commands",
         commands,
@@ -304,7 +326,7 @@ def _build_freedpp_args(
         "--epochs",
         str(config.epochs),
         "--num_sub_proc",
-        str(config.num_sub_proc),
+        str(num_sub_proc),
         "--seed",
         str(config.seed),
         "--num_mols",
@@ -313,6 +335,8 @@ def _build_freedpp_args(
         str(config.steps_per_epoch),
         "--reward_version",
         "soft",
+        "--num_modes",
+        "1",
     ]
 
 
@@ -348,12 +372,15 @@ def _run_freedpp(
     else:
         args = _build_freedpp_args(config, pdbqt_a, center_a, size_a, commands)
 
+    gpu_device = os.getenv("FREEDPP_CUDA_DEVICE")
+    gpu_flag = f'"device={gpu_device}"' if gpu_device is not None else "all"
+
     docker_cmd: list[str] = [
         DOCKER_BIN,
         "run",
         "--rm",
         "--gpus",
-        "all",
+        gpu_flag,
         "-v",
         f"{workspace}:/workspace",
     ]
@@ -373,6 +400,8 @@ def _run_freedpp(
             f"QG_MAX_INVALID_FRACTION={config.qg_max_invalid_fraction}",
             "-e",
             f"QG_MAX_TIMEOUT_FRACTION={config.qg_max_timeout_fraction}",
+            "-e",
+            "GPU_BATCH_DOCK=1",
         ]
     )
 

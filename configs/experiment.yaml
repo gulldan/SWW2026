@@ -46,7 +46,7 @@ generator:
   name: "FREED++"
   freedpp:
     epochs: 200
-    num_sub_proc: 24
+    num_sub_proc: 0            # 0 = auto-detect: 12 for 4090/24GB, 24 for H100/80GB
     starting_smile: "c1([*:1])c([*:2])ccc([*:3])c1"
     docker_image: "dualdocking/freedpp:latest"
     use_model_cache: true

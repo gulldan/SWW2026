@@ -29,15 +29,20 @@ from loguru import logger
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-CORE_PAIRS = ["CDK2_ERK2", "AChE_BChE", "BACE1_GSK3B", "AChE_BACE1", "GSK3B_CDK5"]
-SIGNIFICANCE_CRITERIA = {
-    "p_threshold": 0.05,
-    "cliffs_delta_threshold": 0.33,
-    "ci_excludes_zero": True,
-}
-NO_DEGRADATION_THRESHOLD = -0.47
+# SAP-frozen thresholds (pre-registered, do not change).
+P_THRESHOLD = 0.05
+CLIFFS_DELTA_THRESHOLD = 0.33
 SUCCESS_MIN_PAIRS = 3
 MISSING_DATA_THRESHOLD = 0.20
+
+
+def _load_core_pairs(pairs_config: Path) -> list[str]:
+    """Derive core pair list from pairs.yaml (set: 'core')."""
+    from dualdocking.config import load_pairs
+
+    pairs = load_pairs(pairs_config)["pairs"]
+    return [pid for pid, cfg in pairs.items() if cfg.get("set", "core") == "core"]
+
 
 # SAP Section 6: evidence mapping from claim scenarios to supporting artifacts.
 EVIDENCE_MAP: dict[str, dict] = {
@@ -130,7 +135,7 @@ def _check_significance(entry: dict) -> tuple[bool, list[str]]:
     ci_hi = float(entry.get("ci_upper", 0))
     ci_ok = ci_lo > 0 or ci_hi < 0
 
-    derived_sig = p_adj < 0.05 and cliffs_d >= 0.33 and ci_ok
+    derived_sig = p_adj < P_THRESHOLD and cliffs_d >= CLIFFS_DELTA_THRESHOLD and ci_ok
     reported_sig = entry.get("significant", False)
 
     if derived_sig != reported_sig:
@@ -147,12 +152,14 @@ def _check_significance(entry: dict) -> tuple[bool, list[str]]:
 @click.option("--metrics-json", default="report/metrics.json")
 @click.option("--sensitivity-json", default="report/data/threshold_sensitivity.json")
 @click.option("--output-json", default="report/data/claim_audit.json")
+@click.option("--pairs-config", default="configs/pairs.yaml", help="Path to pairs.yaml (relative to project root).")
 @click.option("--strict/--no-strict", default=True, help="Exit 1 on any audit failure.")
 def main(
     stats_json: str,
     metrics_json: str,
     sensitivity_json: str,
     output_json: str,
+    pairs_config: str,
     strict: bool,
 ) -> None:
     """Run claim traceability audit."""
@@ -160,6 +167,7 @@ def main(
     metrics_path = PROJECT_ROOT / metrics_json
     sensitivity_path = PROJECT_ROOT / sensitivity_json
     output_path = PROJECT_ROOT / output_json
+    core_pairs = _load_core_pairs(PROJECT_ROOT / pairs_config)
 
     audit: dict = {
         "checks": [],
@@ -182,7 +190,7 @@ def main(
         # --- Check 2: All core pairs have H1a + H1b ---
         missing_tests: list[str] = [
             f"{pair_id}/{test_id}"
-            for pair_id in CORE_PAIRS
+            for pair_id in core_pairs
             for test_id in ("H1a", "H1b")
             if test_id not in stats.get(pair_id, {})
         ]
@@ -196,7 +204,7 @@ def main(
         sig_issues: list[str] = []
         n_significant = 0
         pair_significant: dict[str, bool] = {}
-        for pair_id in CORE_PAIRS:
+        for pair_id in core_pairs:
             pair_stats = stats.get(pair_id, {})
             pair_sig = False
             for test_id in ("H1a", "H1b"):
@@ -220,7 +228,7 @@ def main(
         # --- Check 4: No-degradation guard (SAP Section 5.2) ---
         degradation = stats.get("_degradation", {})
         degraded_pairs: list[str] = []
-        for pair_id in CORE_PAIRS:
+        for pair_id in core_pairs:
             pair_deg = degradation.get(pair_id, {})
             for check_name, check_data in pair_deg.items():
                 if check_data.get("degraded", False):
@@ -276,11 +284,15 @@ def main(
             else:
                 audit["claim_scenario"] = "6.2_partial_success"
         else:
+            # Exclude degraded pairs from positive-direction count (SAP 5.2)
             n_positive = sum(
                 1
-                for pair_id in CORE_PAIRS
-                if stats.get(pair_id, {}).get("H1a", {}).get("observed_diff", 0) > 0
-                or stats.get(pair_id, {}).get("H1b", {}).get("observed_diff", 0) > 0
+                for pair_id in core_pairs
+                if pair_id not in degraded_pair_ids
+                and (
+                    stats.get(pair_id, {}).get("H1a", {}).get("observed_diff", 0) > 0
+                    or stats.get(pair_id, {}).get("H1b", {}).get("observed_diff", 0) > 0
+                )
             )
             if n_positive >= SUCCESS_MIN_PAIRS:
                 audit["claim_scenario"] = "6.3_weak_evidence"
@@ -289,9 +301,12 @@ def main(
 
         audit["summary"]["n_positive_direction"] = sum(
             1
-            for pair_id in CORE_PAIRS
-            if stats.get(pair_id, {}).get("H1a", {}).get("observed_diff", 0) > 0
-            or stats.get(pair_id, {}).get("H1b", {}).get("observed_diff", 0) > 0
+            for pair_id in core_pairs
+            if pair_id not in degraded_pair_ids
+            and (
+                stats.get(pair_id, {}).get("H1a", {}).get("observed_diff", 0) > 0
+                or stats.get(pair_id, {}).get("H1b", {}).get("observed_diff", 0) > 0
+            )
         )
 
         # 6.4 is an addendum — appended to any scenario when degradation is found

@@ -21,6 +21,19 @@ from dualdocking.run_manifest import (
     update_task,
 )
 
+
+def _detect_gpu_count() -> int:
+    """Detect number of CUDA GPUs; returns 1 if detection fails."""
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return torch.cuda.device_count()
+    except Exception:
+        logger.debug("GPU detection failed, assuming 1 GPU")
+    return 1
+
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -69,13 +82,18 @@ def _prepare_commands(prepare_freed_data: bool, prepare_baseline: bool, baseline
     return [cmd]
 
 
-def _run_cmd(cmd: list[str], log_path: Path) -> None:
-    _log_to_file(log_path, f"[{_ts()}] RUN: {' '.join(cmd)}")
+def _run_cmd(cmd: list[str], log_path: Path, gpu_id: int | None = None) -> None:
+    env = dict(os.environ)
+    if gpu_id is not None:
+        env["FREEDPP_CUDA_DEVICE"] = str(gpu_id)
+        env["BOLTZ_CUDA_DEVICE"] = str(gpu_id)
+    _log_to_file(log_path, f"[{_ts()}] RUN (gpu={gpu_id}): {' '.join(cmd)}")
     result = subprocess.run(  # noqa: S603
         cmd,
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,
+        env=env,
         check=False,
     )
     if result.returncode != 0:
@@ -86,7 +104,9 @@ def _run_cmd(cmd: list[str], log_path: Path) -> None:
         _log_to_file(log_path, f"[{_ts()}] OUT: {result.stdout[-2000:]}")
 
 
-def _run_one(pair: str, mode: str, seed: int, log_path: Path, resume: bool, mf_path: Path | None = None) -> None:
+def _run_one(
+    pair: str, mode: str, seed: int, log_path: Path, resume: bool, mf_path: Path | None = None, gpu_id: int | None = None
+) -> None:
     run_dir = PROJECT_ROOT / "results" / pair / mode / f"seed_{seed}"
     scored = run_dir / "scored_joined.csv"
     generated = run_dir / "generated.csv"
@@ -108,7 +128,7 @@ def _run_one(pair: str, mode: str, seed: int, log_path: Path, resume: bool, mf_p
             update_task(mf_path, task_id=tid, stage="generate", status="running")
         t0 = time.monotonic()
         try:
-            _run_cmd(_command_generate(pair, mode, seed), log_path)
+            _run_cmd(_command_generate(pair, mode, seed), log_path, gpu_id=gpu_id)
         except RuntimeError as exc:
             if mf_path:
                 update_task(mf_path, task_id=tid, stage="generate", status="failed", error=str(exc))
@@ -121,7 +141,7 @@ def _run_one(pair: str, mode: str, seed: int, log_path: Path, resume: bool, mf_p
         update_task(mf_path, task_id=tid, stage="score", status="running")
     t0 = time.monotonic()
     try:
-        _run_cmd(_command_score(pair, mode, seed), log_path)
+        _run_cmd(_command_score(pair, mode, seed), log_path, gpu_id=gpu_id)
     except RuntimeError as exc:
         if mf_path:
             update_task(mf_path, task_id=tid, stage="score", status="failed", error=str(exc))
@@ -132,7 +152,7 @@ def _run_one(pair: str, mode: str, seed: int, log_path: Path, resume: bool, mf_p
 
 @click.command()
 @click.option("--dry-run", is_flag=True, default=False)
-@click.option("--parallel", default=1, type=int)
+@click.option("--parallel", default=0, type=int, help="Parallel tasks. 0 = auto-detect (# GPUs).")
 @click.option("--resume", is_flag=True, default=False)
 @click.option(
     "--pair",
@@ -188,6 +208,10 @@ def main(
     with_post: bool,
     latex_mode: str,
 ) -> None:
+    if parallel <= 0:
+        parallel = _detect_gpu_count()
+        logger.info("Auto-detected {} GPU(s) → --parallel={}", parallel, parallel)
+
     exp_cfg = load_experiment(PROJECT_ROOT / "configs")
     all_pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
     modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
@@ -241,16 +265,21 @@ def main(
     for cmd in prep_cmds:
         _run_cmd(cmd, log_path)
 
+    n_gpus = _detect_gpu_count()
+
     run_failed = False
     if parallel <= 1:
         for pair_id, mode, seed in tasks:
             try:
-                _run_one(pair_id, mode, seed, log_path, resume, mf_path)
+                _run_one(pair_id, mode, seed, log_path, resume, mf_path, gpu_id=0 if n_gpus == 1 else None)
             except RuntimeError:
                 run_failed = True
     else:
         with ThreadPoolExecutor(max_workers=parallel) as executor:
-            futures = [executor.submit(_run_one, pair_id, mode, seed, log_path, resume, mf_path) for pair_id, mode, seed in tasks]
+            futures = []
+            for i, (pair_id, mode, seed) in enumerate(tasks):
+                gid = i % n_gpus if n_gpus > 1 else None
+                futures.append(executor.submit(_run_one, pair_id, mode, seed, log_path, resume, mf_path, gpu_id=gid))
             for future in as_completed(futures):
                 try:
                     future.result()

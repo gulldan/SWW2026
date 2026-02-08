@@ -2,10 +2,26 @@
 
 import json
 
+import yaml
 from click.testing import CliRunner
 
 import scripts.claim_audit as mod
 from scripts.claim_audit import main
+
+_CORE_PAIRS = ["CDK2_ERK2", "AChE_BChE", "BACE1_GSK3B", "AChE_BACE1", "GSK3B_CDK5"]
+
+
+def _make_pairs_yaml() -> dict:
+    """Minimal pairs.yaml with core pairs for testing."""
+    pairs: dict = {}
+    for pid in _CORE_PAIRS:
+        a, b = pid.split("_", 1)
+        pairs[pid] = {
+            "set": "core",
+            "target_a": {"id": a, "organism": "Homo sapiens"},
+            "target_b": {"id": b, "organism": "Homo sapiens"},
+        }
+    return {"pairs": pairs}
 
 
 def _make_stats(
@@ -17,7 +33,7 @@ def _make_stats(
 ) -> dict:
     """Build a stats.json with controllable significance."""
     stats: dict = {}
-    pairs = ["CDK2_ERK2", "AChE_BChE", "BACE1_GSK3B", "AChE_BACE1", "GSK3B_CDK5"]
+    pairs = _CORE_PAIRS
     for i, pair in enumerate(pairs):
         sig = i < n_significant
         for test_id in ("H1a", "H1b"):
@@ -80,6 +96,10 @@ def _make_sensitivity(*, all_pass: bool = True) -> dict:
 def _setup(tmp_path, monkeypatch, *, n_significant=5, sensitivity_pass=True,
            flip_reported=None, degradation=None, missing_rate=0.0):
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    # Write pairs.yaml so _load_core_pairs can read it
+    configs = tmp_path / "configs"
+    configs.mkdir(parents=True, exist_ok=True)
+    (configs / "pairs.yaml").write_text(yaml.dump(_make_pairs_yaml()))
     report = tmp_path / "report"
     report.mkdir(parents=True, exist_ok=True)
     (report / "stats.json").write_text(json.dumps(_make_stats(
@@ -142,6 +162,9 @@ def test_significance_mismatch_detected(tmp_path, monkeypatch):
 def test_missing_stats_strict(tmp_path, monkeypatch):
     """Missing stats.json in strict mode -> exit 1."""
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    configs = tmp_path / "configs"
+    configs.mkdir(parents=True, exist_ok=True)
+    (configs / "pairs.yaml").write_text(yaml.dump(_make_pairs_yaml()))
     (tmp_path / "report").mkdir(parents=True, exist_ok=True)
     (tmp_path / "report" / "data").mkdir(parents=True, exist_ok=True)
     runner = CliRunner()

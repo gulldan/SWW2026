@@ -411,10 +411,10 @@ class TestDualCallSingleA:
         assert reward == pytest.approx(0.0)
 
     def test_error_reward_value_is_capped(self):
-        """error_val=100 → z=4.0 → reward=-4.0 (not -107.5)."""
+        """error_val=100 → z=4.0 → reward=4.0 (not 107.5)."""
         self.vina._scores = [100.0]
         reward = self.vina()
-        assert reward == pytest.approx(-4.0)
+        assert reward == pytest.approx(4.0)
 
     def test_mixed_calls_track_correctly(self):
         """3 calls: 2 normal + 1 error → total=3, invalid_a=1."""
@@ -485,7 +485,7 @@ class TestDualCallDouble:
         self.vina._scores = [-7.5, -6.0]  # A then B
         reward = self.vina()
         # z_a = (-7.5 - (-7.5))/1.0 = 0.0, z_b = (-6.0 - (-6.0))/0.5 = 0.0
-        assert reward == pytest.approx(0.0)  # -max(0, 0) = 0
+        assert reward == pytest.approx(0.0)  # max(0, 0) = 0
         assert self.mod._call_stats["total"] == 1
         assert self.mod._call_stats["invalid_a"] == 0
         assert self.mod._call_stats["invalid_b"] == 0
@@ -494,8 +494,8 @@ class TestDualCallDouble:
         """Target A error, B normal → invalid_a incremented."""
         self.vina._scores = [100.0, -6.0]
         reward = self.vina()
-        # z_a = 4.0 (capped), z_b = 0.0 → -max(4.0, 0.0) = -4.0
-        assert reward == pytest.approx(-4.0)
+        # z_a = 4.0 (capped), z_b = 0.0 → max(4.0, 0.0) = 4.0
+        assert reward == pytest.approx(4.0)
         assert self.mod._call_stats["invalid_a"] == 1
         assert self.mod._call_stats["invalid_b"] == 0
 
@@ -503,8 +503,8 @@ class TestDualCallDouble:
         """Both targets error → both invalids incremented."""
         self.vina._scores = [100.0, 100.0]
         reward = self.vina()
-        # z_a = z_b = 4.0 → -max(4.0, 4.0) = -4.0
-        assert reward == pytest.approx(-4.0)
+        # z_a = z_b = 4.0 → max(4.0, 4.0) = 4.0
+        assert reward == pytest.approx(4.0)
         assert self.mod._call_stats["invalid_a"] == 1
         assert self.mod._call_stats["invalid_b"] == 1
 
@@ -512,8 +512,8 @@ class TestDualCallDouble:
         """Target A normal, B error → only invalid_b incremented."""
         self.vina._scores = [-7.5, 100.0]
         reward = self.vina()
-        # z_a = 0.0, z_b = 4.0 (capped) → -max(0.0, 4.0) = -4.0
-        assert reward == pytest.approx(-4.0)
+        # z_a = 0.0, z_b = 4.0 (capped) → max(0.0, 4.0) = 4.0
+        assert reward == pytest.approx(4.0)
         assert self.mod._call_stats["invalid_a"] == 0
         assert self.mod._call_stats["invalid_b"] == 1
 
@@ -554,7 +554,7 @@ class TestDualCallSingleB:
         """Error B score → invalid_b incremented, capped reward."""
         self.vina._scores = [100.0]  # Only B (primary, error)
         reward = self.vina()
-        assert reward == pytest.approx(-4.0)
+        assert reward == pytest.approx(4.0)
         assert self.mod._call_stats["invalid_b"] == 1
 
     def test_single_b_does_not_score_a(self):
@@ -648,3 +648,60 @@ class TestRunValidInMetadata:
         self.mod._write_reward_metadata()
         data = json.loads(self.mod._METADATA_PATH.read_text())
         assert data["run_valid"] is False
+
+
+# ---------------------------------------------------------------------------
+# Score validation in _parse_result_from_pdbqt
+# ---------------------------------------------------------------------------
+
+
+class TestParseResultValidation:
+    """Verify that _parse_result_from_pdbqt rejects corrupt scores."""
+
+    @pytest.fixture(autouse=True)
+    def _import(self, _patch_module, tmp_path):
+        self.mod = _patch_module
+        self.tmp_path = tmp_path
+
+    def test_normal_score_accepted(self):
+        p = self.tmp_path / "normal.pdbqt"
+        p.write_text("REMARK VINA RESULT:    -7.500      0.000      0.000\n")
+        assert self.mod._parse_result_from_pdbqt(p) == pytest.approx(-7.5)
+
+    def test_positive_in_range_accepted(self):
+        p = self.tmp_path / "positive.pdbqt"
+        p.write_text("REMARK VINA RESULT:     5.000      0.000      0.000\n")
+        assert self.mod._parse_result_from_pdbqt(p) == pytest.approx(5.0)
+
+    def test_extreme_negative_rejected(self):
+        p = self.tmp_path / "corrupt_neg.pdbqt"
+        p.write_text("REMARK VINA RESULT:    -336.073      0.000      0.000\n")
+        assert self.mod._parse_result_from_pdbqt(p) is None
+
+    def test_extreme_positive_rejected(self):
+        p = self.tmp_path / "corrupt_pos.pdbqt"
+        p.write_text("REMARK VINA RESULT:    10725114.000      0.000      0.000\n")
+        assert self.mod._parse_result_from_pdbqt(p) is None
+
+    def test_boundary_min_accepted(self):
+        p = self.tmp_path / "boundary_min.pdbqt"
+        p.write_text("REMARK VINA RESULT:    -20.000      0.000      0.000\n")
+        assert self.mod._parse_result_from_pdbqt(p) == pytest.approx(-20.0)
+
+    def test_boundary_max_accepted(self):
+        p = self.tmp_path / "boundary_max.pdbqt"
+        p.write_text("REMARK VINA RESULT:     10.000      0.000      0.000\n")
+        assert self.mod._parse_result_from_pdbqt(p) == pytest.approx(10.0)
+
+    def test_just_outside_min_rejected(self):
+        p = self.tmp_path / "outside_min.pdbqt"
+        p.write_text("REMARK VINA RESULT:    -20.001      0.000      0.000\n")
+        assert self.mod._parse_result_from_pdbqt(p) is None
+
+    def test_missing_file_returns_none(self):
+        assert self.mod._parse_result_from_pdbqt(self.tmp_path / "nonexistent.pdbqt") is None
+
+    def test_no_result_line_returns_none(self):
+        p = self.tmp_path / "no_result.pdbqt"
+        p.write_text("ATOM      1  C1  UNL     1       0.000   0.000   0.000\n")
+        assert self.mod._parse_result_from_pdbqt(p) is None

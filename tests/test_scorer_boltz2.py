@@ -382,7 +382,7 @@ class TestOldCacheNotReusedE2E:
         new_cache_file = cache_dir / f"tgt.{ctx2[:8]}.json"
 
         # Mock _score_batch_internal to return known scores
-        def fake_score_batch_internal(target_id, smiles_list, sequence, msa_path):
+        def fake_score_batch_internal(target_id, smiles_list, sequence, msa_path, *, device=None):
             return [-7.5] * len(smiles_list)
 
         monkeypatch.setattr(mod, "_score_batch_internal", fake_score_batch_internal)
@@ -401,6 +401,35 @@ class TestOldCacheNotReusedE2E:
         new_key = _cache_key("tgt", "CCO", ctx_hash=ctx2, seq_hash=seq_hash, msa_hash=msa_hash)
         assert new_key in new_data
         assert new_data[new_key] == pytest.approx(-7.5)
+
+
+class TestBoltzEnvDevice:
+    """Test _boltz_env device parameter for multi-GPU support."""
+
+    def test_device_none_no_env(self, monkeypatch):
+        """device=None + no env var → CUDA_VISIBLE_DEVICES not set."""
+        monkeypatch.delenv("BOLTZ_CUDA_DEVICE", raising=False)
+        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+        env = mod._boltz_env(device=None)
+        assert "CUDA_VISIBLE_DEVICES" not in env
+
+    def test_device_none_with_env(self, monkeypatch):
+        """device=None + BOLTZ_CUDA_DEVICE=1 → falls back to env."""
+        monkeypatch.setenv("BOLTZ_CUDA_DEVICE", "1")
+        env = mod._boltz_env(device=None)
+        assert env["CUDA_VISIBLE_DEVICES"] == "1"
+
+    def test_device_explicit_overrides_env(self, monkeypatch):
+        """Explicit device="0" overrides BOLTZ_CUDA_DEVICE=1."""
+        monkeypatch.setenv("BOLTZ_CUDA_DEVICE", "1")
+        env = mod._boltz_env(device="0")
+        assert env["CUDA_VISIBLE_DEVICES"] == "0"
+
+    def test_device_explicit_no_env(self, monkeypatch):
+        """Explicit device="1" without env var."""
+        monkeypatch.delenv("BOLTZ_CUDA_DEVICE", raising=False)
+        env = mod._boltz_env(device="1")
+        assert env["CUDA_VISIBLE_DEVICES"] == "1"
 
 
 class TestGetScoringContextInfo:

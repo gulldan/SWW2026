@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -22,6 +23,43 @@ from tqdm import tqdm
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _detect_gpu_count() -> int:
+    """Detect number of CUDA GPUs; returns 1 if detection fails."""
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return torch.cuda.device_count()
+    except Exception:
+        logger.debug("GPU detection failed for parallel scoring, assuming 1 GPU")
+    return 1
+
+
+def _score_one_target(
+    target_id: str,
+    smiles_list: list[str],
+    scores_path: Path,
+    force: bool,
+    label: str,
+    *,
+    device: str | None = None,
+) -> tuple[str, np.ndarray]:
+    """Score molecules against one target, with checkpoint support."""
+    from dualdocking.scorer_boltz2 import score_batch
+
+    if not force and scores_path.exists():
+        logger.info("Чекпоинт: скоры мишени {} уже существуют ({}), пропускаем", target_id, scores_path)
+        saved = pd.read_csv(scores_path)
+        return label, saved["score"].to_numpy()
+
+    logger.info("Скоринг {} молекул по мишени {} (device={})", len(smiles_list), target_id, device)
+    scores = score_batch(target_id, smiles_list, device=device)
+
+    pd.DataFrame({"smiles": smiles_list, "score": scores}).to_csv(scores_path, index=False)
+    logger.info("Скоры мишени {} сохранены: {}", target_id, scores_path)
+    return label, scores
+
+
 @click.command()
 @click.option("--pair", required=True, help="ID пары из configs/pairs.yaml")
 @click.option("--mode", type=click.Choice(["single_a", "single_b", "double"]), required=True)
@@ -30,11 +68,27 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 @click.option("--experiment-config", default="configs/experiment.yaml", help="Experiment config for objectives")
 @click.option("--force", is_flag=True, default=False, help="Пересчитать даже если scores уже есть")
 @click.option("--prune-cache", is_flag=True, default=False, help="Remove stale cache files before scoring")
-def main(pair: str, mode: str, seed: int, config: str, experiment_config: str, force: bool, prune_cache: bool) -> None:
+@click.option(
+    "--parallel-scoring",
+    type=click.Choice(["auto", "on", "off"]),
+    default="auto",
+    show_default=True,
+    help="Parallel target scoring: 'auto' enables when >=2 GPUs detected, 'on'/'off' force.",
+)
+def main(
+    pair: str,
+    mode: str,
+    seed: int,
+    config: str,
+    experiment_config: str,
+    force: bool,
+    prune_cache: bool,
+    parallel_scoring: str,
+) -> None:
     """Оценить молекулы по обеим мишеням."""
     from dualdocking.config import load_experiment, load_pairs
     from dualdocking.objectives import compute_combined, parse_objectives_config
-    from dualdocking.scorer_boltz2 import get_scoring_context_info, prune_stale_cache, score_batch
+    from dualdocking.scorer_boltz2 import get_scoring_context_info, prune_stale_cache
 
     if prune_cache:
         n = prune_stale_cache()
@@ -62,7 +116,7 @@ def main(pair: str, mode: str, seed: int, config: str, experiment_config: str, f
     scores_a_path = result_dir / "scores_A.csv"
     scores_b_path = result_dir / "scores_B.csv"
 
-    # --- Скоринг мишени A (с чекпоинтом) ---
+    # --- Скоринг мишеней (адаптивно: параллельно на 2+ GPU, последовательно на 1 GPU) ---
     targets = [
         (target_a_id, scores_a_path, "A"),
         (target_b_id, scores_b_path, "B"),
@@ -70,23 +124,47 @@ def main(pair: str, mode: str, seed: int, config: str, experiment_config: str, f
 
     all_scores: dict[str, np.ndarray] = {}
 
-    progress = tqdm(targets, desc=f"Скоринг [{pair}/{mode}]", unit="target")
-    for target_id, scores_path, label in progress:
-        progress.set_postfix(target=target_id)
+    # Determine whether to use parallel scoring
+    n_gpus = _detect_gpu_count()
+    use_parallel = parallel_scoring == "on" or (
+        parallel_scoring == "auto" and n_gpus >= 2 and os.getenv("BOLTZ_CUDA_DEVICE") is None
+    )
 
-        if not force and scores_path.exists():
-            logger.info("Чекпоинт: скоры мишени {} уже существуют ({}), пропускаем", target_id, scores_path)
-            saved = pd.read_csv(scores_path)
-            all_scores[label] = saved["score"].to_numpy()
-            continue
+    if use_parallel:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        logger.info("Скоринг {} молекул по мишени {}", len(smiles_list), target_id)
-        scores = score_batch(target_id, smiles_list)
-        all_scores[label] = scores
-
-        # Сохранить промежуточный результат сразу (чекпоинт)
-        pd.DataFrame({"smiles": smiles_list, "score": scores}).to_csv(scores_path, index=False)
-        logger.info("Скоры мишени {} сохранены: {}", target_id, scores_path)
+        logger.info("Параллельный скоринг двух мишеней на {} GPU", n_gpus)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = {}
+            for i, (target_id, scores_path, label) in enumerate(targets):
+                gpu_id = str(i % n_gpus)
+                f = pool.submit(
+                    _score_one_target,
+                    target_id,
+                    smiles_list,
+                    scores_path,
+                    force,
+                    label,
+                    device=gpu_id,
+                )
+                futures[f] = label
+            for f in as_completed(futures):
+                label, scores = f.result()
+                all_scores[label] = scores
+    else:
+        if parallel_scoring == "auto" and n_gpus < 2:
+            logger.info("Один GPU обнаружен — последовательный скоринг")
+        progress = tqdm(targets, desc=f"Скоринг [{pair}/{mode}]", unit="target")
+        for target_id, scores_path, label in progress:
+            progress.set_postfix(target=target_id)
+            _, scores = _score_one_target(
+                target_id,
+                smiles_list,
+                scores_path,
+                force,
+                label,
+            )
+            all_scores[label] = scores
 
     scores_a = all_scores["A"]
     scores_b = all_scores["B"]

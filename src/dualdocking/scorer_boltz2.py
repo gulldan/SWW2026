@@ -31,7 +31,29 @@ MSA_CACHE_DIR = CACHE_DIR / "boltz_msa"
 BOLTZ_TIMEOUT = 600  # секунд на одну молекулу
 BOLTZ_BATCH_TIMEOUT = 3600  # секунд на батч
 MAX_LIGAND_ATOMS = 128
-BATCH_SIZE = 8  # молекул за один вызов boltz predict
+_DEFAULT_BATCH_SIZE = 8  # молекул за один вызов boltz predict
+
+
+def _auto_batch_size() -> int:
+    """Pick batch size based on GPU VRAM; override via BOLTZ_BATCH_SIZE env var."""
+    env = os.getenv("BOLTZ_BATCH_SIZE")
+    if env is not None:
+        return int(env)
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            vram_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
+            if vram_gb >= 48:  # H100 80 GB / A100 40–80 GB
+                return 32
+            if vram_gb >= 20:  # RTX 4090 24 GB / A5000 24 GB
+                return 16
+    except Exception:
+        logger.debug("GPU detection failed for batch size, using default={}", _DEFAULT_BATCH_SIZE)
+    return _DEFAULT_BATCH_SIZE
+
+
+BATCH_SIZE = _auto_batch_size()
 
 # Boltz CLI параметры
 _BOLTZ_CLI_ARGS_BASE: list[str] = [
@@ -337,7 +359,24 @@ def _write_boltz_yaml(
     path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
 
 
-def _run_boltz_predict(yaml_path: Path, out_dir: Path) -> subprocess.CompletedProcess[str]:
+def _boltz_env(device: str | None = None) -> dict[str, str]:
+    """Build env dict for boltz subprocess, applying GPU pinning if configured.
+
+    Parameters
+    ----------
+    device:
+        Explicit CUDA device index (e.g. ``"0"``, ``"1"``).  When *None*,
+        falls back to the ``BOLTZ_CUDA_DEVICE`` environment variable.
+    """
+    env = dict(os.environ)
+    cuda_device = device if device is not None else os.getenv("BOLTZ_CUDA_DEVICE")
+    if cuda_device is not None:
+        env["CUDA_VISIBLE_DEVICES"] = cuda_device
+        logger.debug("Boltz GPU pinned to CUDA_VISIBLE_DEVICES={}", cuda_device)
+    return env
+
+
+def _run_boltz_predict(yaml_path: Path, out_dir: Path, *, device: str | None = None) -> subprocess.CompletedProcess[str]:
     """Запуск boltz predict через subprocess."""
     cmd = [
         "uv",
@@ -359,6 +398,7 @@ def _run_boltz_predict(yaml_path: Path, out_dir: Path) -> subprocess.CompletedPr
         text=True,
         timeout=BOLTZ_TIMEOUT,
         cwd=str(PROJECT_ROOT),
+        env=_boltz_env(device=device),
         check=False,
     )
     return result
@@ -381,7 +421,11 @@ def _parse_affinity(out_dir: Path, stem: str) -> float:
 
 
 def _run_boltz_predict_dir(
-    input_dir: Path, out_dir: Path, timeout: int = BOLTZ_BATCH_TIMEOUT
+    input_dir: Path,
+    out_dir: Path,
+    timeout: int = BOLTZ_BATCH_TIMEOUT,
+    *,
+    device: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Запуск boltz predict на директории YAML файлов."""
     cmd = [
@@ -404,6 +448,7 @@ def _run_boltz_predict_dir(
         text=True,
         timeout=timeout,
         cwd=str(PROJECT_ROOT),
+        env=_boltz_env(device=device),
         check=False,
     )
     return result
@@ -414,6 +459,8 @@ def _score_batch_internal(
     smiles_list: list[str],
     sequence: str,
     msa_path: Path,
+    *,
+    device: str | None = None,
 ) -> list[float]:
     """Скорить батч молекул за один вызов boltz predict.
 
@@ -451,7 +498,7 @@ def _score_batch_internal(
         # Один вызов boltz predict на директорию
         timeout = BOLTZ_BATCH_TIMEOUT
         try:
-            result = _run_boltz_predict_dir(input_dir, out_dir, timeout=timeout)
+            result = _run_boltz_predict_dir(input_dir, out_dir, timeout=timeout, device=device)
         except subprocess.TimeoutExpired:
             logger.error("Boltz batch таймаут ({} сек) для {} молекул", timeout, len(valid_indices))
             return scores
@@ -553,6 +600,7 @@ def score_batch(
     target_id: str,
     smiles_list: list[str],
     *,
+    device: str | None = None,
     use_cache: bool = True,
     batch_size: int = BATCH_SIZE,
 ) -> NDArray[np.float64]:
@@ -630,7 +678,7 @@ def score_batch(
         batch_smiles = [smi for _, smi in batch]
 
         # Скорим батч за один вызов boltz predict
-        batch_scores = _score_batch_internal(target_id, batch_smiles, sequence, msa_path)
+        batch_scores = _score_batch_internal(target_id, batch_smiles, sequence, msa_path, device=device)
 
         # Записываем результаты
         for i, (idx, smi) in enumerate(batch):

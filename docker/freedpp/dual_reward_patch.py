@@ -1,8 +1,9 @@
 """Dual-target reward patch for FREED++.
 
-This patch does two things:
+This patch does three things:
 1) replaces ligand preparation backend (OpenBabel) with RDKit+Meeko,
-2) applies z-score based rewards for single_a / single_b / double modes.
+2) applies z-score based rewards for single_a / single_b / double modes,
+3) uses UniDock GPU batch docking (``--gpu_batch``) instead of per-ligand CPU calls.
 
 Box parameters for the second receptor are read from ``/workspace/dual_config.json``::
 
@@ -18,9 +19,10 @@ import os
 import re
 import threading
 from contextlib import suppress
+from multiprocessing import Pool as MPPool
 from pathlib import Path
 from subprocess import TimeoutExpired, run
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,171 @@ _MAX_Z_WARNINGS = 5
 _z_warn_count = {"a": 0, "b": 0}
 _err_warn_count = {"a": 0, "b": 0}
 _RESULT_PATTERN = re.compile(r"RESULT[:\s]+(-?\d+(?:\.\d+)?)", re.IGNORECASE)
+
+# ---------------------------------------------------------------------------
+# GPU batch docking (Phase 2 optimisation)
+# ---------------------------------------------------------------------------
+# When enabled, CacheAndPool for DockingScore pre-computes all docking scores
+# via a single ``unidock --gpu_batch`` call instead of N×num_sub_proc CPU calls.
+_GPU_BATCH_ENABLED = os.environ.get("GPU_BATCH_DOCK", "1") != "0"
+_gpu_dock_cache: dict[tuple[str, str], float] = {}  # (receptor_path, smiles) → score
+_gpu_batch_log_count = 0
+
+
+def _prepare_pdbqt_worker(args: tuple[str, int, str]) -> bool:
+    """Worker for parallel ligand preparation via multiprocessing.Pool.map."""
+    smiles, seed, outpath = args
+    return _prepare_ligand_rdkit(smiles, outpath, seed)
+
+
+def _run_gpu_batch(
+    vina_program: str,
+    receptor: str,
+    center: list[float],
+    size: list[float],
+    pdbqt_paths: list[str],
+    output_dir: str,
+    exhaustiveness: int,
+    num_modes: int,
+    seed: int,
+    timeout: int = 600,
+) -> bool:
+    """Run UniDock --gpu_batch for a list of prepared PDBQT files.
+
+    Returns True on success, False on failure.
+    """
+    cmd = [
+        vina_program,
+        "--receptor",
+        receptor,
+        "--gpu_batch",
+        *pdbqt_paths,
+        "--dir",
+        output_dir,
+        "--center_x",
+        str(center[0]),
+        "--center_y",
+        str(center[1]),
+        "--center_z",
+        str(center[2]),
+        "--size_x",
+        str(size[0]),
+        "--size_y",
+        str(size[1]),
+        "--size_z",
+        str(size[2]),
+        "--exhaustiveness",
+        str(exhaustiveness),
+        "--num_modes",
+        str(num_modes),
+        "--seed",
+        str(seed),
+    ]
+    try:
+        result = run(  # noqa: S603
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+        if result.returncode != 0:
+            logger.warning("gpu_batch_dock: unidock rc=%s: %s", result.returncode, (result.stderr or "")[-500:])
+            return False
+        return True
+    except TimeoutExpired:
+        logger.warning("gpu_batch_dock: timed out after %ss", timeout)
+        return False
+
+
+def _precompute_gpu_batch_for_receptor(
+    unseen_smiles: list[str],
+    config: dict[str, Any],
+    receptor: str,
+    center: Any,
+    size: Any,
+) -> None:
+    """Pre-compute docking scores for *unseen_smiles* against one receptor.
+
+    Results are stored in ``_gpu_dock_cache[(receptor, smi)]``.
+    """
+    global _gpu_batch_log_count
+    error_val = config["error_val"]
+    seed = config["seed"]
+
+    center_f = _coords(center) if isinstance(center, str) else [float(x) for x in center]
+    size_f = _coords(size) if isinstance(size, str) else [float(x) for x in size]
+
+    with TemporaryDirectory(prefix="gpu_batch_") as tmpdir:
+        lig_dir = Path(tmpdir) / "ligands"
+        out_dir = Path(tmpdir) / "output"
+        lig_dir.mkdir()
+        out_dir.mkdir()
+
+        # 1 conformer per SMILES (n_conf uses identical seed → identical result)
+        tasks = []
+        for i, smi in enumerate(unseen_smiles):
+            fname = f"lig_{i:06d}.pdbqt"
+            tasks.append((smi, seed, str(lig_dir / fname)))
+
+        # CPU-parallel ligand preparation (RDKit + Meeko)
+        n_workers = min(len(tasks), os.cpu_count() or 8)
+        with MPPool(processes=n_workers) as pool:
+            prep_ok = pool.map(_prepare_pdbqt_worker, tasks)
+
+        valid_items = [(i, tasks[i]) for i in range(len(tasks)) if prep_ok[i]]
+        valid_paths = [t[2] for _, t in valid_items]
+
+        # Mark failed preps as error_val
+        for i in range(len(tasks)):
+            if not prep_ok[i]:
+                _gpu_dock_cache[(receptor, tasks[i][0])] = error_val
+
+        if not valid_paths:
+            return
+
+        ok = _run_gpu_batch(
+            config["vina_program"],
+            receptor,
+            center_f,
+            size_f,
+            valid_paths,
+            str(out_dir),
+            config["exhaustiveness"],
+            config["num_modes"],
+            seed,
+        )
+
+        if ok:
+            n_cached = 0
+            for _, (smi, _, fpath) in valid_items:
+                stem = Path(fpath).stem
+                out_path = out_dir / f"{stem}_out.pdbqt"
+                parsed = _parse_result_from_pdbqt(out_path)
+                if parsed is not None:
+                    _gpu_dock_cache[(receptor, smi)] = parsed
+                    n_cached += 1
+                # Not cached: _rdkit_docking falls through to CPU
+            n_corrupt = len(valid_items) - n_cached
+            if _gpu_batch_log_count < 5:
+                _gpu_batch_log_count += 1
+                logger.info(
+                    "gpu_batch_dock: %d/%d ligands scored (GPU), %d corrupt → CPU fallback, receptor %s",
+                    n_cached,
+                    len(tasks),
+                    n_corrupt,
+                    Path(receptor).stem,
+                )
+            if n_corrupt > 0:
+                logger.warning(
+                    "gpu_batch_dock: %d/%d corrupt scores for %s",
+                    n_corrupt,
+                    len(valid_items),
+                    Path(receptor).stem,
+                )
+        else:
+            logger.warning("gpu_batch_dock: batch failed for %s, falling back to per-ligand CPU", Path(receptor).stem)
+
 
 # ---------------------------------------------------------------------------
 # Invalid-docking exclusion (ENG-01 / KVA-255)
@@ -179,6 +346,9 @@ def _prepare_ligand_rdkit(smiles: str, out_pdbqt: str, seed: int) -> bool:
     return True
 
 
+_SCORE_MIN, _SCORE_MAX = -20.0, 10.0
+
+
 def _parse_result_from_pdbqt(path: Path) -> float | None:
     try:
         with path.open(encoding="utf-8") as f:
@@ -187,7 +357,17 @@ def _parse_result_from_pdbqt(path: Path) -> float | None:
                     continue
                 match = _RESULT_PATTERN.search(line)
                 if match:
-                    return float(match.group(1))
+                    score = float(match.group(1))
+                    if not (_SCORE_MIN <= score <= _SCORE_MAX):
+                        logger.warning(
+                            "corrupt docking score %.3f outside [%.0f, %.0f]: %s",
+                            score,
+                            _SCORE_MIN,
+                            _SCORE_MAX,
+                            path,
+                        )
+                        return None
+                    return score
     except OSError:
         return None
     return None
@@ -265,6 +445,11 @@ def _apply_dual_patch() -> None:
         **kwargs: Any,  # noqa: ARG001
     ) -> float:
         _set_last_docking_timed_out(value=False)
+
+        # GPU batch cache lookup (pre-computed by _precompute_gpu_batch_for_receptor)
+        cache_key = (receptor, smile)
+        if cache_key in _gpu_dock_cache:
+            return _gpu_dock_cache[cache_key]
 
         center = _coords(box_center)
         size = _coords(box_size)
@@ -349,7 +534,7 @@ def _apply_dual_patch() -> None:
                 _warn_error_value("b", score_b, error_val_b)
             else:
                 _warn_large_z("b", z_b)
-            return -z_b
+            return z_b
 
         # single_a / double: A is primary receptor
         score_a = _original_call(self, *args, **kwargs)
@@ -366,7 +551,7 @@ def _apply_dual_patch() -> None:
             _warn_large_z("a", z_a)
 
         if reward_mode == "single_a":
-            return -z_a
+            return z_a
 
         # double mode: also score B via config swap
         if dual_cfg is None:
@@ -405,10 +590,70 @@ def _apply_dual_patch() -> None:
         else:
             _warn_large_z("b", z_b)
 
-        return -max(z_a, z_b)
+        return max(z_a, z_b)
 
     DockingVina.__call__ = _dual_call
     atexit.register(_write_reward_metadata)
+
+    # -----------------------------------------------------------------------
+    # GPU batch: patch CacheAndPool to pre-compute docking scores via
+    # a single ``unidock --gpu_batch`` call per epoch.
+    # -----------------------------------------------------------------------
+    if _GPU_BATCH_ENABLED:
+        try:
+            from ffreed.utils import CacheAndPool
+        except (ImportError, AttributeError):
+            logger.debug("dual_reward_patch: ffreed.utils.CacheAndPool not available, GPU batch disabled")
+            CacheAndPool = None  # type: ignore[assignment,misc]  # noqa: N806
+
+        if CacheAndPool is None:
+            logger.info("dual_reward_patch: GPU batch docking DISABLED (CacheAndPool unavailable)")
+            return
+
+        _original_cap_call = CacheAndPool.__call__
+
+        def _gpu_aware_cap_call(self: Any, args: list[str]) -> list[Any]:
+            unseen = list(set(args).difference(self.results))
+            if unseen and hasattr(self.func, "property") and isinstance(self.func.property, DockingVina):
+                config = self.func.property.config
+                # Pre-compute for primary receptor
+                _precompute_gpu_batch_for_receptor(
+                    unseen,
+                    config,
+                    config["receptor"],
+                    config["box_center"],
+                    config["box_size"],
+                )
+                # Pre-compute for secondary receptor (double mode)
+                if reward_mode == "double" and dual_cfg:
+                    _precompute_gpu_batch_for_receptor(
+                        unseen,
+                        config,
+                        dual_cfg["receptor_b"],
+                        dual_cfg["center_b"],
+                        dual_cfg["size_b"],
+                    )
+                # Process sequentially — GPU batch already computed, each
+                # _rdkit_docking call is a dict lookup (instant).
+                values = list(map(self.func, unseen))
+                new_results = dict(zip(unseen, values))
+                self.results = {**self.results, **new_results}
+
+                # Clean cache entries to prevent memory growth
+                for smi in unseen:
+                    _gpu_dock_cache.pop((config["receptor"], smi), None)
+                    if dual_cfg:
+                        _gpu_dock_cache.pop((dual_cfg["receptor_b"], smi), None)
+
+                return [self.results[arg] for arg in args]
+
+            return _original_cap_call(self, args)
+
+        CacheAndPool.__call__ = _gpu_aware_cap_call
+        logger.info("dual_reward_patch: GPU batch docking ENABLED (CacheAndPool patched)")
+    else:
+        logger.info("dual_reward_patch: GPU batch docking DISABLED (GPU_BATCH_DOCK=0)")
+
     logger.info(
         "dual_reward_patch: patched DockingVina (reward_mode=%s, ligand_backend=rdkit_meeko, invalid_z_penalty=%.1f)",
         reward_mode,
