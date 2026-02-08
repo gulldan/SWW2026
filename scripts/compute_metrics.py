@@ -19,6 +19,8 @@ from loguru import logger
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+_N_BOOTSTRAP = 10_000
+
 
 def _sem(values: list[float]) -> float:
     arr = np.asarray(values, dtype=float)
@@ -258,7 +260,9 @@ def main(
             if not group_a or not group_b:
                 continue
 
-            result: BootstrapResult = hierarchical_bootstrap_test(group_a, group_b, metric_fn, n_bootstrap=10000, rng_seed=42)
+            result: BootstrapResult = hierarchical_bootstrap_test(
+                group_a, group_b, metric_fn, n_bootstrap=_N_BOOTSTRAP, rng_seed=42,
+            )
             # Per-seed metric values for effect sizes
             values_a = [metric_fn(df) for df in group_a]
             values_b = [metric_fn(df) for df in group_b]

@@ -141,7 +141,7 @@ line-ending = "auto"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
-addopts = "-v"
+addopts = "-v -n auto"
 pythonpath = [".", "src"]
 markers = [
     "integration: marks tests as integration tests",

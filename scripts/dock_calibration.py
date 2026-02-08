@@ -497,6 +497,35 @@ def _dock_batch_unidock(  # noqa: PLR0913
     return scores
 
 
+def _prep_one_ligand(
+    runner: DockerRunner | None,
+    smi: str,
+    sdf_path: Path,
+    pdbqt_path: Path,
+    timeout: int,
+    seed: int,
+    overwrite: bool,
+) -> tuple[str, Path, bool, str]:
+    """Prepare one ligand PDBQT file. Thread-safe."""
+    ok, err = _ensure_ligand_pdbqt(
+        runner,
+        smi,
+        sdf_path,
+        pdbqt_path,
+        timeout=timeout,
+        seed=seed,
+        overwrite=overwrite,
+    )
+    return smi, pdbqt_path, ok, err
+
+
+def _auto_prep_workers() -> int:
+    """Pick number of parallel ligand prep workers based on CPU count."""
+    import os as _os
+
+    return min(_os.cpu_count() or 1, 8)
+
+
 def _parse_vec(vec_str: str) -> tuple[float, float, float]:
     parts = [float(x) for x in vec_str.split(",")]
     if len(parts) != 3:
@@ -527,7 +556,14 @@ def _docking_version(runner: DockerRunner | None, binary: str) -> str:
 @click.option("--docking-binary", default=None, help="Override docking binary")
 @click.option("--overwrite/--skip-existing", default=False)
 @click.option("--dry-run", is_flag=True)
-def main(  # noqa: PLR0913
+@click.option(
+    "--prep-workers",
+    default=0,
+    type=int,
+    show_default=True,
+    help="Parallel ligand prep workers. 0=auto (min(cpu_count, 8)), 1=sequential.",
+)
+def main(  # noqa: PLR0913, PLR0915
     calibration_config: str,
     calibration_set: str | None,
     scores_dir: str,
@@ -541,6 +577,7 @@ def main(  # noqa: PLR0913
     docking_binary: str | None,
     overwrite: bool,
     dry_run: bool,
+    prep_workers: int,
 ) -> None:
     """Dock calibration SMILES set against targets to build score distributions."""
     import yaml
@@ -627,35 +664,94 @@ def main(  # noqa: PLR0913
         if runner:
             logger.info("Using docker image: {}", docker_image)
 
-        # Prepare ligands once
+        # Prepare ligands (parallel when workers > 1)
         ligand_paths: list[Path] = []
         failed_smiles: list[str] = []
-        for smi in tqdm(candidates, desc="Ligands", unit="ligand"):
-            if len(smiles) >= n:
-                break
-            ligand_path = ligands_dir / f"ligand_{len(smiles):05d}.pdbqt"
-            sdf_path = ligands_dir / f"ligand_{len(smiles):05d}.sdf"
-            if dry_run:
+
+        actual_workers = 1 if dry_run else (prep_workers if prep_workers > 0 else _auto_prep_workers())
+
+        if actual_workers > 1 and not dry_run:
+            from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+
+            # Pre-assign indices; submit extra candidates to cover failures
+            max_tasks = min(len(candidates), int(n * 1.2) + 50)
+            # ProcessPoolExecutor for local RDKit (CPU-bound, GIL-releasing C++);
+            # ThreadPoolExecutor for Docker mode (subprocess I/O, runner not picklable).
+            pool_class = ProcessPoolExecutor if runner is None else ThreadPoolExecutor
+            logger.info(
+                "Parallel ligand prep: {} candidates on {} {} workers (need {})",
+                max_tasks,
+                actual_workers,
+                "process" if runner is None else "thread",
+                n,
+            )
+
+            future_to_idx: dict = {}
+            with pool_class(max_workers=actual_workers) as pool:
+                for task_idx in range(max_tasks):
+                    smi = candidates[task_idx]
+                    sdf_p = ligands_dir / f"ligand_{task_idx:05d}.sdf"
+                    pdbqt_p = ligands_dir / f"ligand_{task_idx:05d}.pdbqt"
+                    f = pool.submit(
+                        _prep_one_ligand,
+                        runner,
+                        smi,
+                        sdf_p,
+                        pdbqt_p,
+                        params.timeout_seconds,
+                        seed + task_idx,
+                        overwrite,
+                    )
+                    future_to_idx[f] = task_idx
+
+                # Collect results with progress bar
+                results: list[tuple[int, str, Path, bool, str]] = []
+                for f in tqdm(as_completed(future_to_idx), total=len(future_to_idx), desc="Ligands", unit="ligand"):
+                    idx = future_to_idx[f]
+                    smi_r, path_r, ok_r, err_r = f.result()
+                    results.append((idx, smi_r, path_r, ok_r, err_r))
+
+            # Sort by original candidate order for reproducibility
+            results.sort(key=lambda r: r[0])
+            for _idx, smi_r, path_r, ok_r, err_r in results:
+                if len(smiles) >= n:
+                    break
+                if ok_r:
+                    smiles.append(smi_r)
+                    ligand_paths.append(path_r)
+                else:
+                    failed_smiles.append(smi_r)
+                    logger.warning("Ligand prep failed: {} ({})", smi_r, err_r or "no error text")
+                    if use_existing_manifest:
+                        raise RuntimeError("Ligand prep failed for existing manifest; rerun with --overwrite")
+        else:
+            # Sequential (original path — also used for dry_run)
+            for smi in tqdm(candidates, desc="Ligands", unit="ligand"):
+                if len(smiles) >= n:
+                    break
+                ligand_path = ligands_dir / f"ligand_{len(smiles):05d}.pdbqt"
+                sdf_path = ligands_dir / f"ligand_{len(smiles):05d}.sdf"
+                if dry_run:
+                    smiles.append(smi)
+                    ligand_paths.append(ligand_path)
+                    continue
+                ok, err = _ensure_ligand_pdbqt(
+                    runner,
+                    smi,
+                    sdf_path,
+                    ligand_path,
+                    timeout=params.timeout_seconds,
+                    seed=seed + len(smiles),
+                    overwrite=overwrite,
+                )
+                if not ok:
+                    failed_smiles.append(smi)
+                    logger.warning("Ligand prep failed: {} ({})", smi, err or "no error text")
+                    if use_existing_manifest:
+                        raise RuntimeError("Ligand prep failed for existing manifest; rerun with --overwrite")
+                    continue
                 smiles.append(smi)
                 ligand_paths.append(ligand_path)
-                continue
-            ok, err = _ensure_ligand_pdbqt(
-                runner,
-                smi,
-                sdf_path,
-                ligand_path,
-                timeout=params.timeout_seconds,
-                seed=seed + len(smiles),
-                overwrite=overwrite,
-            )
-            if not ok:
-                failed_smiles.append(smi)
-                logger.warning("Ligand prep failed: {} ({})", smi, err or "no error text")
-                if use_existing_manifest:
-                    raise RuntimeError("Ligand prep failed for existing manifest; rerun with --overwrite")
-                continue
-            smiles.append(smi)
-            ligand_paths.append(ligand_path)
 
         if len(smiles) < n:
             raise RuntimeError(f"Only {len(smiles)} ligands prepared, expected {n}")

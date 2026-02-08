@@ -49,7 +49,7 @@ def _make_fake_docking_vina():
     class FakeDockingVina:
         def __init__(self):
             self.config = {
-                "error_val": 100.0,
+                "error_val": 99.9,
                 "receptor": "/workspace/receptor.pdbqt",
                 "box_center": [0.0, 0.0, 0.0],
                 "box_size": [20.0, 20.0, 20.0],
@@ -65,7 +65,7 @@ def _make_fake_docking_vina():
 
         @staticmethod
         def docking(**kwargs):
-            return kwargs.get("error_val", 100.0)
+            return kwargs.get("error_val", 99.9)
 
     return FakeDockingVina
 
@@ -201,43 +201,71 @@ class TestCappedZscore:
 
     def test_normal_score(self):
         """Normal docking score gets standard z-score."""
-        z, invalid = self.fn(score=-7.5, error_val=100.0, mean=-7.5, std=1.0, penalty_cap=4.0)
+        z, invalid = self.fn(score=-7.5, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
         assert z == pytest.approx(0.0)
         assert invalid is False
 
     def test_normal_negative_score(self):
-        z, invalid = self.fn(score=-8.5, error_val=100.0, mean=-7.5, std=1.0, penalty_cap=4.0)
+        z, invalid = self.fn(score=-8.5, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
         assert z == pytest.approx(-1.0)
         assert invalid is False
 
     def test_error_val_returns_cap(self):
         """Error-val score returns capped penalty, not raw z-score."""
-        z, invalid = self.fn(score=100.0, error_val=100.0, mean=-7.5, std=1.0, penalty_cap=4.0)
+        z, invalid = self.fn(score=99.9, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
         assert z == 4.0
         assert invalid is True
 
     def test_raw_zscore_of_error_would_be_huge(self):
-        """Verifies the problem: raw z of error_val would be ~107.5."""
-        raw_z = (100.0 - (-7.5)) / 1.0
-        assert raw_z == pytest.approx(107.5)
+        """Verifies the problem: raw z of error_val would be ~107.4."""
+        raw_z = (99.9 - (-7.5)) / 1.0
+        assert raw_z == pytest.approx(107.4)
         # But capped_zscore returns 4.0 instead
-        z, _ = self.fn(score=100.0, error_val=100.0, mean=-7.5, std=1.0, penalty_cap=4.0)
+        z, _ = self.fn(score=99.9, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
         assert z == 4.0
 
     def test_custom_penalty_cap(self):
-        z, invalid = self.fn(score=100.0, error_val=100.0, mean=-7.5, std=1.0, penalty_cap=6.0)
+        z, invalid = self.fn(score=99.9, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=6.0)
         assert z == 6.0
         assert invalid is True
 
     def test_std_zero_raises(self):
         with pytest.raises(ZeroDivisionError, match="std=0"):
-            self.fn(score=-5.0, error_val=100.0, mean=-7.5, std=0.0, penalty_cap=4.0)
+            self.fn(score=-5.0, error_val=99.9, mean=-7.5, std=0.0, penalty_cap=4.0)
 
     def test_std_zero_not_checked_for_error_val(self):
         """When score == error_val, std=0 is never reached."""
-        z, invalid = self.fn(score=100.0, error_val=100.0, mean=-7.5, std=0.0, penalty_cap=4.0)
+        z, invalid = self.fn(score=99.9, error_val=99.9, mean=-7.5, std=0.0, penalty_cap=4.0)
         assert z == 4.0
         assert invalid is True
+
+    def test_extreme_negative_z_clamped(self):
+        """Very good binding score gets z clamped to -MAX_Z_ABS."""
+        # raw z = (-100.0 - (-7.5)) / 1.0 = -92.5
+        z, invalid = self.fn(score=-100.0, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
+        assert z == pytest.approx(-10.0)
+        assert invalid is False
+
+    def test_extreme_positive_z_clamped(self):
+        """Very bad score gets z clamped to +MAX_Z_ABS."""
+        # raw z = (50.0 - (-7.5)) / 1.0 = 57.5
+        z, invalid = self.fn(score=50.0, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
+        assert z == pytest.approx(10.0)
+        assert invalid is False
+
+    def test_z_at_boundary_not_clamped(self):
+        """Score producing exactly z=-10 is not altered."""
+        # score = mean + z*std = -7.5 + (-10.0)*1.0 = -17.5
+        z, invalid = self.fn(score=-17.5, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
+        assert z == pytest.approx(-10.0)
+        assert invalid is False
+
+    def test_within_bounds_not_clamped(self):
+        """Moderate z-scores pass through unchanged."""
+        # raw z = (-12.5 - (-7.5)) / 1.0 = -5.0
+        z, invalid = self.fn(score=-12.5, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
+        assert z == pytest.approx(-5.0)
+        assert invalid is False
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +427,7 @@ class TestDualCallSingleA:
         assert self.mod._call_stats["invalid_a"] == 0
 
     def test_error_score_increments_invalid_a(self):
-        self.vina._scores = [100.0]  # error_val
+        self.vina._scores = [99.9]  # error_val
         self.vina()
         assert self.mod._call_stats["total"] == 1
         assert self.mod._call_stats["invalid_a"] == 1
@@ -411,14 +439,14 @@ class TestDualCallSingleA:
         assert reward == pytest.approx(0.0)
 
     def test_error_reward_value_is_capped(self):
-        """error_val=100 → z=4.0 → reward=4.0 (not 107.5)."""
-        self.vina._scores = [100.0]
+        """error_val=99.9 → z=4.0 → reward=4.0 (not raw z)."""
+        self.vina._scores = [99.9]
         reward = self.vina()
         assert reward == pytest.approx(4.0)
 
     def test_mixed_calls_track_correctly(self):
         """3 calls: 2 normal + 1 error → total=3, invalid_a=1."""
-        for score in [-8.0, 100.0, -6.5]:
+        for score in [-8.0, 99.9, -6.5]:
             self.vina._scores = [score]
             self.vina()
         assert self.mod._call_stats["total"] == 3
@@ -427,7 +455,7 @@ class TestDualCallSingleA:
 
     def test_metadata_reflects_dual_call_counters(self, tmp_path):
         """After calls through _dual_call, metadata must have correct fractions."""
-        for score in [-8.0, 100.0, -6.5, 100.0]:
+        for score in [-8.0, 99.9, -6.5, 99.9]:
             self.vina._scores = [score]
             self.vina()
         self.mod._write_reward_metadata()
@@ -439,13 +467,13 @@ class TestDualCallSingleA:
     def test_timeout_flag_increments_timeout_a(self):
         """Simulate timeout via side-channel setter."""
         # Normal error (not timeout) — only invalid_a incremented
-        self.vina._scores = [100.0]
+        self.vina._scores = [99.9]
         self.vina()
         assert self.mod._call_stats["invalid_a"] == 1
         assert self.mod._call_stats["timeout_a"] == 0
 
         # Timeout error — both invalid_a and timeout_a incremented
-        self.vina._scores = [100.0]
+        self.vina._scores = [99.9]
         self.mod._set_last_docking_timed_out(True)
         self.vina()
         assert self.mod._call_stats["invalid_a"] == 2
@@ -453,7 +481,7 @@ class TestDualCallSingleA:
 
     def test_timeout_flag_reset_after_read(self):
         """Flag must be consumed (reset to False) after _dual_call reads it."""
-        self.vina._scores = [100.0]
+        self.vina._scores = [99.9]
         self.mod._set_last_docking_timed_out(True)
         self.vina()
         assert self.mod._get_last_docking_timed_out() is False
@@ -492,7 +520,7 @@ class TestDualCallDouble:
 
     def test_a_error_b_normal(self):
         """Target A error, B normal → invalid_a incremented."""
-        self.vina._scores = [100.0, -6.0]
+        self.vina._scores = [99.9, -6.0]
         reward = self.vina()
         # z_a = 4.0 (capped), z_b = 0.0 → max(4.0, 0.0) = 4.0
         assert reward == pytest.approx(4.0)
@@ -501,7 +529,7 @@ class TestDualCallDouble:
 
     def test_both_error(self):
         """Both targets error → both invalids incremented."""
-        self.vina._scores = [100.0, 100.0]
+        self.vina._scores = [99.9, 99.9]
         reward = self.vina()
         # z_a = z_b = 4.0 → max(4.0, 4.0) = 4.0
         assert reward == pytest.approx(4.0)
@@ -510,7 +538,7 @@ class TestDualCallDouble:
 
     def test_b_error_a_normal(self):
         """Target A normal, B error → only invalid_b incremented."""
-        self.vina._scores = [-7.5, 100.0]
+        self.vina._scores = [-7.5, 99.9]
         reward = self.vina()
         # z_a = 0.0, z_b = 4.0 (capped) → max(0.0, 4.0) = 4.0
         assert reward == pytest.approx(4.0)
@@ -522,7 +550,7 @@ class TestDualCallDouble:
         # In double mode _original_call is called twice (A then B).
         # _dual_call consumes timeout side-channel after each call.
         # Use a list subclass that sets the flag on the 2nd pop (= B's call).
-        self.vina._scores = _ScoresWithTimeout([-7.5, 100.0], self.mod, timeout_at=2)
+        self.vina._scores = _ScoresWithTimeout([-7.5, 99.9], self.mod, timeout_at=2)
         self.vina()
 
         assert self.mod._call_stats["timeout_a"] == 0
@@ -552,7 +580,7 @@ class TestDualCallSingleB:
 
     def test_error_b_score(self):
         """Error B score → invalid_b incremented, capped reward."""
-        self.vina._scores = [100.0]  # Only B (primary, error)
+        self.vina._scores = [99.9]  # Only B (primary, error)
         reward = self.vina()
         assert reward == pytest.approx(4.0)
         assert self.mod._call_stats["invalid_b"] == 1
@@ -566,7 +594,7 @@ class TestDualCallSingleB:
 
     def test_single_b_timeout_tracked(self):
         """Timeout on B is tracked correctly with 1 score."""
-        self.vina._scores = _ScoresWithTimeout([100.0], self.mod, timeout_at=1)
+        self.vina._scores = _ScoresWithTimeout([99.9], self.mod, timeout_at=1)
         self.vina()
         assert self.mod._call_stats["timeout_b"] == 1
         assert self.mod._call_stats["invalid_b"] == 1
@@ -595,22 +623,22 @@ class TestRewardBounds:
         self.mod = _patch_module
 
     def test_normal_reward_is_small(self):
-        z, _ = self.mod._capped_zscore(score=-8.0, error_val=100.0, mean=-7.5, std=1.0, penalty_cap=4.0)
+        z, _ = self.mod._capped_zscore(score=-8.0, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
         reward = -z
         assert -5.0 <= reward <= 5.0
 
     def test_error_reward_is_capped(self):
-        z, _ = self.mod._capped_zscore(score=100.0, error_val=100.0, mean=-7.5, std=1.0, penalty_cap=4.0)
+        z, _ = self.mod._capped_zscore(score=99.9, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
         reward = -z
         assert reward == -4.0
 
     def test_error_reward_does_not_produce_extreme_z(self):
         """The whole point: error_val must NOT produce |z| > 10."""
-        z, _ = self.mod._capped_zscore(score=100.0, error_val=100.0, mean=-7.5, std=0.705, penalty_cap=4.0)
+        z, _ = self.mod._capped_zscore(score=99.9, error_val=99.9, mean=-7.5, std=0.705, penalty_cap=4.0)
         assert abs(z) <= 10
 
     def test_no_nan_in_reward(self):
-        z, _ = self.mod._capped_zscore(score=-7.5, error_val=100.0, mean=-7.5, std=1.0, penalty_cap=4.0)
+        z, _ = self.mod._capped_zscore(score=-7.5, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
         assert not math.isnan(z)
 
 

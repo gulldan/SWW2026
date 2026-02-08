@@ -34,18 +34,23 @@ from scipy import stats as sp_stats
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+_N_BOOTSTRAP = 5_000
+
 
 def _bootstrap_correlation(
     x: np.ndarray,
     y: np.ndarray,
     method: str = "spearman",
-    n_bootstrap: int = 5000,
+    n_bootstrap: int | None = None,
     rng_seed: int = 42,
 ) -> tuple[float, float, float]:
     """Compute correlation + 95% bootstrap CI.
 
     Returns (rho, ci_lower, ci_upper).
     """
+    if n_bootstrap is None:
+        n_bootstrap = _N_BOOTSTRAP
+
     if len(x) < 3:
         return float("nan"), float("nan"), float("nan")
 

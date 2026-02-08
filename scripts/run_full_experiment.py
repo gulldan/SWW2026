@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import click
+import yaml
 from loguru import logger
 
 from dualdocking.config import load_experiment, load_pairs
@@ -35,6 +36,67 @@ def _detect_gpu_count() -> int:
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _ensure_calibrated(pair_id: str, pair_cfg: dict, log_path: Path) -> None:
+    """Ensure both targets in a pair have calibrated normalization statistics.
+
+    If any target is uncalibrated (n_samples=0 or stable=false), runs the full
+    calibration pipeline: prepare_targets → dock_calibration → calibrate_normalization.
+    Fails hard if calibration still incomplete after running.
+    """
+    norm_path = PROJECT_ROOT / "configs" / "normalization.yaml"
+    if not norm_path.exists():
+        raise RuntimeError(f"normalization.yaml not found: {norm_path}")
+
+    norm_data = yaml.safe_load(norm_path.read_text())
+    norm_targets = norm_data.get("targets", {})
+
+    uncalibrated: list[str] = []
+    for role in ("target_a", "target_b"):
+        tid = pair_cfg[role]["id"]
+        entry = norm_targets.get(tid, {})
+        if not entry or entry.get("n_samples", 0) == 0 or not entry.get("stable_mean") or not entry.get("stable_std"):
+            uncalibrated.append(tid)
+
+    if not uncalibrated:
+        return
+
+    _log_to_file(log_path, f"[{_ts()}] CALIBRATE {pair_id}: uncalibrated targets = {uncalibrated}")
+    logger.info("Calibrating targets for pair {}: {}", pair_id, uncalibrated)
+
+    # Step 1: prepare target data
+    _run_cmd(
+        ["uv", "run", "python", "scripts/prepare_targets.py", "--pair", pair_id, "--prepare-all"],
+        log_path,
+    )
+
+    # Step 2: dock calibration for uncalibrated targets only
+    dock_cmd = ["uv", "run", "python", "scripts/dock_calibration.py"]
+    for tid in uncalibrated:
+        dock_cmd.extend(["--target-id", tid])
+    _run_cmd(dock_cmd, log_path)
+
+    # Step 3: regenerate normalization.yaml
+    _run_cmd(["uv", "run", "python", "scripts/calibrate_normalization.py"], log_path)
+
+    # Re-read and validate calibration succeeded
+    norm_data = yaml.safe_load(norm_path.read_text())
+    norm_targets = norm_data.get("targets", {})
+    still_bad: list[str] = []
+    for tid in uncalibrated:
+        entry = norm_targets.get(tid, {})
+        if not entry or entry.get("n_samples", 0) == 0 or not entry.get("stable_mean") or not entry.get("stable_std"):
+            still_bad.append(tid)
+
+    if still_bad:
+        raise RuntimeError(
+            f"Calibration failed for targets {still_bad} in pair {pair_id}. "
+            "Check dock_calibration.py output and data/calibration/scores/."
+        )
+
+    _log_to_file(log_path, f"[{_ts()}] CALIBRATE {pair_id}: OK")
+    logger.info("Calibration complete for pair {}", pair_id)
 
 
 def _log_to_file(log_path: Path, message: str) -> None:
@@ -264,6 +326,13 @@ def main(
 
     for cmd in prep_cmds:
         _run_cmd(cmd, log_path)
+
+    # Ensure normalization calibration for all pairs before dispatching tasks
+    calibrated_pairs: set[str] = set()
+    for pair_id, _mode, _seed in tasks:
+        if pair_id not in calibrated_pairs:
+            _ensure_calibrated(pair_id, pairs[pair_id], log_path)
+            calibrated_pairs.add(pair_id)
 
     n_gpus = _detect_gpu_count()
 

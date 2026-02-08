@@ -2,9 +2,11 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 import scripts.proxy_final_correlation as mod
 import yaml
 from click.testing import CliRunner
@@ -65,9 +67,8 @@ def _write_training_csvs(
     pd.DataFrame(data).to_csv(mols_dir / "train_000.csv", index=False)
 
 
-def _setup(tmp_path, monkeypatch, *, include_docking_b=False):
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
-    (tmp_path / "configs").mkdir()
+def _setup(tmp_path, *, include_docking_b=False):
+    (tmp_path / "configs").mkdir(exist_ok=True)
     (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(_pairs_cfg()))
     (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(_experiment_cfg()))
 
@@ -91,56 +92,88 @@ def _invoke(extra_args=None):
     return runner.invoke(main, args)
 
 
-def test_basic_run(tmp_path, monkeypatch):
-    """Script runs and produces CSV + JSON."""
-    _setup(tmp_path, monkeypatch)
-    result = _invoke()
-    assert result.exit_code == 0, result.output
-
-    csv_path = tmp_path / "report" / "data" / "proxy_final_corr.csv"
-    json_path = tmp_path / "report" / "data" / "proxy_final_corr.json"
-    assert csv_path.exists()
-    assert json_path.exists()
-
-    df = pd.read_csv(csv_path)
-    assert len(df) > 0
-    assert "spearman_rho" in df.columns
-    assert "pearson_r" in df.columns
+# ---------------------------------------------------------------------------
+# Shared-fixture class: default _setup() invoked once for the whole class
+# ---------------------------------------------------------------------------
 
 
-def test_correlation_columns(tmp_path, monkeypatch):
-    """CSV has all expected columns."""
-    _setup(tmp_path, monkeypatch)
-    _invoke()
+class TestDefaultSetup:
+    """Tests that share the same default _setup() + _invoke() result."""
 
-    df = pd.read_csv(tmp_path / "report" / "data" / "proxy_final_corr.csv")
-    expected_cols = {
-        "pair", "mode", "target", "n",
-        "spearman_rho", "spearman_ci_lo", "spearman_ci_hi",
-        "pearson_r", "pearson_ci_lo", "pearson_ci_hi",
-        "n_boltz", "n_docking", "n_joined", "join_rate",
-    }
-    assert expected_cols <= set(df.columns)
+    @pytest.fixture(scope="class")
+    def shared_result(self, tmp_path_factory):
+        tmp_path = tmp_path_factory.mktemp("pfc_default")
+        _setup(tmp_path)
+
+        with patch.object(mod, "PROJECT_ROOT", tmp_path):
+            result = _invoke()
+
+        return tmp_path, result
+
+    @pytest.fixture(autouse=True)
+    def _unpack(self, shared_result):
+        self.tmp_path, self.result = shared_result
+
+    def test_basic_run(self):
+        """Script runs and produces CSV + JSON."""
+        assert self.result.exit_code == 0, self.result.output
+
+        csv_path = self.tmp_path / "report" / "data" / "proxy_final_corr.csv"
+        json_path = self.tmp_path / "report" / "data" / "proxy_final_corr.json"
+        assert csv_path.exists()
+        assert json_path.exists()
+
+        df = pd.read_csv(csv_path)
+        assert len(df) > 0
+        assert "spearman_rho" in df.columns
+        assert "pearson_r" in df.columns
+
+    def test_correlation_columns(self):
+        """CSV has all expected columns."""
+        df = pd.read_csv(self.tmp_path / "report" / "data" / "proxy_final_corr.csv")
+        expected_cols = {
+            "pair", "mode", "target", "n",
+            "spearman_rho", "spearman_ci_lo", "spearman_ci_hi",
+            "pearson_r", "pearson_ci_lo", "pearson_ci_hi",
+            "n_boltz", "n_docking", "n_joined", "join_rate",
+        }
+        assert expected_cols <= set(df.columns)
+
+    def test_json_structure(self):
+        """JSON has pairs, summary, and suitability decision."""
+        data = json.loads(
+            (self.tmp_path / "report" / "data" / "proxy_final_corr.json").read_text()
+        )
+        assert "pairs" in data
+        assert "pair1" in data["pairs"]
+        assert "summary" in data
+        assert "proxy_suitable" in data["summary"]
+        assert "median_spearman_rho" in data["summary"]
+
+    def test_join_rate_less_than_one(self):
+        """Training data has 80% overlap -> join rate < 1.0."""
+        df = pd.read_csv(self.tmp_path / "report" / "data" / "proxy_final_corr.csv")
+        for _, row in df.iterrows():
+            assert row["join_rate"] <= 1.0
+            assert row["join_rate"] > 0.0
+
+    def test_spearman_within_bounds(self):
+        """Spearman rho is within [-1, 1]."""
+        df = pd.read_csv(self.tmp_path / "report" / "data" / "proxy_final_corr.csv")
+        for _, row in df.iterrows():
+            assert -1.0 <= row["spearman_rho"] <= 1.0
+            assert -1.0 <= row["pearson_r"] <= 1.0
 
 
-def test_json_structure(tmp_path, monkeypatch):
-    """JSON has pairs, summary, and suitability decision."""
-    _setup(tmp_path, monkeypatch)
-    _invoke()
-
-    data = json.loads(
-        (tmp_path / "report" / "data" / "proxy_final_corr.json").read_text()
-    )
-    assert "pairs" in data
-    assert "pair1" in data["pairs"]
-    assert "summary" in data
-    assert "proxy_suitable" in data["summary"]
-    assert "median_spearman_rho" in data["summary"]
+# ---------------------------------------------------------------------------
+# Standalone tests with different setup
+# ---------------------------------------------------------------------------
 
 
 def test_double_mode_with_docking_b(tmp_path, monkeypatch):
     """Double mode with docking_b column reports both targets."""
-    _setup(tmp_path, monkeypatch, include_docking_b=True)
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    _setup(tmp_path, include_docking_b=True)
     _invoke()
 
     data = json.loads(
@@ -151,19 +184,8 @@ def test_double_mode_with_docking_b(tmp_path, monkeypatch):
     assert "target_b" in double_data["targets"]
 
 
-def test_join_rate_less_than_one(tmp_path, monkeypatch):
-    """Training data has 80% overlap → join rate < 1.0."""
-    _setup(tmp_path, monkeypatch)
-    _invoke()
-
-    df = pd.read_csv(tmp_path / "report" / "data" / "proxy_final_corr.csv")
-    for _, row in df.iterrows():
-        assert row["join_rate"] <= 1.0
-        assert row["join_rate"] > 0.0
-
-
 def test_empty_results(tmp_path, monkeypatch):
-    """No results → script exits 0, JSON has empty pairs."""
+    """No results -> script exits 0, JSON has empty pairs."""
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     (tmp_path / "configs").mkdir()
     (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(_pairs_cfg()))
@@ -176,14 +198,3 @@ def test_empty_results(tmp_path, monkeypatch):
         (tmp_path / "report" / "data" / "proxy_final_corr.json").read_text()
     )
     assert data["summary"]["n_pair_mode_target_combos"] == 0
-
-
-def test_spearman_within_bounds(tmp_path, monkeypatch):
-    """Spearman rho is within [-1, 1]."""
-    _setup(tmp_path, monkeypatch)
-    _invoke()
-
-    df = pd.read_csv(tmp_path / "report" / "data" / "proxy_final_corr.csv")
-    for _, row in df.iterrows():
-        assert -1.0 <= row["spearman_rho"] <= 1.0
-        assert -1.0 <= row["pearson_r"] <= 1.0

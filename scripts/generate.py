@@ -155,12 +155,13 @@ def main(
                 logger.error("Таргет '{}' отсутствует в normalization.yaml. Запустите calibrate_normalization.py", tid)
                 sys.exit(1)
             if not entry.get("stable_mean") or not entry.get("stable_std"):
-                logger.warning(
+                logger.error(
                     "Таргет '{}' не калиброван (stable=false, n_samples={}). "
                     "Запустите: dock_calibration.py + calibrate_normalization.py",
                     tid,
                     entry.get("n_samples", 0),
                 )
+                sys.exit(1)
 
     second_target_id = None
     if mode in {"single_b", "double"}:

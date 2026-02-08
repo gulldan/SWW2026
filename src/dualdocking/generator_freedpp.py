@@ -84,7 +84,14 @@ class GenerationConfig:
 
 
 def _auto_num_sub_proc() -> int:
-    """Pick num_sub_proc based on GPU VRAM; override via FREEDPP_NUM_SUB_PROC env var."""
+    """Pick num_sub_proc based on GPU VRAM; override via FREEDPP_NUM_SUB_PROC env var.
+
+    VRAM tiers (concurrent UniDock GPU processes):
+        >=80 GB (H100/A100-80)  -> 24
+         >=40 GB (A6000 48 GB)  -> 12
+         <=24 GB (RTX 4090)     ->  8
+    Default (detection failure) ->  8 (safe for any consumer GPU)
+    """
     env = os.getenv("FREEDPP_NUM_SUB_PROC")
     if env is not None:
         return int(env)
@@ -93,14 +100,14 @@ def _auto_num_sub_proc() -> int:
 
         if torch.cuda.is_available():
             vram_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
-            if vram_gb >= 48:  # H100 80 GB / A100
+            if vram_gb >= 80:  # H100 80 GB / A100 80 GB
                 return 24
-            if vram_gb >= 20:  # RTX 4090 24 GB
+            if vram_gb >= 40:  # A6000 48 GB
                 return 12
-            return 8  # smaller GPUs
+            return 8  # RTX 4090 24 GB and smaller
     except Exception:
-        logger.debug("GPU detection failed for num_sub_proc, using default=12")
-    return 12  # safe default
+        logger.debug("GPU detection failed for num_sub_proc, using default=8")
+    return 8  # safe default for any GPU
 
 
 def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:

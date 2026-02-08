@@ -44,7 +44,7 @@ def hierarchical_bootstrap_test(
     n_bootstrap: int = 10000,
     rng_seed: int = 42,
 ) -> BootstrapResult:
-    """Two-level bootstrap: resample seeds then molecules within each seed.
+    """Cluster bootstrap: resample seeds (pre-computed per-seed metrics).
 
     Parameters
     ----------
@@ -62,28 +62,19 @@ def hierarchical_bootstrap_test(
 
     rng = np.random.default_rng(rng_seed)
 
-    def _metric_for_seed(df: pd.DataFrame) -> float:
-        if df.empty:
-            return float("nan")
-        idx = rng.integers(0, len(df), size=len(df))
-        return metric_fn(df.iloc[idx])
+    # Pre-compute per-seed metric values (outside the loop).
+    metrics_a_pre = np.array([metric_fn(df) for df in group_a], dtype=float)
+    metrics_b_pre = np.array([metric_fn(df) for df in group_b], dtype=float)
+    observed_diff = float(np.nanmean(metrics_b_pre) - np.nanmean(metrics_a_pre))
 
-    # Observed difference (no resampling)
-    obs_a = np.array([metric_fn(df) for df in group_a], dtype=float)
-    obs_b = np.array([metric_fn(df) for df in group_b], dtype=float)
-    observed_diff = float(np.nanmean(obs_b) - np.nanmean(obs_a))
-
-    diffs = np.empty(n_bootstrap, dtype=float)
     n_a = len(group_a)
     n_b = len(group_b)
+    diffs = np.empty(n_bootstrap, dtype=float)
 
     for i in range(n_bootstrap):
-        seed_idx_a = rng.integers(0, n_a, size=n_a)
-        seed_idx_b = rng.integers(0, n_b, size=n_b)
-
-        metrics_a = [_metric_for_seed(group_a[j]) for j in seed_idx_a]
-        metrics_b = [_metric_for_seed(group_b[j]) for j in seed_idx_b]
-        diffs[i] = float(np.nanmean(metrics_b) - np.nanmean(metrics_a))
+        idx_a = rng.integers(0, n_a, size=n_a)
+        idx_b = rng.integers(0, n_b, size=n_b)
+        diffs[i] = float(np.nanmean(metrics_b_pre[idx_b]) - np.nanmean(metrics_a_pre[idx_a]))
 
     p_value = float(np.mean(np.abs(diffs) >= abs(observed_diff)))
     ci_lower, ci_upper = np.percentile(diffs, [2.5, 97.5])

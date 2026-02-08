@@ -205,6 +205,10 @@ _INVALID_Z_PENALTY = float(os.environ.get("INVALID_Z_PENALTY", "4.0"))
 if not (0 < _INVALID_Z_PENALTY < float("inf")):
     raise ValueError(f"INVALID_Z_PENALTY must be a positive finite number, got {_INVALID_Z_PENALTY}")
 
+_MAX_Z_ABS = float(os.environ.get("MAX_Z_ABS", "10.0"))
+if not (0 < _MAX_Z_ABS < float("inf")):
+    raise ValueError(f"MAX_Z_ABS must be a positive finite number, got {_MAX_Z_ABS}")
+
 _call_stats: dict[str, int] = {
     "total": 0,
     "invalid_a": 0,
@@ -250,7 +254,9 @@ def _capped_zscore(
         return penalty_cap, True
     if std == 0:
         raise ZeroDivisionError("std=0 в normalization.yaml")
-    return (score - mean) / std, False
+    z = (score - mean) / std
+    z = max(-_MAX_Z_ABS, min(_MAX_Z_ABS, z))
+    return z, False
 
 
 def _write_reward_metadata() -> None:
@@ -272,6 +278,7 @@ def _write_reward_metadata() -> None:
         "timeout_fraction_a": _call_stats["timeout_a"] / total,
         "timeout_fraction_b": _call_stats["timeout_b"] / total,
         "invalid_z_penalty": _INVALID_Z_PENALTY,
+        "max_z_abs": _MAX_Z_ABS,
         "primary_target": target_id_b if reward_mode == "single_b" else target_id_a,
         "reward_mode": reward_mode,
     }
@@ -509,6 +516,13 @@ def _apply_dual_patch() -> None:
 
             parsed = DockingVina.parse_output(result.stdout, error_val)
             if parsed != error_val:
+                if not (_SCORE_MIN <= parsed <= _SCORE_MAX):
+                    logger.warning(
+                        "corrupt docking score %.3f from CPU path: %s",
+                        parsed,
+                        smile,
+                    )
+                    return error_val
                 return parsed
 
             parsed_from_file = _parse_result_from_pdbqt(Path(docking_file.name))
@@ -655,9 +669,12 @@ def _apply_dual_patch() -> None:
         logger.info("dual_reward_patch: GPU batch docking DISABLED (GPU_BATCH_DOCK=0)")
 
     logger.info(
-        "dual_reward_patch: patched DockingVina (reward_mode=%s, ligand_backend=rdkit_meeko, invalid_z_penalty=%.1f)",
+        "dual_reward_patch: patched DockingVina"
+        " (reward_mode=%s, ligand_backend=rdkit_meeko,"
+        " invalid_z_penalty=%.1f, max_z_abs=%.1f)",
         reward_mode,
         _INVALID_Z_PENALTY,
+        _MAX_Z_ABS,
     )
 
 

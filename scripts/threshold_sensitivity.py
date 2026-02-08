@@ -24,6 +24,8 @@ from loguru import logger
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+_N_BOOTSTRAP = 10_000
+
 DEFAULT_THRESHOLDS = [-1.0, 0.0, 1.0]
 
 
@@ -203,7 +205,7 @@ def main(
                     group_ctrl,
                     group_treat,
                     metric_fn,
-                    n_bootstrap=10000,
+                    n_bootstrap=_N_BOOTSTRAP,
                     rng_seed=42,
                 )
                 vals_ctrl = [metric_fn(df) for df in group_ctrl]
