@@ -34,6 +34,7 @@ P_THRESHOLD = 0.05
 CLIFFS_DELTA_THRESHOLD = 0.33
 SUCCESS_MIN_PAIRS = 3
 MISSING_DATA_THRESHOLD = 0.20
+DEGRADATION_DELTA_THRESHOLD = -0.47
 
 
 def _load_core_pairs(pairs_config: Path) -> list[str]:
@@ -129,7 +130,9 @@ EVIDENCE_MAP: dict[str, dict] = {
 def _check_significance(entry: dict) -> tuple[bool, list[str]]:
     """Re-derive significance from raw values per SAP Section 4.4."""
     issues: list[str] = []
-    p_adj = entry.get("p_value_adjusted", entry.get("p_value_raw", 1.0))
+    p_adj = entry.get("p_value_adjusted")
+    if p_adj is None:
+        p_adj = entry.get("p_value_raw", 1.0)
     cliffs_d = abs(float(entry.get("cliffs_delta", 0)))
     ci_lo = float(entry.get("ci_lower", 0))
     ci_hi = float(entry.get("ci_upper", 0))
@@ -231,8 +234,16 @@ def main(
         for pair_id in core_pairs:
             pair_deg = degradation.get(pair_id, {})
             for check_name, check_data in pair_deg.items():
-                if check_data.get("degraded", False):
-                    delta = check_data.get("cliffs_delta", float("nan"))
+                delta = float(check_data.get("cliffs_delta", float("nan")))
+                # Re-derive from raw delta (SAP 5.2) instead of trusting pre-computed flag.
+                is_degraded = delta <= DEGRADATION_DELTA_THRESHOLD
+                reported_degraded = check_data.get("degraded", False)
+                if is_degraded != reported_degraded:
+                    all_issues.append(
+                        f"Degradation mismatch {pair_id}/{check_name}: "
+                        f"derived={is_degraded}, reported={reported_degraded} (delta={delta:.3f})"
+                    )
+                if is_degraded:
                     degraded_pairs.append(f"{pair_id}/{check_name} (delta={delta:.3f})")
 
         if degraded_pairs:

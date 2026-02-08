@@ -4,9 +4,9 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 1.0 |
-| **Date** | 2026-02-07 |
-| **Status** | FROZEN |
+| **Version** | 1.1 |
+| **Date** | 2026-02-08 |
+| **Status** | FROZEN (amended v1.1 — see Section 11) |
 | **Pre-registration ref** | `docs/preregistration.md` (commit `f2eceb2`) |
 | **Pipeline entry point** | `scripts/compute_metrics.py` |
 
@@ -138,7 +138,8 @@ For each contrast (e.g., H1a: `double` vs `single_a` on a given pair):
    c. Compute metric on each resampled DataFrame.
    d. Record `diff_b = mean(metric_treat) - mean(metric_ctrl)`.
 5. **95% CI:** Percentile method — `[percentile(diffs, 2.5), percentile(diffs, 97.5)]`.
-6. **p-value:** `mean(|diff_b| >= |obs_diff|)` (two-sided).
+6. **p-value:** `mean(diff_b <= 0)` (one-sided; fraction of replicates
+   where treatment does not improve over control).
 
 **Parameters:**
 
@@ -147,10 +148,10 @@ For each contrast (e.g., H1a: `double` vs `single_a` on a given pair):
 | B (replicates) | 10,000 | Standard for percentile CI (Efron & Tibshirani) |
 | RNG seed | 42 | Fixed for reproducibility |
 | CI level | 95% | Convention |
-| p-value type | Two-sided | Conservative; allows detecting both directions |
+| p-value type | One-sided | Directional: H1 is double > single (goal.md line 99) |
 
-Implementation: `src/dualdocking/statistical.py:39-96`
-(`hierarchical_bootstrap_test()`).
+Implementation: `src/dualdocking/statistical.py:44-171`
+(`hierarchical_bootstrap_test()`; includes fast numpy path for column-mean metrics).
 
 ### 4.2 Multiple Testing Correction
 
@@ -166,9 +167,9 @@ Implementation: `src/dualdocking/statistical.py:39-96`
 2. For rank i out of n tests: `p_adj[i] = min(p_adj[i+1], p_raw[i] * n / i)`.
 3. Clip to [0, 1].
 
-Implementation: `src/dualdocking/statistical.py:99-122` (`fdr_correction()`).
+Implementation: `src/dualdocking/statistical.py:174-197` (`fdr_correction()`).
 
-Applied in: `compute_metrics.py:282-301` (primary family FDR + secondary/auxiliary marking).
+Applied in: `compute_metrics.py:297-316` (primary family FDR + secondary/auxiliary marking).
 
 ### 4.3 Effect Sizes
 
@@ -193,7 +194,7 @@ where `n_greater` = number of pairs where treat > ctrl,
 | < 0.474 | Medium |
 | >= 0.474 | Large |
 
-Implementation: `src/dualdocking/statistical.py:125-136` (`cliffs_delta()`).
+Implementation: `src/dualdocking/statistical.py:200-211` (`cliffs_delta()`).
 
 #### 4.3.2 Cohen's d (Secondary)
 
@@ -205,7 +206,7 @@ d = (mean_treat - mean_ctrl) / sqrt(pooled_var)
 
 **Interpretation:** 0.2 small, 0.5 medium, 0.8 large (Cohen 1988).
 
-Implementation: `src/dualdocking/statistical.py:139-154` (`cohens_d()`).
+Implementation: `src/dualdocking/statistical.py:214-229` (`cohens_d()`).
 
 ### 4.4 Significance Decision Rule
 
@@ -216,7 +217,7 @@ A contrast is declared **significant** if ALL three conditions hold
 2. |Cliff's delta| >= 0.33 (at least medium effect)
 3. Bootstrap 95% CI excludes zero (ci_lower > 0 OR ci_upper < 0)
 
-Implementation: `compute_metrics.py:272-276`.
+Implementation: `compute_metrics.py:302-306`.
 
 ```python
 entry["significant"] = (
@@ -327,15 +328,15 @@ manual computation steps required.
 |-------------|---------------|----------------|
 | 2.2 Fairness gate | `src/dualdocking/fairness.py:44-86` | `validate_fairness()` |
 | 2.2 Quality gate | `src/dualdocking/fairness.py:89-167` | `validate_reward_quality()` |
-| 2.3 Missing data | `scripts/compute_metrics.py:199-218` | Completeness check |
-| 3.1 hr_both | `scripts/compute_metrics.py:163` | `(aff_a <= thr_a) & (aff_b <= thr_b)` |
+| 2.3 Missing data | `scripts/compute_metrics.py:207-226` | Completeness check |
+| 3.1 hr_both | `scripts/compute_metrics.py:169` | `(aff_a <= thr_a) & (aff_b <= thr_b)` |
 | 3.1 Thresholds | `configs/metrics.yaml:13-43` | `T_A = T_B = 0.0` |
-| 4.1 Bootstrap | `src/dualdocking/statistical.py:39-96` | `hierarchical_bootstrap_test()` |
-| 4.2 FDR | `src/dualdocking/statistical.py:99-122` | `fdr_correction()` |
-| 4.3.1 Cliff's delta | `src/dualdocking/statistical.py:125-136` | `cliffs_delta()` |
-| 4.3.2 Cohen's d | `src/dualdocking/statistical.py:139-154` | `cohens_d()` |
-| 4.4 Significance rule | `scripts/compute_metrics.py:272-276` | Conjunctive criterion |
-| 5.2 No-degradation guard | `scripts/compute_metrics.py:291-316` | Degradation Cliff's delta |
+| 4.1 Bootstrap | `src/dualdocking/statistical.py:44-171` | `hierarchical_bootstrap_test()` |
+| 4.2 FDR | `src/dualdocking/statistical.py:174-197` | `fdr_correction()` |
+| 4.3.1 Cliff's delta | `src/dualdocking/statistical.py:200-211` | `cliffs_delta()` |
+| 4.3.2 Cohen's d | `src/dualdocking/statistical.py:214-229` | `cohens_d()` |
+| 4.4 Significance rule | `scripts/compute_metrics.py:302-306` | Conjunctive criterion |
+| 5.2 No-degradation guard | `scripts/compute_metrics.py:318-350` | Degradation Cliff's delta |
 | 5.3 Threshold sensitivity | `scripts/threshold_sensitivity.py` | Full script |
 | 6.x Claim audit | `scripts/claim_audit.py` | Full script |
 | Proxy-final correlation | `scripts/proxy_final_correlation.py` | Full script |
@@ -355,9 +356,9 @@ manual computation steps required.
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
-| Bootstrap RNG seed | 42 | `statistical.py:45` |
-| Bootstrap replicates | 10,000 | `compute_metrics.py:248` |
-| FDR alpha | 0.05 | `compute_metrics.py:268` |
+| Bootstrap RNG seed | 42 | `statistical.py:50` |
+| Bootstrap replicates | 10,000 | `compute_metrics.py:22` |
+| FDR alpha | 0.05 | `compute_metrics.py:298` |
 | RL seeds | [42, 137, 256, 512, 1024] | `configs/experiment.yaml:11` |
 | Molecules per run | 1,000 | `configs/experiment.yaml:7` |
 | Hit threshold T | 0.0 (1 uM) | `configs/metrics.yaml:16-39` |
@@ -408,3 +409,30 @@ No manual editing of intermediate files is required.
   Chapman & Hall/CRC.
 - Passaro, S., et al. (2025). Boltz-2: Atomic Coordinate Generation with
   Confidence. *bioRxiv*. PMID 40667369.
+
+## 11. Amendment Log
+
+### v1.1 (2026-02-08)
+
+**Rationale:** Align SAP with `docs/goal.md` (authoritative spec) after
+code audit identified discrepancy between SAP v1.0 and goal.md line 99.
+
+**Changes:**
+
+1. **Section 4.1 p-value type:** Changed from two-sided
+   (`mean(|diff_b| >= |obs_diff|)`) to one-sided (`mean(diff_b <= 0)`).
+   Goal.md line 99 specifies "доля реплик с разностью ≤ 0" (fraction of
+   replicates with difference <= 0), which is a directional (one-sided)
+   test consistent with H1: double > single. The two-sided formulation in
+   v1.0 was an error introduced during initial SAP drafting.
+2. **Section 7 line references:** Updated to reflect `fast_column`/`fast_fn`
+   optimization added to `hierarchical_bootstrap_test()` (performance
+   improvement; no change to statistical semantics).
+3. **Section 8 line references:** Updated accordingly.
+4. **Blocked pair filtering:** `compute_metrics.py` and `aggregate.py` now
+   exclude pairs with `set: blocked` in `pairs.yaml`. This was already
+   implied by the design (blocked pairs have no results) but is now
+   enforced explicitly in code.
+5. **Degradation re-derivation:** `claim_audit.py` now independently
+   re-derives degradation status from raw Cliff's delta instead of
+   trusting pre-computed boolean flags, per SAP Section 5.2.

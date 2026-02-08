@@ -62,13 +62,13 @@ _BOLTZ_CLI_ARGS_BASE: list[str] = [
     "--recycling_steps",
     "3",
     "--sampling_steps",
-    "200",
+    "50",
     "--diffusion_samples",
-    "4",
+    "1",
     "--sampling_steps_affinity",
-    "200",
+    "50",
     "--diffusion_samples_affinity",
-    "5",
+    "1",
     "--override",
 ]
 

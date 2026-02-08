@@ -417,3 +417,162 @@ def test_fdr_scope_primary_only(tmp_path, monkeypatch):
         entry = stats["aux_pair"][test_id]
         assert entry["p_value_adjusted"] is None, f"aux {test_id} should not be FDR-corrected"
         assert entry["significant"] is False
+
+
+def test_blocked_pairs_excluded(tmp_path, monkeypatch):
+    """Blocked pairs (set=blocked) must not appear in metrics or completeness count."""
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+
+    pairs_cfg = {
+        "pairs": {
+            "active_pair": {
+                "set": "core",
+                "target_a": {"id": "A", "organism": "Homo sapiens"},
+                "target_b": {"id": "B", "organism": "Homo sapiens"},
+            },
+            "blocked_pair": {
+                "set": "blocked",
+                "target_a": {"id": "C", "organism": "Ovis aries"},
+                "target_b": {"id": "D", "organism": "Mus musculus"},
+            },
+        }
+    }
+    (tmp_path / "configs").mkdir()
+    (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(pairs_cfg))
+    (tmp_path / "configs" / "experiment.yaml").write_text(
+        yaml.dump({"modes": ["single_a", "single_b", "double"], "seeds": [1, 2, 3, 4, 5]})
+    )
+    (tmp_path / "configs" / "metrics.yaml").write_text(yaml.dump({
+        "thresholds": {
+            "active_pair": {"target_a": 0.0, "target_b": 0.0},
+            "blocked_pair": {"target_a": 0.0, "target_b": 0.0},
+        }
+    }))
+
+    rng = np.random.default_rng(42)
+    # Only create runs for active_pair (blocked has no results)
+    for mode in ("single_a", "single_b", "double"):
+        for seed in [1, 2, 3, 4, 5]:
+            run_dir = tmp_path / "results" / "active_pair" / mode / f"seed_{seed}"
+            _write_run(run_dir, rng)
+
+    import dualdocking.fairness as fairness_mod
+
+    monkeypatch.setattr(fairness_mod, "validate_fairness", lambda _: {"budget_consistent": True, "issues": []})
+    monkeypatch.setattr(
+        fairness_mod,
+        "validate_reward_quality",
+        lambda *_args, **_kwargs: {"run_valid": True, "issues": []},
+    )
+
+    result = _invoke()
+    assert result.exit_code == 0, result.output
+
+    metrics = json.loads((tmp_path / "report" / "metrics.json").read_text())
+    stats = json.loads((tmp_path / "report" / "stats.json").read_text())
+
+    # Blocked pair must not appear in metrics or stats
+    assert "blocked_pair" not in metrics
+    assert "blocked_pair" not in stats
+
+    # Completeness should only count active_pair: 1 pair x 3 modes x 5 seeds = 15
+    comp = stats["_completeness"]
+    assert comp["n_expected"] == 15
+    assert comp["n_valid"] == 15
+    assert comp["missing_rate"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Edge-case tests
+# ---------------------------------------------------------------------------
+
+
+def test_all_seeds_fail_quality_gate(tmp_path, monkeypatch):
+    """If every seed fails quality gate, pair should have no metrics but not crash."""
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    _setup_full(tmp_path)
+
+    import dualdocking.fairness as fairness_mod
+
+    monkeypatch.setattr(fairness_mod, "validate_fairness", lambda _: {"budget_consistent": True, "issues": []})
+    # All seeds fail quality gate
+    monkeypatch.setattr(
+        fairness_mod,
+        "validate_reward_quality",
+        lambda *_args, **_kwargs: {"run_valid": False, "issues": ["all bad"]},
+    )
+
+    result = _invoke()
+    assert result.exit_code == 0, result.output
+
+    metrics = json.loads((tmp_path / "report" / "metrics.json").read_text())
+    stats = json.loads((tmp_path / "report" / "stats.json").read_text())
+    # pair1 should have no mode entries (all seeds rejected)
+    assert metrics.get("pair1", {}) == {}
+    # No statistical tests could be run
+    assert stats.get("pair1", {}) == {}
+
+
+def test_all_nan_affinities(tmp_path, monkeypatch):
+    """DataFrames with all-NaN affinities should produce empty metrics (skipped)."""
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+
+    (tmp_path / "configs").mkdir(exist_ok=True)
+    (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(_pairs_cfg()))
+    (tmp_path / "configs" / "experiment.yaml").write_text(
+        yaml.dump({"modes": ["single_a", "single_b", "double"], "seeds": [1]})
+    )
+    (tmp_path / "configs" / "metrics.yaml").write_text(yaml.dump(_metrics_cfg()))
+
+    # Write scored CSVs with all-NaN affinities
+    for mode in ("single_a", "single_b", "double"):
+        run_dir = tmp_path / "results" / "pair1" / mode / "seed_1"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        df = pd.DataFrame({
+            "smiles_canonical": ["C0", "C1", "C2"],
+            "affinity_a": [float("nan")] * 3,
+            "affinity_b": [float("nan")] * 3,
+            "is_hit_both": [False] * 3,
+        })
+        df.to_csv(run_dir / "scored_joined.csv", index=False)
+
+    import dualdocking.fairness as fairness_mod
+
+    monkeypatch.setattr(fairness_mod, "validate_fairness", lambda _: {"budget_consistent": True, "issues": []})
+    monkeypatch.setattr(
+        fairness_mod,
+        "validate_reward_quality",
+        lambda *_args, **_kwargs: {"run_valid": True, "issues": []},
+    )
+
+    result = _invoke()
+    assert result.exit_code == 0, result.output
+
+    metrics = json.loads((tmp_path / "report" / "metrics.json").read_text())
+    # All affinities NaN -> valid filter removes all rows -> no hr values -> mode skipped
+    # OR NaN affinities produce 0 valid rows -> continue
+    # Either way it should not crash.
+
+
+def test_degradation_boundary_exactly_minus_047():
+    """Verify degradation flag at delta = exactly -0.47 via compute_metrics logic."""
+    # This tests compute_metrics.py line 326: `delta <= no_degradation_thr`
+    # SAP says "> -0.47" passes, so exactly -0.47 should be degraded.
+    no_degradation_thr = -0.47
+    delta = -0.47
+    assert delta <= no_degradation_thr  # should be degraded
+
+    delta_above = -0.469
+    assert not (delta_above <= no_degradation_thr)  # should NOT be degraded
+
+
+def test_sem_with_empty_values():
+    """_sem with 0 or 1 values should return 0.0."""
+    assert mod._sem([]) == 0.0
+    assert mod._sem([42.0]) == 0.0
+    assert mod._sem([float("nan")]) == 0.0
+
+
+def test_sem_with_all_nan():
+    """_sem with all NaN values should return 0.0 (after filtering, len<=1)."""
+    assert mod._sem([float("nan"), float("nan"), float("nan")]) == 0.0

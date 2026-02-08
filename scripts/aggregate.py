@@ -25,7 +25,9 @@ def main(config: str, experiment_config: str, output: str) -> None:
     """Агрегировать результаты всех пар и режимов."""
     from dualdocking.config import load_experiment, load_pairs
 
-    pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
+    all_pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
+    # Exclude blocked pairs from aggregation (they have no results).
+    pairs = {pid: cfg for pid, cfg in all_pairs.items() if cfg.get("set") != "blocked"}
     exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
     seeds = exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
     modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])

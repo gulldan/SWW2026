@@ -1,3 +1,7 @@
+# ТЕСТОВЫЙ ПРОГОН: проверка полного пайплайна end-to-end.
+# epochs=10, Boltz-2 diffusion_samples=1/sampling_steps=50 (fast mode).
+# Для production вернуть epochs>=80, валидировать Boltz-2 корреляцию.
+#
 # Экспериментальный бюджет и настройки воспроизводимости.
 #
 # Все single-target и double-target запуски используют ОДИНАКОВЫЙ бюджет,

@@ -36,6 +36,11 @@ def _as_dataframe_list(
     return frames
 
 
+def _column_mean(arr: np.ndarray, indices: np.ndarray) -> float:
+    """Fast mean of arr[indices] — used as default fast_fn for column_mean mode."""
+    return float(np.mean(arr[indices]))
+
+
 def hierarchical_bootstrap_test(
     scored_csvs_a: Iterable[Any],
     scored_csvs_b: Iterable[Any],
@@ -43,8 +48,17 @@ def hierarchical_bootstrap_test(
     *,
     n_bootstrap: int = 10000,
     rng_seed: int = 42,
+    fast_column: str | None = None,
+    fast_fn: Callable[[np.ndarray, np.ndarray], float] | None = None,
 ) -> BootstrapResult:
-    """Cluster bootstrap: resample seeds (pre-computed per-seed metrics).
+    """Two-level hierarchical bootstrap (goal.md lines 94-99).
+
+    Level 1 (seeds): resample RL runs with replacement.
+    Level 2 (molecules): within each resampled run, resample molecules
+    with replacement before computing the metric.
+
+    p-value: one-sided — fraction of bootstrap replicates with diff <= 0
+    (goal.md line 99: "доля реплик с разностью ≤ 0").
 
     Parameters
     ----------
@@ -52,6 +66,14 @@ def hierarchical_bootstrap_test(
         Iterables of paths or DataFrames (one per seed).
     metric_fn:
         Function that computes scalar metric from a DataFrame.
+    fast_column:
+        If set, pre-extract this column as a numpy array and use numpy
+        fancy indexing in the inner loop instead of df.iloc.  When set
+        without *fast_fn*, computes mean(arr[indices]).
+    fast_fn:
+        Custom numpy-level function ``(arr, indices) -> float`` for use
+        with *fast_column*.  Called with the pre-extracted array and the
+        bootstrap row indices.  Ignored unless *fast_column* is set.
     """
     cache: dict[Path, pd.DataFrame] = {}
     group_a = _as_dataframe_list(scored_csvs_a, cache)
@@ -62,21 +84,83 @@ def hierarchical_bootstrap_test(
 
     rng = np.random.default_rng(rng_seed)
 
-    # Pre-compute per-seed metric values (outside the loop).
-    metrics_a_pre = np.array([metric_fn(df) for df in group_a], dtype=float)
-    metrics_b_pre = np.array([metric_fn(df) for df in group_b], dtype=float)
-    observed_diff = float(np.nanmean(metrics_b_pre) - np.nanmean(metrics_a_pre))
+    # --- fast path: pre-extract numpy arrays --------------------------------
+    if fast_column is not None:
+        _fn = fast_fn if fast_fn is not None else _column_mean
+        arrays_a = [df[fast_column].to_numpy(dtype=float, copy=False) for df in group_a]
+        arrays_b = [df[fast_column].to_numpy(dtype=float, copy=False) for df in group_b]
+        lens_a = np.array([len(a) for a in arrays_a])
+        lens_b = np.array([len(b) for b in arrays_b])
+
+        # Observed diff
+        metrics_a_obs = np.array([_fn(arr, np.arange(len(arr))) for arr in arrays_a], dtype=float)
+        metrics_b_obs = np.array([_fn(arr, np.arange(len(arr))) for arr in arrays_b], dtype=float)
+        observed_diff = float(np.nanmean(metrics_b_obs) - np.nanmean(metrics_a_obs))
+
+        n_a = len(arrays_a)
+        n_b = len(arrays_b)
+        diffs = np.empty(n_bootstrap, dtype=float)
+
+        for i in range(n_bootstrap):
+            idx_a = rng.integers(0, n_a, size=n_a)
+            idx_b = rng.integers(0, n_b, size=n_b)
+
+            boot_a = np.empty(n_a, dtype=float)
+            for j, k in enumerate(idx_a):
+                arr = arrays_a[k]
+                row_idx = rng.integers(0, lens_a[k], size=lens_a[k])
+                boot_a[j] = _fn(arr, row_idx)
+
+            boot_b = np.empty(n_b, dtype=float)
+            for j, k in enumerate(idx_b):
+                arr = arrays_b[k]
+                row_idx = rng.integers(0, lens_b[k], size=lens_b[k])
+                boot_b[j] = _fn(arr, row_idx)
+
+            diffs[i] = float(np.nanmean(boot_b) - np.nanmean(boot_a))
+
+        p_value = float(np.mean(diffs <= 0))
+        ci_lower, ci_upper = np.percentile(diffs, [2.5, 97.5])
+        return BootstrapResult(
+            observed_diff=observed_diff,
+            p_value=p_value,
+            ci_lower=float(ci_lower),
+            ci_upper=float(ci_upper),
+        )
+
+    # --- slow path: DataFrame-based (backward compat) -----------------------
+
+    # Observed diff: per-seed metrics on original data.
+    metrics_a_obs = np.array([metric_fn(df) for df in group_a], dtype=float)
+    metrics_b_obs = np.array([metric_fn(df) for df in group_b], dtype=float)
+    observed_diff = float(np.nanmean(metrics_b_obs) - np.nanmean(metrics_a_obs))
 
     n_a = len(group_a)
     n_b = len(group_b)
     diffs = np.empty(n_bootstrap, dtype=float)
 
     for i in range(n_bootstrap):
+        # Level 1: resample seeds with replacement.
         idx_a = rng.integers(0, n_a, size=n_a)
         idx_b = rng.integers(0, n_b, size=n_b)
-        diffs[i] = float(np.nanmean(metrics_b_pre[idx_b]) - np.nanmean(metrics_a_pre[idx_a]))
 
-    p_value = float(np.mean(np.abs(diffs) >= abs(observed_diff)))
+        # Level 2: resample molecules within each selected seed.
+        boot_a = np.empty(n_a, dtype=float)
+        for j, k in enumerate(idx_a):
+            df = group_a[k]
+            row_idx = rng.integers(0, len(df), size=len(df))
+            boot_a[j] = metric_fn(df.iloc[row_idx])
+
+        boot_b = np.empty(n_b, dtype=float)
+        for j, k in enumerate(idx_b):
+            df = group_b[k]
+            row_idx = rng.integers(0, len(df), size=len(df))
+            boot_b[j] = metric_fn(df.iloc[row_idx])
+
+        diffs[i] = float(np.nanmean(boot_b) - np.nanmean(boot_a))
+
+    # One-sided p-value: fraction of replicates where diff <= 0.
+    p_value = float(np.mean(diffs <= 0))
     ci_lower, ci_upper = np.percentile(diffs, [2.5, 97.5])
 
     return BootstrapResult(

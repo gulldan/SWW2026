@@ -48,7 +48,7 @@ RL-генерация, оптимизированная под worst-case цел
 │   ├── generator_freedpp.py  # Обёртка генератора FREED++ (Docker subprocess)
 │   ├── binding_box.py    # Извлечение binding box из PDB (лиганд / fallback)
 │   ├── chem_sanitize.py  # Валидация и дедупликация SMILES
-│   ├── statistical.py    # Иерархический bootstrap, FDR, effect sizes
+│   ├── statistical.py    # Двухуровневый иерархический bootstrap, FDR, effect sizes
 │   ├── config.py         # Загрузка YAML-конфигов (вкл. organism gate)
 │   ├── cache_io.py       # Атомарный disk I/O (fcntl + temp-and-replace)
 │   ├── run_manifest.py   # Lifecycle-трекинг запусков (run_manifest.json)
@@ -622,7 +622,7 @@ report/
 │   ├── {pair}_molecules_double.png
 │   └── {pair}_molecules_top_hits.png
 ├── metrics.json              # hr_a/hr_b/hr_both/balance per pair/mode
-├── stats.json                # Bootstrap tests, FDR, _degradation guard, _completeness
+├── stats.json                # Two-level bootstrap, FDR (core H1a/H1b only), _degradation, _completeness
 ├── data/claim_audit.json     # Claim traceability audit trail + evidence map
 └── summary.txt               # Текстовый отчёт с аналитикой
 ```
@@ -690,8 +690,9 @@ uv run python scripts/proxy_final_correlation.py
 ### SCI-10: Claim Traceability Audit
 
 Верифицирует, что все primary claims traceable к статистическим артефактам.
-8 проверок: наличие stats/metrics, полнота H1a/H1b, re-derivation significance (SAP 4.4),
-no-degradation guard (SAP 5.2), completeness gate (SAP 6.6), scenario selection (6 SAP scenarios),
+7 проверок: наличие stats/metrics, полнота H1a/H1b, re-derivation significance (SAP 4.4),
+no-degradation guard с независимой re-derivation из Cliff's delta (SAP 5.2),
+completeness gate (SAP 6.6), scenario selection (6 SAP scenarios),
 evidence-to-claims mapping (artifact → SAP section → manuscript section).
 
 ```bash

@@ -1,6 +1,6 @@
 # Документация: карта достоверности
 
-Обновлено: 2026-02-07
+Обновлено: 2026-02-08
 
 Этот файл фиксирует, какие документы использовать как источник истины для запуска экспериментов, а какие являются исследовательскими заметками.
 
@@ -19,7 +19,8 @@
 | `docs/goal.md` | Operational spec | Гипотеза, метод, метрики, критерии успеха |
 | `docs/tasks.md` | Living log | Журнал выполнения и план |
 | `docs/selection_criteria.md` | Reference | Обоснование выбора пар; фактические пары берутся из `configs/pairs.yaml` |
-| `docs/preregistration.md` | Frozen | Pre-registration: hypotheses, endpoints, decision rules, SAP summary |
+| `docs/preregistration.md` | Frozen (amended v1.1) | Pre-registration: hypotheses, endpoints, decision rules, SAP summary |
+| `docs/statistical_analysis_plan.md` | Frozen (amended v1.1) | SAP: inference, claim rules, pipeline-to-code mapping |
 | `docs/README.md` | Index | Этот файл: карта достоверности и приоритетов |
 
 ## Правило разрешения конфликтов

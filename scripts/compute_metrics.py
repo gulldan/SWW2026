@@ -93,7 +93,9 @@ def main(
         hierarchical_bootstrap_test,
     )
 
-    pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
+    all_pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
+    # Exclude blocked pairs from analysis (they have no results).
+    pairs = {pid: cfg for pid, cfg in all_pairs.items() if cfg.get("set") != "blocked"}
     exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
     metrics_cfg = load_metrics(PROJECT_ROOT / metrics_config)
 
@@ -245,23 +247,37 @@ def main(
             return float("nan")
         return float(np.median(np.abs(df["affinity_a"].to_numpy() - df["affinity_b"].to_numpy())))
 
+    def _balance_fast_fn(arr: np.ndarray, indices: np.ndarray) -> float:
+        return float(np.median(arr[indices]))
+
     for pair_id in pairs:
         stats_out[pair_id] = {}
         tests = [
-            ("H1a", "double", "single_a", "hr_both", _metric_hr_both),
-            ("H1b", "double", "single_b", "hr_both", _metric_hr_both),
-            ("H2a", "double", "single_a", "balance", _metric_balance),
-            ("H2b", "double", "single_b", "balance", _metric_balance),
+            ("H1a", "double", "single_a", "hr_both", _metric_hr_both, "is_hit_both", None),
+            ("H1b", "double", "single_b", "hr_both", _metric_hr_both, "is_hit_both", None),
+            ("H2a", "double", "single_a", "balance", _metric_balance, "_abs_aff_diff", _balance_fast_fn),
+            ("H2b", "double", "single_b", "balance", _metric_balance, "_abs_aff_diff", _balance_fast_fn),
         ]
 
-        for test_id, mode_b, mode_a, metric_name, metric_fn in tests:
+        for test_id, mode_b, mode_a, metric_name, metric_fn, fast_col, fast_fn in tests:
             group_a = list(data.get(pair_id, {}).get(mode_a, {}).values())
             group_b = list(data.get(pair_id, {}).get(mode_b, {}).values())
             if not group_a or not group_b:
                 continue
 
+            # Pre-compute derived column for balance metric
+            if fast_col == "_abs_aff_diff":
+                for df in (d for d in group_a + group_b if "_abs_aff_diff" not in d.columns):
+                    df["_abs_aff_diff"] = np.abs(df["affinity_a"].to_numpy() - df["affinity_b"].to_numpy())
+
             result: BootstrapResult = hierarchical_bootstrap_test(
-                group_a, group_b, metric_fn, n_bootstrap=_N_BOOTSTRAP, rng_seed=42,
+                group_a,
+                group_b,
+                metric_fn,
+                n_bootstrap=_N_BOOTSTRAP,
+                rng_seed=42,
+                fast_column=fast_col,
+                fast_fn=fast_fn,
             )
             # Per-seed metric values for effect sizes
             values_a = [metric_fn(df) for df in group_a]

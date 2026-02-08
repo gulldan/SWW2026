@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Date** | 2026-02-07 |
-| **Status** | FROZEN |
+| **Status** | FROZEN (amended v1.1 — see Section 11) |
 | **Freeze commit** | `f2eceb2` |
 
 ---
@@ -126,7 +126,7 @@ Effect size: Cohen's d (secondary).
 - **Replicates:** 10,000.
 - **RNG seed:** 42.
 - **95% CI:** Percentile method (2.5th, 97.5th percentiles).
-- **p-value:** Fraction of replicates where `|diff| >= |observed_diff|` (two-sided).
+- **p-value:** Fraction of replicates where `diff <= 0` (one-sided; H1 is double > single).
 
 Implementation: `src/dualdocking/statistical.py: hierarchical_bootstrap_test()`
 
@@ -181,3 +181,13 @@ Source: `configs/experiment.yaml: objectives.alternatives`, `docs/goal.md` lines
 | `docs/goal.md` | Full hypothesis, notation, endpoint hierarchy, success criteria |
 | `docs/selection_criteria.md` | Pair rationale, factorial design, core vs auxiliary split |
 | `src/dualdocking/statistical.py` | Bootstrap test, FDR correction, Cliff's delta, Cohen's d |
+
+## 11. Amendment Log
+
+### v1.1 (2026-02-08)
+
+**Section 7.1 p-value:** Changed from two-sided (`|diff| >= |observed_diff|`)
+to one-sided (`diff <= 0`). This aligns with `docs/goal.md` line 99 which
+specifies a directional test (H1: double > single). The original v1.0
+formulation was inconsistent with goal.md. No other pre-registered
+parameters are affected.

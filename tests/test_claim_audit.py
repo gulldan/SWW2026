@@ -299,6 +299,43 @@ def test_degradation_excludes_from_success_count(tmp_path, monkeypatch):
     assert audit["claim_scenario"] in ("6.3_weak_evidence", "6.5_no_evidence")
 
 
+def test_degradation_mismatch_detected(tmp_path, monkeypatch):
+    """When pre-computed degraded flag disagrees with raw delta, audit catches it."""
+    degradation = {
+        "CDK2_ERK2": {
+            # delta=-0.5 <= -0.47 -> should be degraded, but reported as False
+            "hr_a_double_vs_single_a": {"cliffs_delta": -0.5, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.2, "degraded": False},
+        },
+        "AChE_BChE": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.2, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.3, "degraded": False},
+        },
+        "BACE1_GSK3B": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+        "AChE_BACE1": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+        "GSK3B_CDK5": {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        },
+    }
+    _setup(tmp_path, monkeypatch, n_significant=5, degradation=degradation)
+    runner = CliRunner()
+    result = runner.invoke(main, ["--no-strict"])
+    assert result.exit_code == 0
+    audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
+    assert audit["pass"] is False
+    # Should detect the mismatch
+    assert any("Degradation mismatch" in i for i in audit["issues"])
+    # Should still detect the degradation itself
+    assert any("CDK2_ERK2" in p for p in audit["degradation_warning"]["pairs"])
+
+
 def test_evidence_map_populated(tmp_path, monkeypatch):
     """Evidence map links claim scenario to artifacts and SAP sections."""
     _setup(tmp_path, monkeypatch, n_significant=0)
@@ -312,3 +349,122 @@ def test_evidence_map_populated(tmp_path, monkeypatch):
     assert "claim_template" in emap
     assert "evidence" in emap
     assert "sap_sections" in emap
+
+
+# ---------------------------------------------------------------------------
+# Edge-case tests
+# ---------------------------------------------------------------------------
+
+
+def test_check_significance_with_none_p_value_adjusted():
+    """_check_significance must handle p_value_adjusted=None (auxiliary pairs)."""
+    from scripts.claim_audit import _check_significance
+
+    # Auxiliary pair entry: p_value_adjusted is None, should fall back to p_value_raw
+    entry = {
+        "p_value_adjusted": None,
+        "p_value_raw": 0.01,
+        "cliffs_delta": 0.5,
+        "ci_lower": 0.01,
+        "ci_upper": 0.10,
+        "significant": False,
+    }
+    # Should not raise TypeError
+    derived, issues = _check_significance(entry)
+    # With p_adj=None, code should fall back to p_value_raw=0.01
+    # derived should be True (p<0.05, |delta|>=0.33, CI excludes 0)
+    assert derived is True
+    # Mismatch with reported=False
+    assert len(issues) > 0
+    assert "Significance mismatch" in issues[0]
+
+
+def test_degradation_boundary_exactly_minus_047(tmp_path, monkeypatch):
+    """Cliff's delta = exactly -0.47 should count as degraded (SAP: '> -0.47' passes)."""
+    degradation = {}
+    for pair in _CORE_PAIRS:
+        degradation[pair] = {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        }
+    # Set CDK2_ERK2 to exactly -0.47
+    degradation["CDK2_ERK2"]["hr_a_double_vs_single_a"] = {
+        "cliffs_delta": -0.47,
+        "degraded": True,  # correctly flagged
+    }
+    _setup(tmp_path, monkeypatch, n_significant=5, degradation=degradation)
+    runner = CliRunner()
+    result = runner.invoke(main, ["--no-strict"])
+    assert result.exit_code == 0
+    audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
+    # -0.47 <= -0.47 is True, so CDK2_ERK2 should be degraded
+    assert any("CDK2_ERK2" in p for p in audit["summary"]["degraded_pairs"])
+    assert "CDK2_ERK2" in audit["summary"]["degraded_excluded"]
+
+
+def test_degradation_boundary_just_above(tmp_path, monkeypatch):
+    """Cliff's delta = -0.469 should NOT count as degraded."""
+    degradation = {}
+    for pair in _CORE_PAIRS:
+        degradation[pair] = {
+            "hr_a_double_vs_single_a": {"cliffs_delta": 0.1, "degraded": False},
+            "hr_b_double_vs_single_b": {"cliffs_delta": 0.1, "degraded": False},
+        }
+    # -0.469 > -0.47 so NOT degraded
+    degradation["CDK2_ERK2"]["hr_a_double_vs_single_a"] = {
+        "cliffs_delta": -0.469,
+        "degraded": False,
+    }
+    _setup(tmp_path, monkeypatch, n_significant=5, degradation=degradation)
+    runner = CliRunner()
+    result = runner.invoke(main, [])
+    assert result.exit_code == 0
+    audit = json.loads((tmp_path / "report" / "data" / "claim_audit.json").read_text())
+    assert len(audit["summary"]["degraded_pairs"]) == 0
+
+
+def test_core_pair_with_set_blocked_excluded(tmp_path, monkeypatch):
+    """If a pair has set=blocked, it must not appear in core_pairs list."""
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    # Make a pairs.yaml where CDK2_ERK2 is blocked
+    pairs = {}
+    for pid in _CORE_PAIRS:
+        a, b = pid.split("_", 1)
+        pairs[pid] = {
+            "set": "blocked" if pid == "CDK2_ERK2" else "core",
+            "target_a": {"id": a, "organism": "Homo sapiens"},
+            "target_b": {"id": b, "organism": "Homo sapiens"},
+        }
+    configs = tmp_path / "configs"
+    configs.mkdir(parents=True, exist_ok=True)
+    (configs / "pairs.yaml").write_text(yaml.dump({"pairs": pairs}))
+
+    from scripts.claim_audit import _load_core_pairs
+    core = _load_core_pairs(configs / "pairs.yaml")
+    assert "CDK2_ERK2" not in core
+    assert len(core) == 4
+
+
+def test_all_pairs_missing_from_stats(tmp_path, monkeypatch):
+    """When stats.json has no core pair entries, audit reports missing tests."""
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    configs = tmp_path / "configs"
+    configs.mkdir(parents=True, exist_ok=True)
+    (configs / "pairs.yaml").write_text(yaml.dump(_make_pairs_yaml()))
+    report = tmp_path / "report"
+    report.mkdir(parents=True, exist_ok=True)
+    (report / "data").mkdir(parents=True, exist_ok=True)
+    (report / "metrics.json").write_text(json.dumps({}))
+    # Empty stats (no pair keys at all)
+    stats = {"_completeness": {"n_expected": 75, "n_valid": 0, "missing_rate": 1.0}, "_degradation": {}}
+    (report / "stats.json").write_text(json.dumps(stats))
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["--no-strict"])
+    assert result.exit_code == 0
+    audit = json.loads((report / "data" / "claim_audit.json").read_text())
+    assert audit["pass"] is False
+    # Should report missing tests for all 5 core pairs x 2 tests = 10
+    missing_check = next(c for c in audit["checks"] if c["name"] == "core_tests_complete")
+    assert missing_check["pass"] is False
+    assert len(missing_check["missing"]) == 10

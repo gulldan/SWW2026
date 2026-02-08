@@ -86,7 +86,8 @@ def _render_grid(
         r, c = divmod(int(idx), n_cols)
         ax = axes[r][c]
 
-        mol = Chem.MolFromSmiles(row["smiles"])
+        smiles_val = row.get("smiles") or row.get("smiles_canonical") or ""
+        mol = Chem.MolFromSmiles(smiles_val)
         if mol is None:
             ax.text(0.5, 0.5, "Invalid\nSMILES", ha="center", va="center", fontsize=10)
             ax.axis("off")
@@ -96,7 +97,9 @@ def _render_grid(
         ax.imshow(img)
         ax.axis("off")
 
-        hit = _is_hit(row["score_a"], row["score_b"], th_a, th_b)
+        val_a = row.get("affinity_a", row.get("score_a", float("nan")))
+        val_b = row.get("affinity_b", row.get("score_b", float("nan")))
+        hit = _is_hit(val_a, val_b, th_a, th_b)
 
         if hit:
             rect = FancyBboxPatch(
@@ -114,7 +117,7 @@ def _render_grid(
 
         ax.set_title(f"#{int(idx) + 1}", fontsize=11, fontweight="bold")
         primary_val = row.get(sort_col, float("nan"))
-        score_text = f"{name_a}: {row['score_a']:.2f}  |  {name_b}: {row['score_b']:.2f}\n{sort_col}: {primary_val:.2f}"
+        score_text = f"{name_a}: {val_a:.2f}  |  {name_b}: {val_b:.2f}\n{sort_col}: {primary_val:.2f}"
         if hit:
             score_text += "  [HIT]"
         ax.text(
