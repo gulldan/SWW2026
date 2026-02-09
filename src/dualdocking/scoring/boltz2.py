@@ -328,6 +328,34 @@ def _validate_smiles(smiles: str) -> bool:
     return mol.GetNumAtoms() <= MAX_LIGAND_ATOMS
 
 
+def _neutralize_smiles(smiles: str) -> str:
+    """Neutralize formal charges for Boltz-2 compatibility.
+
+    Boltz-2 v2.2.1 crashes on charged species ([NH2+], [O-], etc.).
+    Strips protonation states while preserving molecular identity.
+    Returns original SMILES if neutralization fails.
+    """
+    try:
+        from rdkit import Chem
+        from rdkit.Chem.MolStandardize import rdMolStandardize
+    except ImportError:
+        return smiles
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return smiles
+
+    try:
+        uncharger = rdMolStandardize.Uncharger()
+        mol = uncharger.uncharge(mol)
+    except Exception:
+        logger.debug("Neutralization failed for SMILES: {}", smiles)
+        return smiles
+
+    result = Chem.MolToSmiles(mol)
+    return result or smiles
+
+
 def _write_boltz_yaml(
     sequence: str,
     smiles: str,
@@ -420,6 +448,39 @@ def _parse_affinity(out_dir: Path, stem: str) -> float:
     return float(data["affinity_pred_value"])
 
 
+def _score_single_internal(
+    target_id: str,
+    smiles: str,
+    sequence: str,
+    msa_path: Path,
+    *,
+    device: str | None = None,
+) -> float:
+    """Score one molecule via individual boltz predict call (no cache)."""
+    with tempfile.TemporaryDirectory(prefix=f"boltz_retry_{target_id}_") as tmpdir:
+        tmp_path = Path(tmpdir)
+        yaml_stem = "input"
+        yaml_path = tmp_path / f"{yaml_stem}.yaml"
+        out_dir = tmp_path / "output"
+
+        _write_boltz_yaml(sequence, smiles, yaml_path, msa_path=msa_path)
+
+        try:
+            result = _run_boltz_predict(yaml_path, out_dir, device=device)
+        except subprocess.TimeoutExpired:
+            logger.debug("Boltz retry timeout for SMILES: {}", smiles)
+            return float("nan")
+
+        if result.returncode != 0:
+            logger.debug("Boltz retry failed (rc={}) for SMILES: {}", result.returncode, smiles)
+            return float("nan")
+
+        try:
+            return _parse_affinity(out_dir, yaml_stem)
+        except (FileNotFoundError, KeyError, json.JSONDecodeError):
+            return float("nan")
+
+
 def _run_boltz_predict_dir(
     input_dir: Path,
     out_dir: Path,
@@ -466,6 +527,11 @@ def _score_batch_internal(
 
     Создаёт директорию с YAML файлами и запускает boltz predict на ней.
     Модель загружается один раз, что значительно быстрее.
+
+    Fixes applied:
+    - SMILES are neutralized before scoring (Boltz-2 crashes on charged species)
+    - Partial results are parsed even after timeout (not just on rc!=0)
+    - Failed molecules are retried individually as fallback
     """
     scores = [float("nan")] * len(smiles_list)
 
@@ -480,19 +546,21 @@ def _score_batch_internal(
     if not valid_indices:
         return scores
 
+    batch_failed = False
+
     with tempfile.TemporaryDirectory(prefix=f"boltz_batch_{target_id}_") as tmpdir:
         tmp_path = Path(tmpdir)
         input_dir = tmp_path / "inputs"
         out_dir = tmp_path / "output"
         input_dir.mkdir(parents=True, exist_ok=True)
 
-        # Создаём YAML для каждой валидной молекулы
+        # Создаём YAML для каждой валидной молекулы (FIX 1: neutralize SMILES)
         stem_to_idx: dict[str, int] = {}
         for idx in valid_indices:
-            smi = smiles_list[idx]
+            smi_neutralized = _neutralize_smiles(smiles_list[idx])
             stem = f"mol_{idx:04d}"
             yaml_path = input_dir / f"{stem}.yaml"
-            _write_boltz_yaml(sequence, smi, yaml_path, msa_path=msa_path)
+            _write_boltz_yaml(sequence, smi_neutralized, yaml_path, msa_path=msa_path)
             stem_to_idx[stem] = idx
 
         # Один вызов boltz predict на директорию
@@ -500,35 +568,58 @@ def _score_batch_internal(
         try:
             result = _run_boltz_predict_dir(input_dir, out_dir, timeout=timeout, device=device)
         except subprocess.TimeoutExpired:
-            logger.error("Boltz batch таймаут ({} сек) для {} молекул", timeout, len(valid_indices))
-            return scores
+            # FIX 3: don't return — fall through to parse partial results
+            logger.error("Boltz batch таймаут ({} сек) для {} молекул, парсим partial results", timeout, len(valid_indices))
+            batch_failed = True
+        else:
+            if result.returncode != 0:
+                stderr = result.stderr or ""
+                if "CUDA out of memory" in stderr:
+                    logger.error("Boltz batch OOM GPU для {} молекул", len(valid_indices))
+                else:
+                    logger.error(
+                        "Boltz batch ошибка (rc={}) для {} молекул\nstderr: {}",
+                        result.returncode,
+                        len(valid_indices),
+                        stderr[-2000:],
+                    )
+                batch_failed = True
 
-        if result.returncode != 0:
-            stderr = result.stderr or ""
-            if "CUDA out of memory" in stderr:
-                logger.error("Boltz batch OOM GPU для {} молекул", len(valid_indices))
-            else:
-                logger.error(
-                    "Boltz batch ошибка (rc={}) для {} молекул\nstderr: {}",
-                    result.returncode,
-                    len(valid_indices),
-                    stderr[-2000:],
-                )
-            # Попробуем распарсить частичные результаты
-
-        # Парсим результаты для каждой молекулы
-        # При батчевом запуске структура: boltz_results_{dir_name}/predictions/{stem}/affinity_{stem}.json
+        # Парсим результаты (всегда — даже после timeout/error, для partial recovery)
         results_dir = out_dir / f"boltz_results_{input_dir.name}"
+        parsed_ok = 0
         for stem, idx in stem_to_idx.items():
             affinity_path = results_dir / "predictions" / stem / f"affinity_{stem}.json"
             try:
                 if not affinity_path.exists():
-                    logger.debug("Affinity файл не найден: {}", affinity_path)
                     continue
                 data = json.loads(affinity_path.read_text())
                 scores[idx] = float(data["affinity_pred_value"])
+                parsed_ok += 1
             except (KeyError, json.JSONDecodeError) as exc:
                 logger.debug("Не удалось распарсить affinity для {}: {}", stem, exc)
+
+        if batch_failed:
+            logger.info(
+                "Batch partial recovery: {}/{} molecules scored from failed batch",
+                parsed_ok,
+                len(valid_indices),
+            )
+
+    # FIX 2: retry NaN molecules individually if batch had errors
+    if batch_failed:
+        failed_indices = [idx for idx in valid_indices if np.isnan(scores[idx])]
+        if failed_indices:
+            logger.info(
+                "Batch fallback: retrying {} NaN molecules individually for {}",
+                len(failed_indices),
+                target_id,
+            )
+            for idx in failed_indices:
+                smi_neutralized = _neutralize_smiles(smiles_list[idx])
+                scores[idx] = _score_single_internal(
+                    target_id, smi_neutralized, sequence, msa_path, device=device,
+                )
 
     return scores
 
@@ -565,7 +656,8 @@ def score_single(target_id: str, smiles: str) -> float:
         yaml_path = tmp_path / f"{yaml_stem}.yaml"
         out_dir = tmp_path / "output"
 
-        _write_boltz_yaml(sequence, smiles, yaml_path, msa_path=msa_path)
+        smiles_neutralized = _neutralize_smiles(smiles)
+        _write_boltz_yaml(sequence, smiles_neutralized, yaml_path, msa_path=msa_path)
 
         try:
             result = _run_boltz_predict(yaml_path, out_dir)
