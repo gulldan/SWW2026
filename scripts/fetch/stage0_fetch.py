@@ -166,7 +166,7 @@ def verify_offline_readiness() -> list[str]:
             role_letter = role[-1].upper()
 
             # PDB
-            pdb_path = PROJECT_ROOT / "data" / "targets" / pair_id / role_letter / f"{pdb_id}.pdb"
+            pdb_path = PROJECT_ROOT / "data" / "targets" / pair_id / role_letter / f"{pdb_id.lower()}.pdb"
             if not pdb_path.exists():
                 missing.append(f"PDB: {pdb_path.relative_to(PROJECT_ROOT)}")
 

@@ -1,7 +1,11 @@
 """Обёртка скоринга Boltz-2.
 
 Предоставляет ``score_batch(target, smiles_list)`` с дисковым кешем.
-Вызывает ``boltz predict`` через subprocess (Boltz-2 не имеет публичного Python API).
+Поддерживает два бэкенда:
+- ``cli`` (по умолчанию): вызывает ``boltz predict`` через subprocess
+- ``nim``: вызывает NVIDIA NIM Boltz-2 REST API (persistent GPU server)
+
+Выбор бэкенда: ``BOLTZ_BACKEND=nim`` (env var).
 """
 
 from __future__ import annotations
@@ -12,6 +16,8 @@ import json
 import os
 import subprocess
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -79,6 +85,27 @@ _CONTEXT_HASH: str | None = None
 
 # Docker image for FREED++ (used for digest lookup)
 _FREEDPP_DOCKER_IMAGE = "dualdocking/freedpp:latest"
+
+# ---------------------------------------------------------------------------
+# NIM backend configuration
+# ---------------------------------------------------------------------------
+_BOLTZ_BACKEND: str = os.getenv("BOLTZ_BACKEND", "cli").lower()
+_BOLTZ_NIM_URL: str = os.getenv("BOLTZ_NIM_URL", "http://localhost:8000")
+_NIM_PREDICT_ENDPOINT = "/biology/mit/boltz2/predict"
+_NIM_HEALTH_ENDPOINT = "/v1/health/ready"
+_NIM_TIMEOUT = 300  # seconds per molecule via NIM
+
+# NIM prediction params — mirrors _BOLTZ_CLI_ARGS_BASE values.
+# step_scale=1.5: boltz2 model default (CLI uses 1.5; NIM defaults to 1.638 if unset).
+_NIM_PREDICT_PARAMS: dict = {
+    "recycling_steps": 3,
+    "sampling_steps": 50,
+    "diffusion_samples": 1,
+    "sampling_steps_affinity": 50,
+    "diffusion_samples_affinity": 1,
+    "step_scale": 1.5,
+    "output_format": "mmcif",
+}
 
 
 def _resolve_accelerator() -> str:
@@ -196,22 +223,33 @@ def _scoring_context_hash() -> str:
     if _CONTEXT_HASH is not None:
         return _CONTEXT_HASH
 
-    boltz_ver = _boltz_version()
-    cli_args = "|".join(_BOLTZ_CLI_ARGS_BASE)
-    accelerator = os.getenv("BOLTZ_ACCELERATOR", "gpu").lower()
-    digest = _docker_digest()
+    if _BOLTZ_BACKEND == "nim":
+        nim_params_str = json.dumps(_NIM_PREDICT_PARAMS, sort_keys=True)
+        blob = f"nim||{_BOLTZ_NIM_URL}||{nim_params_str}".encode()
+        _CONTEXT_HASH = hashlib.sha256(blob).hexdigest()[:16]
+        logger.info(
+            "Scoring context (NIM): url={}, params_hash={}... -> ctx={}",
+            _BOLTZ_NIM_URL,
+            hashlib.sha256(nim_params_str.encode()).hexdigest()[:8],
+            _CONTEXT_HASH,
+        )
+    else:
+        boltz_ver = _boltz_version()
+        cli_args = "|".join(_BOLTZ_CLI_ARGS_BASE)
+        accelerator = os.getenv("BOLTZ_ACCELERATOR", "gpu").lower()
+        digest = _docker_digest()
 
-    blob = f"{boltz_ver}||{cli_args}||{accelerator}||{digest}".encode()
-    _CONTEXT_HASH = hashlib.sha256(blob).hexdigest()[:16]
+        blob = f"{boltz_ver}||{cli_args}||{accelerator}||{digest}".encode()
+        _CONTEXT_HASH = hashlib.sha256(blob).hexdigest()[:16]
 
-    logger.info(
-        "Scoring context: boltz={}, cli_hash={}..., accel={}, docker={}... -> ctx={}",
-        boltz_ver,
-        hashlib.sha256(cli_args.encode()).hexdigest()[:8],
-        accelerator,
-        digest[:16],
-        _CONTEXT_HASH,
-    )
+        logger.info(
+            "Scoring context: boltz={}, cli_hash={}..., accel={}, docker={}... -> ctx={}",
+            boltz_ver,
+            hashlib.sha256(cli_args.encode()).hexdigest()[:8],
+            accelerator,
+            digest[:16],
+            _CONTEXT_HASH,
+        )
     return _CONTEXT_HASH
 
 
@@ -222,12 +260,21 @@ def get_cache_context_hash() -> str:
 
 def get_scoring_context_info() -> dict:
     """Return all scoring context components (for metadata persistence)."""
+    if _BOLTZ_BACKEND == "nim":
+        nim_params_str = json.dumps(_NIM_PREDICT_PARAMS, sort_keys=True)
+        return {
+            "cache_context_hash": get_cache_context_hash(),
+            "backend": "nim",
+            "nim_url": _BOLTZ_NIM_URL,
+            "nim_params_hash": hashlib.sha256(nim_params_str.encode()).hexdigest()[:16],
+        }
     boltz_ver = _boltz_version()
     cli_args = "|".join(_BOLTZ_CLI_ARGS_BASE)
     accelerator = os.getenv("BOLTZ_ACCELERATOR", "gpu").lower()
     digest = _docker_digest()
     return {
         "cache_context_hash": get_cache_context_hash(),
+        "backend": "cli",
         "boltz_version": boltz_ver,
         "docker_digest": digest,
         "accelerator": accelerator,
@@ -515,11 +562,122 @@ def _run_boltz_predict_dir(
     return result
 
 
+def _nim_health_check() -> bool:
+    """Check if NIM Boltz-2 server is ready."""
+    url = f"{_BOLTZ_NIM_URL.rstrip('/')}{_NIM_HEALTH_ENDPOINT}"
+    try:
+        req = urllib.request.Request(url)  # noqa: S310
+        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+            return b"true" in resp.read().lower()
+    except Exception:
+        return False
+
+
+_NIM_MAX_RETRIES = 2  # total attempts = 1 + retries
+
+
+def _nim_predict_affinity(sequence: str, smiles: str) -> float:
+    """Score one molecule via NIM REST API.
+
+    Returns log10(IC50 in μM), or NaN on failure.
+    NIM returns two values from two affinity models — we average them.
+    Retries up to _NIM_MAX_RETRIES times on transient errors.
+    """
+    import time
+
+    url = f"{_BOLTZ_NIM_URL.rstrip('/')}{_NIM_PREDICT_ENDPOINT}"
+
+    payload: dict = {
+        "polymers": [{"id": "A", "molecule_type": "protein", "sequence": sequence}],
+        "ligands": [{"id": "B", "smiles": smiles, "predict_affinity": True}],
+        **_NIM_PREDICT_PARAMS,
+    }
+
+    data = json.dumps(payload).encode()
+
+    last_error: Exception | None = None
+    for attempt in range(_NIM_MAX_RETRIES + 1):
+        req = urllib.request.Request(  # noqa: S310
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=_NIM_TIMEOUT) as resp:  # noqa: S310
+                result = json.loads(resp.read().decode())
+            break
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode(errors="replace")[:500] if exc.fp else ""
+            # 4xx errors are not retryable (bad input)
+            if 400 <= exc.code < 500:
+                logger.error("NIM HTTP {} for SMILES {}: {}", exc.code, smiles, body)
+                return float("nan")
+            last_error = exc
+            logger.warning(
+                "NIM HTTP {} for SMILES {} (attempt {}/{}): {}",
+                exc.code,
+                smiles,
+                attempt + 1,
+                _NIM_MAX_RETRIES + 1,
+                body,
+            )
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last_error = exc
+            logger.warning("NIM request failed for SMILES {} (attempt {}/{}): {}", smiles, attempt + 1, _NIM_MAX_RETRIES + 1, exc)
+
+        if attempt < _NIM_MAX_RETRIES:
+            time.sleep(1.0 * (attempt + 1))  # linear backoff
+    else:
+        logger.error("NIM exhausted {} retries for SMILES {}: {}", _NIM_MAX_RETRIES + 1, smiles, last_error)
+        return float("nan")
+
+    try:
+        affinities = result["affinities"]["B"]
+        pred_values = affinities["affinity_pred_value"]
+        # Two affinity models → average
+        return float(np.mean(pred_values))
+    except (KeyError, TypeError, IndexError) as exc:
+        logger.error("Failed to parse NIM affinity for SMILES {}: {}", smiles, exc)
+        return float("nan")
+
+
+def _score_batch_internal_nim(
+    target_id: str,  # noqa: ARG001
+    smiles_list: list[str],
+    sequence: str,
+    msa_path: Path | None,  # noqa: ARG001
+    *,
+    device: str | None = None,  # noqa: ARG001
+) -> list[float]:
+    """Score a batch via NIM (one HTTP request per molecule).
+
+    NIM only allows one ligand with predict_affinity=true per request,
+    so we loop over molecules sequentially.
+    """
+    scores = [float("nan")] * len(smiles_list)
+
+    valid_indices: list[int] = []
+    for idx, smi in enumerate(smiles_list):
+        if _validate_smiles(smi):
+            valid_indices.append(idx)
+        else:
+            logger.warning("Invalid SMILES or too large (>{} atoms): {}", MAX_LIGAND_ATOMS, smi)
+
+    if not valid_indices:
+        return scores
+
+    for idx in valid_indices:
+        smi = _neutralize_smiles(smiles_list[idx])
+        scores[idx] = _nim_predict_affinity(sequence, smi)
+
+    return scores
+
+
 def _score_batch_internal(
     target_id: str,
     smiles_list: list[str],
     sequence: str,
-    msa_path: Path,
+    msa_path: Path | None,
     *,
     device: str | None = None,
 ) -> list[float]:
@@ -533,6 +691,15 @@ def _score_batch_internal(
     - Partial results are parsed even after timeout (not just on rc!=0)
     - Failed molecules are retried individually as fallback
     """
+    if _BOLTZ_BACKEND == "nim":
+        return _score_batch_internal_nim(
+            target_id,
+            smiles_list,
+            sequence,
+            msa_path,
+            device=device,
+        )
+
     scores = [float("nan")] * len(smiles_list)
 
     # Валидация SMILES
@@ -618,7 +785,11 @@ def _score_batch_internal(
             for idx in failed_indices:
                 smi_neutralized = _neutralize_smiles(smiles_list[idx])
                 scores[idx] = _score_single_internal(
-                    target_id, smi_neutralized, sequence, msa_path, device=device,
+                    target_id,
+                    smi_neutralized,
+                    sequence,
+                    msa_path,
+                    device=device,
                 )
 
     return scores
@@ -640,6 +811,11 @@ def score_single(target_id: str, smiles: str) -> float:
 
     # Загрузить sequence
     sequence = _load_sequence(target_id)
+
+    # NIM backend: no MSA/subprocess needed, just HTTP
+    if _BOLTZ_BACKEND == "nim":
+        smi_neutralized = _neutralize_smiles(smiles)
+        return _nim_predict_affinity(sequence, smi_neutralized)
 
     # Найти pre-computed MSA
     msa_path = _get_msa_path(target_id)
@@ -723,7 +899,7 @@ def score_batch(
     # Загрузить sequence и MSA один раз
     sequence = _load_sequence(target_id)
     msa_path = _get_msa_path(target_id)
-    if msa_path is None:
+    if msa_path is None and _BOLTZ_BACKEND != "nim":
         msg = (
             f"Pre-computed MSA не найден для {target_id}. "
             f"Запустите: uv run python scripts/prep/prepare_targets.py --pair <pair> --prepare-all"

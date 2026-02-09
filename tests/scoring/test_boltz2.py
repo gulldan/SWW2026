@@ -2,6 +2,8 @@
 
 import json
 import math
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
 
 import pytest
 import yaml
@@ -13,8 +15,11 @@ from dualdocking.scoring.boltz2 import (
     _load_cache,
     _load_sequence,
     _msa_content_hash,
+    _nim_health_check,
+    _nim_predict_affinity,
     _parse_affinity,
     _save_cache,
+    _score_batch_internal_nim,
     _scoring_context_hash,
     _sequence_content_hash,
     _validate_smiles,
@@ -29,6 +34,7 @@ def _reset_scorer_state(monkeypatch):
     """Reset module-level cached state between tests."""
     monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
     monkeypatch.setattr(mod, "_ACCELERATOR", None)
+    monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "cli")
     mod._sequence_cache.clear()
     yield
     mod._sequence_cache.clear()
@@ -441,6 +447,7 @@ class TestGetScoringContextInfo:
         monkeypatch.setenv("BOLTZ_ACCELERATOR", "cpu")
 
         info = get_scoring_context_info()
+        assert info["backend"] == "cli"
         assert info["boltz_version"] == "2.2.1"
         assert info["docker_digest"] == "sha256:abc123"
         assert info["accelerator"] == "cpu"
@@ -448,3 +455,286 @@ class TestGetScoringContextInfo:
         assert "cli_args_hash" in info
         assert len(info["cache_context_hash"]) == 16
         assert len(info["cli_args_hash"]) == 16
+
+
+# ===================================================================
+# NIM backend tests
+# ===================================================================
+
+
+class _NimHandler(BaseHTTPRequestHandler):
+    """Fake NIM server for testing."""
+
+    # Class-level response overrides — set by tests
+    response_body: dict | None = None
+    status_code: int = 200
+    health_ready: bool = True
+
+    def do_GET(self):  # noqa: N802
+        if self.path == "/v1/health/ready":
+            body = b"true" if self.health_ready else b"false"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self.send_error(404)
+
+    def do_POST(self):  # noqa: N802
+        length = int(self.headers.get("Content-Length", 0))
+        _payload = self.rfile.read(length)
+        self.send_response(self.status_code)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        body = self.response_body or {}
+        self.wfile.write(json.dumps(body).encode())
+
+    def log_message(self, *_args):
+        pass  # suppress stderr
+
+
+@pytest.fixture
+def nim_server(monkeypatch):
+    """Start a local HTTP server faking NIM and point module at it."""
+    # Reset handler defaults
+    _NimHandler.response_body = None
+    _NimHandler.status_code = 200
+    _NimHandler.health_ready = True
+
+    server = HTTPServer(("127.0.0.1", 0), _NimHandler)
+    port = server.server_address[1]
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    url = f"http://127.0.0.1:{port}"
+    monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "nim")
+    monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", url)
+
+    yield server
+    server.shutdown()
+
+
+class TestNimHealthCheck:
+    def test_health_ok(self, nim_server):
+        assert _nim_health_check() is True
+
+    def test_health_not_ready(self, nim_server):
+        _NimHandler.health_ready = False
+        assert _nim_health_check() is False
+
+    def test_health_no_server(self, monkeypatch):
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://127.0.0.1:1")
+        assert _nim_health_check() is False
+
+
+class TestNimPredictAffinity:
+    def test_success_averages_two_models(self, nim_server):
+        _NimHandler.response_body = {
+            "affinities": {
+                "B": {
+                    "affinity_pred_value": [-5.0, -6.0],
+                    "affinity_pic50": [5.0, 6.0],
+                    "affinity_probability_binary": [0.8, 0.9],
+                },
+            },
+        }
+        score = _nim_predict_affinity("MKTAY", "CCO")
+        assert score == pytest.approx(-5.5)
+
+    def test_success_single_value(self, nim_server):
+        _NimHandler.response_body = {
+            "affinities": {"B": {"affinity_pred_value": [-4.2]}},
+        }
+        score = _nim_predict_affinity("MKTAY", "CCO")
+        assert score == pytest.approx(-4.2)
+
+    def test_http_error_returns_nan(self, nim_server):
+        _NimHandler.status_code = 500
+        _NimHandler.response_body = {"error": "OOM"}
+        score = _nim_predict_affinity("MKTAY", "CCO")
+        assert math.isnan(score)
+
+    def test_missing_affinities_returns_nan(self, nim_server):
+        _NimHandler.response_body = {"structures": []}
+        score = _nim_predict_affinity("MKTAY", "CCO")
+        assert math.isnan(score)
+
+    def test_connection_refused_returns_nan(self, monkeypatch):
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://127.0.0.1:1")
+        score = _nim_predict_affinity("MKTAY", "CCO")
+        assert math.isnan(score)
+
+
+class TestNimScoreBatchInternal:
+    def test_batch_scores_valid_molecules(self, nim_server):
+        call_count = 0
+
+        def make_response():
+            nonlocal call_count
+            call_count += 1
+            return {"affinities": {"B": {"affinity_pred_value": [-3.0 - call_count]}}}
+
+        orig_do_post = _NimHandler.do_POST
+
+        def counting_post(self_handler):
+            _NimHandler.response_body = make_response()
+            orig_do_post(self_handler)
+
+        _NimHandler.do_POST = counting_post
+
+        scores = _score_batch_internal_nim("tgt", ["CCO", "CCCO", "C"], "MKTAY", None)
+        assert len(scores) == 3
+        assert all(not math.isnan(s) for s in scores)
+
+        _NimHandler.do_POST = orig_do_post
+
+    def test_batch_skips_invalid_smiles(self, nim_server):
+        _NimHandler.response_body = {
+            "affinities": {"B": {"affinity_pred_value": [-5.0]}},
+        }
+        scores = _score_batch_internal_nim("tgt", ["CCO", "not_a_smiles!!!"], "MKTAY", None)
+        assert not math.isnan(scores[0])
+        assert math.isnan(scores[1])
+
+
+class TestNimScoringContext:
+    def test_nim_context_hash_differs_from_cli(self, monkeypatch):
+        # CLI context
+        monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "cli")
+        monkeypatch.setattr(mod, "_boltz_version", lambda: "2.0")
+        monkeypatch.setattr(mod, "_docker_digest", lambda: "d1")
+        monkeypatch.setenv("BOLTZ_ACCELERATOR", "cpu")
+        h_cli = _scoring_context_hash()
+
+        # NIM context
+        monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
+        monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "nim")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://localhost:8000")
+        h_nim = _scoring_context_hash()
+
+        assert h_cli != h_nim
+
+    def test_nim_context_changes_with_url(self, monkeypatch):
+        monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "nim")
+
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://host1:8000")
+        h1 = _scoring_context_hash()
+
+        monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://host2:8000")
+        h2 = _scoring_context_hash()
+
+        assert h1 != h2
+
+    def test_nim_scoring_context_info(self, monkeypatch):
+        monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "nim")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://localhost:8000")
+        info = get_scoring_context_info()
+        assert info["backend"] == "nim"
+        assert info["nim_url"] == "http://localhost:8000"
+        assert "cache_context_hash" in info
+
+
+class TestNimScoreBatchE2E:
+    """Integration: score_batch with NIM backend uses cache correctly."""
+
+    def test_score_batch_nim_with_cache(self, tmp_path, monkeypatch, nim_server):
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        monkeypatch.setattr(mod, "CACHE_DIR", cache_dir)
+        monkeypatch.setattr(mod, "DATA_DIR", data_dir)
+        monkeypatch.setattr(mod, "MSA_CACHE_DIR", tmp_path / "msa")
+
+        (data_dir / "tgt.fasta").write_text(">tgt\nMKTAY\n")
+
+        _NimHandler.response_body = {
+            "affinities": {"B": {"affinity_pred_value": [-6.0, -6.2]}},
+        }
+
+        scores = mod.score_batch("tgt", ["CCO", "CCCO"])
+        assert len(scores) == 2
+        assert scores[0] == pytest.approx(-6.1)
+        assert scores[1] == pytest.approx(-6.1)
+
+        # Second call should hit cache (even if server is down)
+        nim_server.shutdown()
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://127.0.0.1:1")
+        scores2 = mod.score_batch("tgt", ["CCO", "CCCO"])
+        assert scores2[0] == pytest.approx(-6.1)
+        assert scores2[1] == pytest.approx(-6.1)
+
+
+class TestNimScoreSingle:
+    """Test score_single() dispatches to NIM correctly."""
+
+    def test_score_single_nim(self, tmp_path, monkeypatch, nim_server):
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "tgt.fasta").write_text(">tgt\nMKTAY\n")
+        monkeypatch.setattr(mod, "DATA_DIR", data_dir)
+
+        _NimHandler.response_body = {
+            "affinities": {"B": {"affinity_pred_value": [-3.5, -4.0]}},
+        }
+        score = mod.score_single("tgt", "CCO")
+        assert score == pytest.approx(-3.75)
+
+    def test_score_single_nim_invalid_smiles(self, tmp_path, monkeypatch, nim_server):
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "tgt.fasta").write_text(">tgt\nMKTAY\n")
+        monkeypatch.setattr(mod, "DATA_DIR", data_dir)
+
+        score = mod.score_single("tgt", "not_a_smiles!!!")
+        assert math.isnan(score)
+
+
+class TestNimRetry:
+    """Test that _nim_predict_affinity retries on transient 5xx errors."""
+
+    def test_retries_on_500_then_succeeds(self, nim_server):
+        attempt_counter = {"n": 0}
+
+        # Save original as a plain function reference
+        _orig = _NimHandler.__dict__["do_POST"]
+
+        def flaky_post(self_handler):
+            attempt_counter["n"] += 1
+            if attempt_counter["n"] <= 1:
+                # First call: 500
+                self_handler.send_response(500)
+                self_handler.send_header("Content-Type", "application/json")
+                self_handler.end_headers()
+                self_handler.wfile.write(b'{"error": "temporary"}')
+            else:
+                # Subsequent: success
+                _NimHandler.response_body = {
+                    "affinities": {"B": {"affinity_pred_value": [-5.0]}},
+                }
+                _orig(self_handler)
+
+        _NimHandler.do_POST = flaky_post
+        score = _nim_predict_affinity("MKTAY", "CCO")
+        assert score == pytest.approx(-5.0)
+        assert attempt_counter["n"] >= 2
+        _NimHandler.do_POST = _orig
+
+    def test_no_retry_on_400(self, nim_server):
+        attempt_counter = {"n": 0}
+        _orig = _NimHandler.__dict__["do_POST"]
+
+        def always_400(self_handler):
+            attempt_counter["n"] += 1
+            self_handler.send_response(400)
+            self_handler.send_header("Content-Type", "application/json")
+            self_handler.end_headers()
+            self_handler.wfile.write(b'{"error": "bad request"}')
+
+        _NimHandler.do_POST = always_400
+        score = _nim_predict_affinity("MKTAY", "CCO")
+        assert math.isnan(score)
+        assert attempt_counter["n"] == 1  # no retries on 4xx
+        _NimHandler.do_POST = _orig

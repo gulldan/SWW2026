@@ -145,6 +145,7 @@ addopts = "-v -n auto"
 pythonpath = [".", "src"]
 markers = [
     "integration: marks tests as integration tests",
+    "benchmark: marks performance benchmarks (require GPU + optional NIM container)",
 ]
 
 [tool.coverage.run]

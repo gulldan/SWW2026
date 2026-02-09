@@ -50,3 +50,4 @@ docker/freedpp/dualdocking-freedpp.tar.zst
 .env
 *.key
 data/
+docker/boltz2/boltz2_1.5.0.tar

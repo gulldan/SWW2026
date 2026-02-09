@@ -12,6 +12,7 @@ from loguru import logger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_OUTPUT = PROJECT_ROOT / "data" / "baseline" / "zinc-druglike-cano.tar.xz"
+DEFAULT_URL = "https://huggingface.co/datasets/Pixelatory/ZINC20-Druglike/resolve/main/zinc-druglike-cano.tar.xz?download=true"
 DEFAULT_URL_ENV = "ZINC_BASELINE_URL"
 
 
@@ -55,11 +56,7 @@ def main(url: str | None, output: str, timeout: int, overwrite: bool) -> None:
     if not needs_download:
         logger.info("File already exists, skip download: {}", output_path)
     else:
-        resolved_url = url or os.environ.get(DEFAULT_URL_ENV)
-        if not resolved_url:
-            raise click.UsageError(
-                f"Baseline URL is required: pass --url or export {DEFAULT_URL_ENV}=<https://.../zinc-druglike-cano.tar.xz>"
-            )
+        resolved_url = url or os.environ.get(DEFAULT_URL_ENV) or DEFAULT_URL
         _download(resolved_url, output_path, timeout=timeout)
 
     checksum = _sha256(output_path)

@@ -36,7 +36,7 @@ RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache dgl -f https://data.dgl.ai/wh
 RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache \
         rdkit \
         numpy==1.26.4 \
-        "pandas<2.0" \
+        "pandas==2.2.3" \
         scipy==1.14.1 \
         networkx \
         tqdm \
@@ -53,6 +53,9 @@ RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache --no-deps molsets==0.3.1 \
 # 4) moses/sascorer: rdkit.six removed in modern RDKit (was a Python 2/3 shim)
 RUN sed -i 's/from rdkit.six import iteritems/iteritems = lambda d: d.items()/' \
     /opt/venv/lib/python3.12/site-packages/moses/metrics/SA_Score/sascorer.py
+# 5) moses/utils: DataFrame.append removed in pandas 2.x → pd.concat
+RUN sed -i 's/_mcf\.append(_pains, sort=True)/pd.concat([_mcf, _pains], sort=True)/' \
+    /opt/venv/lib/python3.12/site-packages/moses/metrics/utils.py
 
 # ── Clone FFREED ─────────────────────────────────────────────────────
 RUN git clone https://github.com/AIRI-Institute/FFREED.git /opt/freed \
@@ -79,8 +82,8 @@ RUN chmod +x /opt/freed/ffreed/env/qvina02 2>/dev/null || true
 # CLI-совместим с AutoDock Vina: --receptor, --ligand, --center_x/y/z, etc.
 # unidock is only available via conda-forge, not PyPI.
 RUN wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C /usr/local bin/micromamba \
-    && micromamba create -n unidock -c conda-forge unidock --yes --root-prefix /opt/micromamba \
-    && micromamba install -n unidock -c conda-forge openmm pdbfixer --yes --root-prefix /opt/micromamba \
+    && MAMBA_NO_LOW_SPEED_LIMIT=1 micromamba create -n unidock -c conda-forge unidock --yes --root-prefix /opt/micromamba --retry-clean-cache \
+    && MAMBA_NO_LOW_SPEED_LIMIT=1 micromamba install -n unidock -c conda-forge openmm pdbfixer --yes --root-prefix /opt/micromamba \
     && ln -sf /opt/micromamba/envs/unidock/bin/unidock /usr/local/bin/unidock \
     && rm -rf /opt/micromamba/pkgs
 
