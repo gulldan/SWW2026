@@ -18,18 +18,18 @@ git clone <repo-url> && cd SWW2026
 uv sync --group dev
 
 # 2. Build FREED++ Docker image
-uv run python scripts/fetch_freed_data.py
+uv run python scripts/fetch/fetch_freed_data.py
 docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 
 # 3. Fetch all external data (internet required only here)
-uv run python scripts/stage0_fetch.py
+uv run python scripts/fetch/stage0_fetch.py
 
 # 4. Calibrate normalization
-uv run python scripts/dock_calibration.py
-uv run python scripts/calibrate_normalization.py
+uv run python scripts/validation/dock_calibration.py
+uv run python scripts/validation/calibrate_normalization.py
 
 # 5. Run full experiment (offline from here)
-EXPERIMENT_RUN_ID=run01 uv run python scripts/run_full_experiment.py \
+EXPERIMENT_RUN_ID=run01 uv run python scripts/run/run_full_experiment.py \
   --resume --parallel 2 --with-post --latex-mode draft
 ```
 
@@ -38,7 +38,7 @@ Results in `results/` and `report/`. See [Pipeline](docs/pipeline.md) for detail
 ### Smoke Test
 
 ```bash
-uv run python scripts/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
+uv run python scripts/run/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
 ```
 
 ### Tests

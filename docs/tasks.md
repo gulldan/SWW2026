@@ -16,13 +16,13 @@
 - **KVA-267 / SCI-03**: Receptor QC sheet per target. 100% targets покрыты, `docs/receptor_qc.md`.
 - **KVA-268 / SCI-04**: Redocking validation (RMSD). RMSD таблица, pass/fail threshold, `report/data/redocking_metrics.csv`.
 - **KVA-263 / ENG-09**: Docs hard-sync с кодом. README.md + docs/tasks.md синхронизированы с кодом.
-- **KVA-270 / SCI-06**: Hit-threshold calibration + sensitivity. `scripts/threshold_sensitivity.py` создан, тесты 7/7 pass, sensitivity_thresholds в metrics.yaml.
-- **KVA-271 / SCI-07**: Proxy vs Final correlation. `scripts/proxy_final_correlation.py` создан, тесты 7/7 pass. Spearman/Pearson + bootstrap CI.
+- **KVA-270 / SCI-06**: Hit-threshold calibration + sensitivity. `scripts/analysis/threshold_sensitivity.py` создан, тесты 7/7 pass, sensitivity_thresholds в metrics.yaml.
+- **KVA-271 / SCI-07**: Proxy vs Final correlation. `scripts/analysis/proxy_final_correlation.py` создан, тесты 7/7 pass. Spearman/Pearson + bootstrap CI.
 - **KVA-272 / SCI-08**: SAP — Statistical Analysis Plan submission-grade. `docs/statistical_analysis_plan.md` frozen. Полное покрытие: hierarchical bootstrap, FDR, effect sizes, claim language rules (6 сценариев), pipeline-to-SAP mapping с точными номерами строк кода.
 
 ## In Progress
 
-- **KVA-274 / SCI-10**: Full matrix run + claim audit. `scripts/claim_audit.py` — 8 checks: stats existence, core tests completeness, significance consistency, no-degradation guard (SAP 5.2), completeness gate (SAP 6.6), scenario selection with evidence-to-claims mapping (6 SAP scenarios). `compute_metrics.py` computes `_degradation` block (per-target Cliff's delta). Tests 10+12=22 pass. Awaits GPU run for full matrix.
+- **KVA-274 / SCI-10**: Full matrix run + claim audit. `scripts/validation/claim_audit.py` — 8 checks: stats existence, core tests completeness, significance consistency, no-degradation guard (SAP 5.2), completeness gate (SAP 6.6), scenario selection with evidence-to-claims mapping (6 SAP scenarios). `compute_metrics.py` computes `_degradation` block (per-target Cliff's delta). Tests 10+12=22 pass. Awaits GPU run for full matrix.
 
 ## Backlog
 

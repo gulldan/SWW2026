@@ -86,8 +86,8 @@ Runs in Docker due to dependency conflicts (Python 3.10, PyTorch 1.12, DGL 0.9).
 ### Data Flow
 
 ```
-scripts/generate.py
-  -> generator_freedpp.generate(config)
+scripts/run/generate.py
+  -> generation.freedpp.generate(config)
       1. _ensure_docker_image()       # build if absent
       2. _prepare_receptor()          # PDB -> PDBQT + binding box
       3. _run_freedpp()               # docker run --gpus all ... python main.py
@@ -125,7 +125,7 @@ task status, timestamps, and config hashes.
 
 ## Offline Principle
 
-All external data is fetched once during `scripts/stage0_fetch.py`.
+All external data is fetched once during `scripts/fetch/stage0_fetch.py`.
 After that, the entire pipeline (generation, scoring, analysis) runs offline.
 
 | Data | Location | Source |

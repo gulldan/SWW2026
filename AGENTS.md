@@ -28,7 +28,7 @@ All documents describe the **same experiment** and must stay consistent. When ch
 | `configs/pairs.yaml`    | `docs/selection_criteria.md`, `report/chapters/04_experimental_protocol.tex`     |
 | `configs/metrics.yaml`  | `docs/goal.md` (thresholds), `report/chapters/04_experimental_protocol.tex`      |
 | `configs/experiment.yaml` | `docs/goal.md`, `report/chapters/03_methods_notes.tex`                         |
-| `src/dualdocking/*.py`  | Corresponding `tests/test_*.py`, `docs/goal.md` if behavior changes             |
+| `src/dualdocking/**/*.py` | Corresponding `tests/test_*.py`, `docs/goal.md` if behavior changes            |
 | `docs/goal.md`          | `report/chapters/` (methods, protocol, limitations)                              |
 | `report/references.bib` | All `\cite{}` in `report/chapters/*.tex`                                         |
 | Install/Docker/pipeline | `docs/setup.md`, `docs/pipeline.md`                                             |
@@ -55,7 +55,7 @@ All other documents (`report/`, `docs/selection_criteria.md`, `README.md`, `conf
 
 1. **`docs/goal.md`** — supreme authority: hypothesis, endpoints, success criteria, notation. **Read-only without user approval.**
 2. `configs/*.yaml` — ground truth for runtime parameters (must agree with goal.md)
-3. `src/dualdocking/` — ground truth for computation logic (must implement what goal.md specifies)
+3. `src/dualdocking/` (all subpackages) — ground truth for computation logic (must implement what goal.md specifies)
 4. `docs/selection_criteria.md` — ground truth for pair selection rationale
 5. `report/chapters/*.tex` — narrative must reflect the above, never contradict
 6. `README.md` — operational guide, may simplify but must not misrepresent
@@ -91,27 +91,43 @@ docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 ## Project Architecture
 
 ```
-src/dualdocking/        # Core library (15 modules)
-  objectives.py         #   Multi-objective functions (min, harmonic, Pareto, etc.)
-  scorer_boltz2.py      #   Boltz-2 affinity scorer with disk cache
-  generator_freedpp.py  #   FREED++ Docker subprocess wrapper
-  cache_io.py           #   Atomic disk I/O (fcntl + temp-and-replace)
-  config.py             #   YAML config loading & validation
-  statistical.py        #   Bootstrap, FDR, Cliff's delta
-  binding_box.py        #   PDB binding site extraction
-  chem_sanitize.py      #   SMILES validation & dedup
-  baseline.py           #   Baseline comparison
-  chembl_validation.py  #   ChEMBL target validation
-  run_manifest.py       #   Lifecycle tracking for experiment runs
-scripts/                # CLI entry points (stage0_fetch → run_full_experiment)
-tests/                  # pytest suite, monkeypatch-heavy
-configs/                # YAML: pairs.yaml, metrics.yaml, experiment.yaml
-docker/freedpp/         # Dockerfile + dual_reward_patch.py monkey-patch
-data/                   # Runtime data (gitignored): targets/, calibration/, baseline/
-cache/                  # Boltz-2 score cache (gitignored), keyed by context hash
-results/                # Experiment outputs (gitignored)
-report/                 # LaTeX manuscript (chapters/, figures/, references.bib)
-docs/                   # goal.md (spec), selection_criteria.md, tasks.md
+src/dualdocking/              # Core library (subpackage layout)
+  config.py                   #   YAML config loading & validation
+  scoring/                    #   Scoring & docking subpackage
+    objectives.py             #     Multi-objective functions (min, harmonic, Pareto, etc.)
+    boltz2.py                 #     Boltz-2 affinity scorer with disk cache
+    cache_io.py               #     Atomic disk I/O (fcntl + temp-and-replace)
+    binding_box.py            #     PDB binding site extraction
+  generation/                 #   Molecule generation subpackage
+    freedpp.py                #     FREED++ Docker subprocess wrapper
+  analysis/                   #   Statistical analysis subpackage
+    statistical.py            #     Bootstrap, FDR, Cliff's delta
+    fairness.py               #     Fairness metrics
+    enrichment.py             #     Enrichment analysis
+    diversity.py              #     Chemical diversity metrics
+  data/                       #   Data handling subpackage
+    chem_sanitize.py          #     SMILES validation & dedup
+    baseline.py               #     Baseline comparison
+    chembl_validation.py      #     ChEMBL target validation
+  reporting/                  #   Reporting subpackage
+    run_manifest.py           #     Lifecycle tracking for experiment runs
+    latex_report.py           #     LaTeX report generation
+scripts/                      # CLI entry points (organized by stage)
+  fetch/                      #   Data fetching scripts
+  prep/                       #   Preparation scripts
+  run/                        #   Experiment execution scripts
+  analysis/                   #   Analysis scripts
+  validation/                 #   Validation scripts
+  viz/                        #   Visualization scripts
+  smoke/                      #   Smoke tests
+tests/                        # pytest suite, monkeypatch-heavy
+configs/                      # YAML: pairs.yaml, metrics.yaml, experiment.yaml
+docker/freedpp/               # Dockerfile + dual_reward_patch.py monkey-patch
+data/                         # Runtime data (gitignored): targets/, calibration/, baseline/
+cache/                        # Boltz-2 score cache (gitignored), keyed by context hash
+results/                      # Experiment outputs (gitignored)
+report/                       # LaTeX manuscript (chapters/, figures/, references.bib)
+docs/                         # goal.md (spec), selection_criteria.md, tasks.md
 ```
 
 ### Data Flow
@@ -163,8 +179,8 @@ Boltz-2 scores use a disk cache segmented by target: `cache/{target}.{ctx[:8]}.j
 
 - **Never commit** `data/`, `cache/`, `results/`, `.env`, or credential files (all gitignored)
 - Docker container runs as non-root; GPU passthrough via `--gpus all`
-- `cache_io.py` uses `fcntl.flock` — safe for concurrent single-machine access, NOT for NFS
-- External API calls (ChEMBL, PDB) are only in `scripts/` and `chembl_validation.py`, never in core library
+- `scoring/cache_io.py` uses `fcntl.flock` — safe for concurrent single-machine access, NOT for NFS
+- External API calls (ChEMBL, PDB) are only in `scripts/` and `data/chembl_validation.py`, never in core library
 
 ## Experiment Design (Context for Changes)
 

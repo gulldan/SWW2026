@@ -7,7 +7,7 @@ All stages after Stage 0 run **fully offline** (no internet required).
 Single entry point for everything that needs internet:
 
 ```bash
-uv run python scripts/stage0_fetch.py
+uv run python scripts/fetch/stage0_fetch.py
 ```
 
 This downloads PDB structures, FASTA sequences, MSA data, calibration SMILES,
@@ -37,10 +37,10 @@ builds the Docker image, and prepares PDBQT receptors. Supports flags:
 ## Stage 0.5: Calibration & Validation (offline, GPU)
 
 ```bash
-uv run python scripts/dock_calibration.py
-uv run python scripts/calibrate_normalization.py
-uv run python scripts/validate_redocking.py         # SCI-04: RMSD check
-uv run python scripts/enrichment_benchmark.py        # SCI-05: AUROC/BEDROC
+uv run python scripts/validation/dock_calibration.py
+uv run python scripts/validation/calibrate_normalization.py
+uv run python scripts/validation/validate_redocking.py         # SCI-04: RMSD check
+uv run python scripts/validation/enrichment_benchmark.py        # SCI-05: AUROC/BEDROC
 ```
 
 ## Stage 1 + 2: Full Experiment (offline)
@@ -48,7 +48,7 @@ uv run python scripts/enrichment_benchmark.py        # SCI-05: AUROC/BEDROC
 Orchestrated run — generation, scoring, and analysis:
 
 ```bash
-EXPERIMENT_RUN_ID=run01 uv run python scripts/run_full_experiment.py \
+EXPERIMENT_RUN_ID=run01 uv run python scripts/run/run_full_experiment.py \
   --resume --parallel 2 --with-post --latex-mode draft
 ```
 
@@ -56,17 +56,17 @@ Or split into stages:
 
 ```bash
 # Stage 1: generate + score (all pairs x modes x seeds)
-EXPERIMENT_RUN_ID=run01 uv run python scripts/run_full_experiment.py --resume --parallel 2
+EXPERIMENT_RUN_ID=run01 uv run python scripts/run/run_full_experiment.py --resume --parallel 2
 
 # Stage 2: aggregate + metrics + plots + report
-EXPERIMENT_RUN_ID=run01 uv run python scripts/run_post_pipeline.py --latex-mode draft
+EXPERIMENT_RUN_ID=run01 uv run python scripts/run/run_post_pipeline.py --latex-mode draft
 ```
 
 ### Filtering
 
 ```bash
 # Single pair, subset of seeds
-uv run python scripts/run_full_experiment.py --pair CDK2_ERK2 --seeds 42,137 --resume --with-post
+uv run python scripts/run/run_full_experiment.py --pair CDK2_ERK2 --seeds 42,137 --resume --with-post
 ```
 
 ## Pilot Run (SCI-09)
@@ -74,10 +74,10 @@ uv run python scripts/run_full_experiment.py --pair CDK2_ERK2 --seeds 42,137 --r
 Quick end-to-end check (1 pair x 3 modes x 2 seeds) before committing to full matrix:
 
 ```bash
-uv run python scripts/run_pilot.py                       # CDK2_ERK2, seeds 42+137
-uv run python scripts/run_pilot.py --pair AChE_BChE       # Custom pair
-uv run python scripts/run_pilot.py --dry-run              # Dry run
-uv run python scripts/run_pilot.py --verify-only          # Check existing artifacts
+uv run python scripts/run/run_pilot.py                       # CDK2_ERK2, seeds 42+137
+uv run python scripts/run/run_pilot.py --pair AChE_BChE       # Custom pair
+uv run python scripts/run/run_pilot.py --dry-run              # Dry run
+uv run python scripts/run/run_pilot.py --verify-only          # Check existing artifacts
 ```
 
 ## Manual Step-by-Step (single pair)
@@ -86,21 +86,21 @@ For debugging or understanding the pipeline:
 
 ```bash
 # Generate (3 modes)
-uv run python scripts/generate.py --pair CDK2_ERK2 --mode single_a
-uv run python scripts/generate.py --pair CDK2_ERK2 --mode single_b
-uv run python scripts/generate.py --pair CDK2_ERK2 --mode double
+uv run python scripts/run/generate.py --pair CDK2_ERK2 --mode single_a
+uv run python scripts/run/generate.py --pair CDK2_ERK2 --mode single_b
+uv run python scripts/run/generate.py --pair CDK2_ERK2 --mode double
 
 # Score
-uv run python scripts/score.py --pair CDK2_ERK2 --mode single_a
-uv run python scripts/score.py --pair CDK2_ERK2 --mode single_b
-uv run python scripts/score.py --pair CDK2_ERK2 --mode double
+uv run python scripts/run/score.py --pair CDK2_ERK2 --mode single_a
+uv run python scripts/run/score.py --pair CDK2_ERK2 --mode single_b
+uv run python scripts/run/score.py --pair CDK2_ERK2 --mode double
 
 # Analyze
-uv run python scripts/aggregate.py
-uv run python scripts/compute_metrics.py
-uv run python scripts/plot_results.py
-uv run python scripts/render_molecules.py
-uv run python scripts/summarize.py
+uv run python scripts/analysis/aggregate.py
+uv run python scripts/analysis/compute_metrics.py
+uv run python scripts/viz/plot_results.py
+uv run python scripts/viz/render_molecules.py
+uv run python scripts/analysis/summarize.py
 ```
 
 ## Full Matrix (all pairs)
@@ -108,37 +108,37 @@ uv run python scripts/summarize.py
 ```bash
 for pair in CDK2_ERK2 AChE_BChE BACE1_GSK3B AChE_BACE1 GSK3B_CDK5 EGFR_HER2 BACE1_CDK5 AChE_MAOB; do
   for mode in single_a single_b double; do
-    uv run python scripts/generate.py --pair $pair --mode $mode
-    uv run python scripts/score.py --pair $pair --mode $mode
+    uv run python scripts/run/generate.py --pair $pair --mode $mode
+    uv run python scripts/run/score.py --pair $pair --mode $mode
   done
 done
 
-uv run python scripts/aggregate.py
-uv run python scripts/compute_metrics.py
-uv run python scripts/plot_results.py
-uv run python scripts/render_molecules.py
-uv run python scripts/summarize.py
+uv run python scripts/analysis/aggregate.py
+uv run python scripts/analysis/compute_metrics.py
+uv run python scripts/viz/plot_results.py
+uv run python scripts/viz/render_molecules.py
+uv run python scripts/analysis/summarize.py
 ```
 
 ## Validation Scripts
 
 | Script | SAP ref | What it checks |
 |--------|---------|----------------|
-| `validate_redocking.py` | SCI-04 | Co-crystal re-docking RMSD <= 2.0 A |
-| `enrichment_benchmark.py` | SCI-05 | AUROC > 0.6, BEDROC > 0.3 per target |
-| `threshold_sensitivity.py` | SCI-06 | Robustness at T = -1, 0, +1 |
-| `proxy_final_correlation.py` | SCI-07 | Spearman rho (docking vs Boltz-2) |
-| `claim_audit.py` | SCI-10 | Claim traceability (8 checks) |
+| `validation/validate_redocking.py` | SCI-04 | Co-crystal re-docking RMSD <= 2.0 A |
+| `validation/enrichment_benchmark.py` | SCI-05 | AUROC > 0.6, BEDROC > 0.3 per target |
+| `analysis/threshold_sensitivity.py` | SCI-06 | Robustness at T = -1, 0, +1 |
+| `analysis/proxy_final_correlation.py` | SCI-07 | Spearman rho (docking vs Boltz-2) |
+| `validation/claim_audit.py` | SCI-10 | Claim traceability (8 checks) |
 
 ## LaTeX Report
 
 ```bash
 # Draft (.tex only)
-uv run python scripts/generate_latex_report.py --mode draft \
+uv run python scripts/viz/generate_latex_report.py --mode draft \
   --chapters-dir report/chapters --chapters-manifest report/chapters/manifest.yaml
 
 # Full PDF compilation
-uv run python scripts/generate_latex_report.py --mode full
+uv run python scripts/viz/generate_latex_report.py --mode full
 ```
 
 Output: `report/manuscript.tex`, `report/manuscript.pdf`.

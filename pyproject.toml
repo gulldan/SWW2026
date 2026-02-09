@@ -33,15 +33,15 @@ dev = [
 ]
 
 [project.scripts]
-dd-prepare = "scripts.prepare_targets:main"
-dd-generate = "scripts.generate:main"
-dd-score = "scripts.score:main"
-dd-aggregate = "scripts.aggregate:main"
-dd-smoke = "scripts.boltz_smoke:main"
-dd-metrics = "scripts.compute_metrics:main"
-dd-plot = "scripts.plot_results:main"
-dd-render = "scripts.render_molecules:main"
-dd-summarize = "scripts.summarize:main"
+dd-prepare = "scripts.prep.prepare_targets:main"
+dd-generate = "scripts.run.generate:main"
+dd-score = "scripts.run.score:main"
+dd-aggregate = "scripts.analysis.aggregate:main"
+dd-smoke = "scripts.smoke.boltz_smoke:main"
+dd-metrics = "scripts.analysis.compute_metrics:main"
+dd-plot = "scripts.viz.plot_results:main"
+dd-render = "scripts.viz.render_molecules:main"
+dd-summarize = "scripts.analysis.summarize:main"
 
 [build-system]
 requires = ["hatchling"]
