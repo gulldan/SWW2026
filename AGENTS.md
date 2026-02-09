@@ -29,8 +29,10 @@ All documents describe the **same experiment** and must stay consistent. When ch
 | `configs/metrics.yaml`  | `docs/goal.md` (thresholds), `report/chapters/04_experimental_protocol.tex`      |
 | `configs/experiment.yaml` | `docs/goal.md`, `report/chapters/03_methods_notes.tex`                         |
 | `src/dualdocking/*.py`  | Corresponding `tests/test_*.py`, `docs/goal.md` if behavior changes             |
-| `docs/goal.md`          | `report/chapters/` (methods, protocol, limitations), `README.md`                |
+| `docs/goal.md`          | `report/chapters/` (methods, protocol, limitations)                              |
 | `report/references.bib` | All `\cite{}` in `report/chapters/*.tex`                                         |
+| Install/Docker/pipeline | `docs/setup.md`, `docs/pipeline.md`                                             |
+| Scoring/caching/FREED++ | `docs/architecture.md`                                                           |
 
 **Before finishing any task**, verify cross-document consistency for the entities you touched. If you change a number in one place and the same number appears elsewhere, update all occurrences or flag the discrepancy.
 

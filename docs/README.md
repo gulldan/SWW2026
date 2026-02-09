@@ -1,30 +1,34 @@
-# Документация: карта достоверности
+# Documentation Index
 
-Обновлено: 2026-02-08
+Source priority and conflict resolution rules.
 
-Этот файл фиксирует, какие документы использовать как источник истины для запуска экспериментов, а какие являются исследовательскими заметками.
+Updated: 2026-02-09
 
-## Приоритет источников
+## Source Priority (higher wins)
 
-1. `configs/*.yaml` и `scripts/*.py` (фактическое поведение кода)
-2. `README.md` (каноничный runbook)
-3. `docs/goal.md`, `docs/tasks.md` (цели, критерии, текущий статус выполнения)
-4. `report/chapters/manifest.yaml` + `report/chapters/*.tex` (модульная структура и narrative-контент статьи)
+1. `docs/goal.md` — supreme authority: hypothesis, endpoints, success criteria, notation. **Read-only without user approval.**
+2. `configs/*.yaml` + `src/dualdocking/` — runtime parameters and computation logic
+3. `docs/preregistration.md`, `docs/statistical_analysis_plan.md` — frozen analysis contracts
+4. `docs/selection_criteria.md` — pair rationale
+5. `report/chapters/*.tex` — narrative (must not contradict above)
+6. `README.md` — operational guide (may simplify, must not misrepresent)
 
-## Статус файлов
+## Document Status
 
-| Файл | Статус | Назначение |
-|---|---|---|
-| `README.md` | Canonical | Пошаговое воспроизведение и команды |
-| `docs/goal.md` | Operational spec | Гипотеза, метод, метрики, критерии успеха |
-| `docs/tasks.md` | Living log | Журнал выполнения и план |
-| `docs/selection_criteria.md` | Reference | Обоснование выбора пар; фактические пары берутся из `configs/pairs.yaml` |
-| `docs/preregistration.md` | Frozen (amended v1.1) | Pre-registration: hypotheses, endpoints, decision rules, SAP summary |
-| `docs/statistical_analysis_plan.md` | Frozen (amended v1.1) | SAP: inference, claim rules, pipeline-to-code mapping |
-| `docs/README.md` | Index | Этот файл: карта достоверности и приоритетов |
+| File | Status | Purpose |
+|------|--------|---------|
+| [`goal.md`](goal.md) | Operational spec | Hypothesis, method, metrics, success criteria |
+| [`setup.md`](setup.md) | Canonical | Installation, Docker, calibration, baseline |
+| [`pipeline.md`](pipeline.md) | Canonical | Full experiment pipeline: fetch -> run -> analyze |
+| [`architecture.md`](architecture.md) | Reference | Boltz-2, FREED++, caching, score conventions, troubleshooting |
+| [`selection_criteria.md`](selection_criteria.md) | Reference | Pair rationale; actual pairs from `configs/pairs.yaml` |
+| [`preregistration.md`](preregistration.md) | Frozen (v1.1) | Pre-registration: hypotheses, endpoints, decision rules |
+| [`statistical_analysis_plan.md`](statistical_analysis_plan.md) | Frozen (v1.1) | SAP: inference, claim rules, code mapping |
+| [`receptor_qc.md`](receptor_qc.md) | Reference | Per-target structural quality control |
+| [`tasks.md`](tasks.md) | Living log | Task journal and execution plan |
 
-## Правило разрешения конфликтов
+## Conflict Resolution
 
-Если команда/параметр в исследовательском документе расходится с кодом или `README.md`, использовать код и `README.md`.
+If a command/parameter in a document conflicts with code or `README.md`, use code and `README.md`.
 
-**Примечание**: `AGENTS.md` является авторитетным источником для конвенций разработки (архитектура, стиль кода, тестирование). Данный файл (`docs/README.md`) определяет приоритеты для разрешения параметров эксперимента.
+See `AGENTS.md` for development conventions (architecture, code style, testing).
