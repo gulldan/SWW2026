@@ -34,7 +34,7 @@ done
 # 6) (Опционально) Дёрнем минимальный запрос, чтобы убедиться, что всё реально работает
 curl -s -X POST \
   -H "Content-Type: application/json" \
-  -d '{"polymers":[{"id":"A","molecule_type":"protein","sequence":"MALWMRLLPLLALLALWGPDPAAA"}],"recycling_steps":1,"sampling_steps":5,"diffusion_samples":1,"output_format":"mmcif"}' \
+  -d '{"polymers":[{"id":"A","molecule_type":"protein","sequence":"MALWMRLLPLLALLALWGPDPAAA"}],"recycling_steps":1,"sampling_steps":10,"diffusion_samples":1,"output_format":"mmcif"}' \
   http://localhost:8000/biology/mit/boltz2/predict >/dev/null
 # маршрут predict есть в их примере :contentReference[oaicite:8]{index=8}
 
