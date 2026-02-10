@@ -1,85 +1,245 @@
 # Dual-Target Docking
 
-Comparing single-target vs dual-target RL molecule generation using **FREED++** (generator) and **Boltz-2** (scorer).
+Single-target vs dual-target RL molecule generation using **FREED++** (generator) and **Boltz-2** (scorer).
 
-**Hypothesis:** RL optimized for worst-case dual-target docking (`max(d_A, d_B)`) produces molecules with higher dual hit-rate than single-target optimization.
+**Hypothesis.** RL optimized for worst-case dual-target docking (`max(d_A, d_B)`) produces molecules with higher dual hit-rate than single-target optimization, evaluated by an orthogonal Boltz-2 affinity surrogate.
 
-## Requirements
+---
 
-- Python >= 3.11, [uv](https://docs.astral.sh/uv/) >= 0.9
-- Docker >= 20.x + [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/)
-- NVIDIA GPU >= 16 GB VRAM
+## Data Flow
 
-## Quick Start
+```
+Stage 0: Fetch                   Generation (FREED++)               Scoring (Boltz-2)
+---------------------     ----------------------------      --------------------------
+ PDB structures                                               Boltz-2 affinity (a_A, a_B)
+ UniProt FASTA          ->  For each of 5 core pairs:    ->   per molecule, both targets
+ ZINC calibration sets       3 modes x 5 seeds                 (log10 IC50-like uM)
+ ChEMBL actives              - single_a: reward=f(d_A)
+                              - single_b: reward=f(d_B)         |
+                              - double:   reward=f(max(d_A,d_B))  v
 
-```bash
-# 1. Install
-git clone <repo-url> && cd SWW2026
-uv sync --group dev
-
-# 2. Build FREED++ Docker image
-uv run python scripts/fetch/fetch_freed_data.py
-docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
-
-# 3. Fetch all external data (internet required only here)
-uv run python scripts/fetch/stage0_fetch.py
-
-# 4. Calibrate normalization
-uv run python scripts/validation/dock_calibration.py
-uv run python scripts/validation/calibrate_normalization.py
-
-# 5. Run full experiment (offline from here)
-EXPERIMENT_RUN_ID=run01 uv run python scripts/run/run_full_experiment.py \
-  --resume --parallel 2 --with-post --latex-mode draft
+                              UniDock GPU docking             Analysis & Report
+                              (d_A, d_B in kcal/mol)     --------------------------
+                                                           Dual hit-rate comparison
+                                                           Bootstrap CI (m=5 seeds)
+                                                           Cliff's delta effect size
+                                                           LaTeX manuscript + figures
 ```
 
-Results in `results/` and `report/`. See [Pipeline](docs/pipeline.md) for details.
+**75 runs total**: 5 core pairs x 3 modes x 5 seeds. Auxiliary pairs (3) for robustness checks.
 
-### Smoke Test
-
-```bash
-uv run python scripts/run/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
-```
-
-### Tests
-
-```bash
-uv run pytest tests/ -v
-uv run ruff check src/ scripts/ docker/
-```
+---
 
 ## Project Structure
 
 ```
-configs/              # pairs.yaml, metrics.yaml, experiment.yaml
-src/dualdocking/      # Core library (scoring, generation, statistics, objectives)
-scripts/              # CLI entry points (fetch, generate, score, analyze)
-docker/freedpp/       # FREED++ Docker image + dual_reward_patch.py
-tests/                # pytest suite (333 tests)
-data/                 # Runtime data: targets/, calibration/, baseline/ (gitignored)
-cache/                # Boltz-2 score cache (gitignored)
-results/              # Experiment outputs (gitignored)
-report/               # LaTeX manuscript, figures, metrics (partially generated)
-docs/                 # Project documentation (see below)
+SWW2026/
+|-- dualdocking/                Core Python library
+|   |-- config.py               YAML config loading & validation (pairs, metrics, experiment)
+|   |-- scoring/                Scoring & docking objectives
+|   |   |-- objectives.py       Multi-objective scalarizations (min, harmonic, Tchebycheff, Pareto, ...)
+|   |   |-- boltz2.py           Boltz-2 affinity scorer with disk cache + NIM backend
+|   |   |-- cache_io.py         Process-safe JSON cache (fcntl.flock + atomic temp-and-replace)
+|   |   +-- binding_box.py      PDB binding-site extraction from co-crystallized ligands
+|   |-- generation/             FREED++ molecule generation
+|   |   +-- freedpp.py          Docker subprocess wrapper (GenerationConfig, generate())
+|   |-- analysis/               Post-hoc statistical analysis
+|   |   |-- statistical.py      Hierarchical bootstrap, FDR correction, Cliff's delta
+|   |   |-- fairness.py         Generation budget and duplication checks
+|   |   |-- enrichment.py       AUROC, BEDROC, enrichment factor for docking validation
+|   |   +-- diversity.py        Uniqueness, scaffold diversity, Tanimoto metrics
+|   |-- data/                   Molecular data ingestion and cleaning
+|   |   |-- chem_sanitize.py    SMILES validation, canonicalization & deduplication
+|   |   |-- baseline.py         ZINC calibration baseline stability checks
+|   |   +-- chembl_validation.py ChEMBL active retrieval, dual-active overlap, enrichment
+|   +-- reporting/              Experiment provenance and manuscript
+|       |-- run_manifest.py     Run lifecycle tracking (JSON manifest with atomic I/O)
+|       +-- latex_report.py     Jinja2-to-LaTeX rendering and PDF compilation
+|
+|-- scripts/                    CLI entry points (organized by pipeline stage)
+|   |-- s0_fetch/               Data download (PDB, FASTA, FREED fragments, ZINC, ChEMBL)
+|   |-- s1_prepare/             Target preparation (PDB -> PDBQT, binding box, MSA)
+|   |-- s2_calibrate/           Calibration and validation (dock calibration, normalization, redocking)
+|   |-- s3_generate/            Molecule generation (FREED++)
+|   |-- s4_score/               Affinity scoring (Boltz-2)
+|   |-- s5_analyze/             Statistical analysis (aggregate, metrics, correlation)
+|   |-- s6_report/              Visualization and manuscript (plots, molecules, LaTeX)
+|   |-- s7_audit/               Post-hoc verification (claim traceability)
+|   |-- pipeline/               End-to-end orchestrators (full experiment, pilot, post)
+|   +-- smoke/                  Smoke tests (Boltz-2 health check, reward capping)
+|
+|-- configs/                    YAML configuration (pairs, metrics, experiment, normalization)
+|-- tests/                      pytest suite (~400 tests)
+|-- docker/freedpp/             FREED++ Docker image + dual_reward_patch.py
+|-- docs/                       Project documentation (see Documentation Map below)
+|-- report/                     LaTeX manuscript (chapters/, figures/, templates/)
++-- output/                     Runtime data (gitignored)
+    |-- data/                   Target structures, calibration sets, baseline
+    |-- cache/                  Boltz-2 score cache + MSA cache
+    +-- results/                Experiment outputs
 ```
 
-## Documentation
+---
 
-| Document | Description |
-|----------|-------------|
-| [Setup](docs/setup.md) | Installation, Docker, calibration, baseline |
-| [Pipeline](docs/pipeline.md) | Stage 0 -> generation -> scoring -> analysis -> report |
-| [Architecture](docs/architecture.md) | Boltz-2, FREED++, caching, score conventions, troubleshooting |
-| [Goal](docs/goal.md) | Hypothesis, notation, endpoints, success criteria |
-| [Selection Criteria](docs/selection_criteria.md) | Target pair rationale, factorial design |
-| [Pre-registration](docs/preregistration.md) | Frozen hypotheses and decision rules |
-| [Statistical Analysis Plan](docs/statistical_analysis_plan.md) | Frozen SAP: inference, claim rules, code mapping |
-| [Receptor QC](docs/receptor_qc.md) | Per-target structural quality control |
-| [Doc Index](docs/README.md) | Source priority and conflict resolution |
+## Requirements
+
+| Requirement | Minimum |
+|-------------|---------|
+| Python | >= 3.11 |
+| [uv](https://docs.astral.sh/uv/) | >= 0.9 |
+| Docker | >= 20.x with [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/) |
+| GPU | NVIDIA, >= 16 GB VRAM (24 GB recommended for Boltz-2) |
+| OS | Linux (fcntl-based file locking) |
+
+---
+
+## Quick Start
+
+```bash
+# 1. Clone and install
+git clone <repo-url> && cd SWW2026
+uv sync --group dev
+
+# 2. Build FREED++ Docker image
+uv run python scripts/s0_fetch/fetch_freed_fragments.py
+docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
+
+# 3. Fetch all external data (internet required only for this step)
+uv run python scripts/s0_fetch/fetch_all.py
+
+# 4. Calibrate normalization (per-target z-score parameters)
+uv run python scripts/s2_calibrate/dock_calibration.py
+uv run python scripts/s2_calibrate/compute_normalization.py
+
+# 5. Run full experiment (offline from here)
+EXPERIMENT_RUN_ID=run01 uv run python scripts/pipeline/run_full_experiment.py \
+  --resume --parallel 1 --with-post --latex-mode draft
+```
+
+Results land in `output/results/` and `report/`. See [Pipeline](docs/pipeline.md) for stage-by-stage details.
+
+### Smoke Test
+
+Verify the setup works end-to-end with a minimal run:
+
+```bash
+# Generate 10 molecules for one pair, 2 epochs (takes ~2 minutes with GPU)
+uv run python scripts/s3_generate/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
+
+# Boltz-2 health check
+uv run dd-smoke
+```
+
+---
+
+## CLI Commands
+
+All commands are installed as console scripts via `uv sync`:
+
+| Command | Description |
+|---------|-------------|
+| `dd-prepare` | Prepare target structures (download PDB, extract binding boxes, generate PDBQT) |
+| `dd-generate` | Run FREED++ molecule generation for a specific pair/mode |
+| `dd-score` | Score generated molecules with Boltz-2 affinity predictor |
+| `dd-aggregate` | Aggregate results across seeds and modes into summary tables |
+| `dd-metrics` | Compute evaluation metrics (hit-rates, Cliff's delta, bootstrap CI) |
+| `dd-summarize` | Generate text summaries of experiment results |
+| `dd-plot` | Generate result plots (violin, heatmap, Pareto front) |
+| `dd-render` | Render 2D molecule images for top hits |
+| `dd-smoke` | Boltz-2 smoke test (health check and single-molecule scoring) |
+
+Run any command with `--help` for usage details, e.g. `uv run dd-generate --help`.
+
+---
+
+## Key Concepts
+
+### Notation
+
+The project uses two independent scoring systems with distinct roles:
+
+| Symbol | Source | Units | Role |
+|--------|--------|-------|------|
+| `d_A`, `d_B` | UniDock GPU (docking) | kcal/mol, lower-is-better | **RL reward** -- drives molecule generation |
+| `a_A`, `a_B` | Boltz-2 (learned affinity) | log10(IC50-like, uM), lower-is-better | **Evaluation surrogate** -- orthogonal assessment |
+
+The two scorers are never mixed: FREED++ optimizes only `d_A, d_B`; Boltz-2 evaluates post-hoc.
+
+### Score Convention
+
+**lower_is_better = True** throughout the codebase. Docking scores are negative (more negative = better binding). Utility = -score when lower_is_better is True.
+
+### Generation Modes
+
+- **single_a**: RL reward based on docking to target A only
+- **single_b**: RL reward based on docking to target B only
+- **double**: RL reward = `max(d_A, d_B)` (worst-case, after per-target z-score normalization)
+
+### Target Pairs
+
+Defined in `configs/pairs.yaml`. Each pair has a `set` field:
+
+| Set | Count | Purpose | Pairs |
+|-----|-------|---------|-------|
+| **core** | 5 | Primary hypothesis test | CDK2_ERK2, AChE_BChE, BACE1_GSK3B, AChE_BACE1, GSK3B_CDK5 |
+| **auxiliary** | 3 | Robustness / sensitivity | EGFR_HER2, BACE1_CDK5, AChE_MAOB |
+| **blocked** | 1 | Excluded (non-human PDB) | COX1_COX2 |
+
+### Hit Definition
+
+A molecule is a **hit** for target X if Boltz-2 affinity `a_X <= T_X`, where `T_A = T_B = 0.0` (= 1 uM). A **dual hit** satisfies both thresholds simultaneously. Thresholds are fixed pre-experiment in `configs/metrics.yaml`.
+
+### Success Criteria
+
+Cliff's delta > -0.47 (medium effect size) on at least 3 of 5 core pairs, comparing double vs best-of(single_a, single_b) dual hit-rates.
+
+---
+
+## Documentation Map
+
+Read in the order shown for fastest onboarding.
+
+| # | Document | Status | Description |
+|---|----------|--------|-------------|
+| 1 | [Goal](docs/goal.md) | Operational spec (read-only) | Hypothesis, notation, endpoints, success criteria -- single source of truth |
+| 2 | [Setup](docs/setup.md) | Canonical | Installation, Docker build, calibration, baseline preparation |
+| 3 | [Pipeline](docs/pipeline.md) | Canonical | Full experiment pipeline: Stage 0 through report generation |
+| 4 | [Architecture](docs/architecture.md) | Reference | Boltz-2, FREED++, caching, score conventions, troubleshooting |
+| 5 | [Selection Criteria](docs/selection_criteria.md) | Reference | Target pair rationale, factorial design, core/auxiliary split |
+| 6 | [Pre-registration](docs/preregistration.md) | Frozen (v1.1) | Frozen hypotheses and decision rules |
+| 7 | [Statistical Analysis Plan](docs/statistical_analysis_plan.md) | Frozen (v1.1) | Inference procedures, claim rules, code mapping |
+| 8 | [Receptor QC](docs/receptor_qc.md) | Reference | Per-target structural quality control |
+| 9 | [NIM Benchmark](docs/nim_benchmark.md) | Reference | Boltz-2 NIM backend benchmarks |
+| 10 | [Doc Index](docs/README.md) | Living | Source priority and conflict resolution rules |
+
+**Source priority** (higher wins in conflicts): goal.md > configs/*.yaml > dualdocking/ > selection_criteria.md > report/ > README.md.
+
+---
+
+## Testing
+
+```bash
+# Full test suite (~400 tests, parallelized)
+uv run pytest tests/ -v
+
+# Single test file
+uv run pytest tests/scoring/test_objectives.py -v
+
+# Linting (must pass with zero warnings)
+uv run ruff check dualdocking/ scripts/ docker/
+
+# Type checking (must pass with zero errors)
+uv run ty check dualdocking/
+
+# Auto-format
+uv run ruff format dualdocking/ scripts/
+```
+
+---
 
 ## References
 
-- **FREED++**: Telepov et al., TMLR 2023 — [arXiv:2401.09840](https://arxiv.org/abs/2401.09840)
-- **Boltz-2**: Passaro et al., 2025 — [boltz-community](https://github.com/jwohlwend/boltz)
-- **UniDock**: [dptech-corp/Uni-Dock](https://github.com/dptech-corp/Uni-Dock)
-- **RDKit**: [rdkit.org](https://www.rdkit.org/)
+- **FREED++**: Telepov et al., TMLR 2023 -- [arXiv:2401.09840](https://arxiv.org/abs/2401.09840). RL-based molecular generation with docking reward.
+- **Boltz-2**: Passaro et al., 2025 -- [bioRxiv (PMID 40667369)](https://github.com/jwohlwend/boltz). Structure-aware learned affinity predictor (Pearson 0.66 on 4-target FEP+).
+- **UniDock**: Yu et al. -- [dptech-corp/Uni-Dock](https://github.com/dptech-corp/Uni-Dock). GPU-accelerated molecular docking (Vina scoring function).
+- **RDKit**: [rdkit.org](https://www.rdkit.org/). Cheminformatics toolkit for molecular processing.

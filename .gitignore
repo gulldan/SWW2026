@@ -23,11 +23,11 @@ wheels/
 Thumbs.db
 
 # Project-specific
-cache/
-data/targets/*/A/*.pdb
-data/targets/*/B/*.pdb
-data/*.pdb
-results/
+output/cache/
+output/data/targets/*/A/*.pdb
+output/data/targets/*/B/*.pdb
+output/data/*.pdb
+output/results/
 report/experiment_*.log
 report/post_*.log
 report/calibration_full.log
@@ -49,5 +49,6 @@ docker/freedpp/dualdocking-freedpp.tar.zst
 # Secrets / credentials
 .env
 *.key
-data/
+output/data/
 docker/boltz2/boltz2_1.5.0.tar
+docker/boltz2/cache

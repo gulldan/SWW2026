@@ -65,6 +65,7 @@ def _set_backend(
     monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
     if backend == "nim":
         monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://localhost:8000")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://localhost:8000"])
 
 
 def _run_batch(

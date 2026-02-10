@@ -1,5 +1,5 @@
 version: '1.0'
-calibration_set: data/calibration/zinc_druglike_calibration_1000_v2024.smi
+calibration_set: output/data/calibration/zinc_druglike_calibration_1000_v2024.smi
 subset_name: zinc_druglike_calibration_1000_v2024
 n: 1000
 seed: 137

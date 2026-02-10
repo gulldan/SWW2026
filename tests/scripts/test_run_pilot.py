@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from scripts.run.run_pilot import _verify_pilot_artifacts
+from scripts.pipeline.run_pilot import _verify_pilot_artifacts
 
 PROJECT_ROOT_MARKER = "PROJECT_ROOT"
 
@@ -22,7 +22,7 @@ def _create_run_artifacts(
     rng = np.random.default_rng(42)
     for mode in ("single_a", "single_b", "double"):
         for seed in seeds:
-            run_dir = root / "results" / pair / mode / f"seed_{seed}"
+            run_dir = root / "output" / "results" / pair / mode / f"seed_{seed}"
             run_dir.mkdir(parents=True, exist_ok=True)
 
             # generated.csv
@@ -50,7 +50,7 @@ def _create_run_artifacts(
 
 def test_verify_all_present(tmp_path, monkeypatch):
     """All artifacts present → no issues."""
-    import scripts.run.run_pilot as mod
+    import scripts.pipeline.run_pilot as mod
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137])
@@ -61,7 +61,7 @@ def test_verify_all_present(tmp_path, monkeypatch):
 
 def test_verify_missing_scored(tmp_path, monkeypatch):
     """Missing scored_joined.csv → reported."""
-    import scripts.run.run_pilot as mod
+    import scripts.pipeline.run_pilot as mod
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137], skip_scored="double/seed_137")
@@ -73,7 +73,7 @@ def test_verify_missing_scored(tmp_path, monkeypatch):
 
 def test_verify_missing_metrics(tmp_path, monkeypatch):
     """Missing metrics.json → reported."""
-    import scripts.run.run_pilot as mod
+    import scripts.pipeline.run_pilot as mod
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137])
@@ -85,7 +85,7 @@ def test_verify_missing_metrics(tmp_path, monkeypatch):
 
 def test_verify_empty_stats(tmp_path, monkeypatch):
     """Empty stats.json → reported."""
-    import scripts.run.run_pilot as mod
+    import scripts.pipeline.run_pilot as mod
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137])

@@ -1,11 +1,12 @@
-"""Smoke-тест Boltz-2.
+"""Smoke test for Boltz-2 scoring.
 
-Запускает минимальный пример скоринга для проверки работоспособности Boltz-2.
-Результат: results/smoke/boltz_score.json
+Runs a minimal scoring example to verify Boltz-2 is functional.
+Result: ``results/smoke/boltz_score.json``
 
-Использование:
-    uv run python scripts/boltz_smoke.py --target CDK2
-    uv run python scripts/boltz_smoke.py --target CDK2 --dry-run
+Usage::
+
+    uv run python scripts/smoke/boltz_smoke.py --target CDK2
+    uv run python scripts/smoke/boltz_smoke.py --target CDK2 --dry-run
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ import numpy as np
 from loguru import logger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT))
 
 # Сокращённый набор: 3 молекулы для быстрой проверки
 SMOKE_SMILES = [
@@ -38,7 +39,15 @@ SCORE_MAX = 2.0
 @click.option("--target", default="CDK2", help="ID мишени для скоринга")
 @click.option("--dry-run", is_flag=True, default=False, help="Только сгенерировать YAML без запуска Boltz")
 def main(target: str, dry_run: bool) -> None:
-    """Запустить smoke-тест Boltz-2."""
+    """Run Boltz-2 smoke test with a small set of known molecules.
+
+    Scores benzene, aspirin, and ibuprofen against the specified target
+    and validates that returned scores fall within the expected range.
+
+    Args:
+        target: Target identifier (e.g. ``"CDK2"``).
+        dry_run: If ``True``, only generate input YAML files without scoring.
+    """
     if dry_run:
         _run_dry(target)
         return
@@ -57,7 +66,7 @@ def main(target: str, dry_run: bool) -> None:
         "status": "ok",
     }
 
-    out_dir = PROJECT_ROOT / "results" / "smoke"
+    out_dir = PROJECT_ROOT / "output" / "results" / "smoke"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "boltz_score.json"
     out_path.write_text(json.dumps(results, indent=2))
@@ -76,7 +85,11 @@ def main(target: str, dry_run: bool) -> None:
 
 
 def _run_dry(target: str) -> None:
-    """Dry-run: сгенерировать YAML без запуска Boltz для проверки формата."""
+    """Dry-run: generate input YAML files without invoking Boltz.
+
+    Args:
+        target: Target identifier for sequence and MSA lookup.
+    """
     from dualdocking.scoring.boltz2 import _get_msa_path, _load_sequence, _write_boltz_yaml
 
     logger.info("Dry-run: генерация YAML для мишени {}", target)
@@ -90,7 +103,7 @@ def _run_dry(target: str) -> None:
     else:
         logger.warning("MSA не найден для {}. Boltz потребует --use_msa_server (онлайн).", target)
 
-    out_dir = PROJECT_ROOT / "results" / "smoke" / "dry_run"
+    out_dir = PROJECT_ROOT / "output" / "results" / "smoke" / "dry_run"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for i, smi in enumerate(SMOKE_SMILES):

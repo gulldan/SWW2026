@@ -10,8 +10,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-import scripts.analysis.compute_metrics as mod
-from scripts.analysis.compute_metrics import main
+import scripts.s5_analyze.compute_metrics as mod
+from scripts.s5_analyze.compute_metrics import main
 
 
 def _pairs_cfg():
@@ -76,14 +76,14 @@ def _setup_full(tmp_path, seeds=None, missing_seeds=None):
         for seed in seeds:
             if seed in missing_seeds:
                 continue
-            run_dir = tmp_path / "results" / "pair1" / mode / f"seed_{seed}"
+            run_dir = tmp_path / "output" / "results" / "pair1" / mode / f"seed_{seed}"
             _write_run(run_dir, rng)
 
 
 def _invoke(extra_args=None):
     runner = CliRunner()
     args = [
-        "--results-root", "results",
+        "--results-root", "output/results",
         "--pairs-config", "configs/pairs.yaml",
         "--experiment-config", "configs/experiment.yaml",
         "--metrics-config", "configs/metrics.yaml",
@@ -173,7 +173,7 @@ class TestDefaultFullSetup:
         assert self.result.exit_code == 0, self.result.output
 
         # Verify by reading a scored CSV and checking the load function
-        run_dir = self.tmp_path / "results" / "pair1" / "double" / "seed_1"
+        run_dir = self.tmp_path / "output" / "results" / "pair1" / "double" / "seed_1"
         df = mod._load_scored_csv(run_dir / "scored_joined.csv", 0.0, 0.0)
         assert "is_hit_a" in df.columns
         assert "is_hit_b" in df.columns
@@ -233,7 +233,7 @@ def test_main_missing_input(tmp_path, monkeypatch):
         main,
         [
             "--results-root",
-            "results",
+            "output/results",
             "--pairs-config",
             "configs/pairs.yaml",
             "--experiment-config",
@@ -257,7 +257,7 @@ def test_objective_means_in_metrics(tmp_path, monkeypatch):
     rng = np.random.default_rng(42)
     for mode in ("single_a", "single_b", "double"):
         for seed in [1, 2, 3, 4, 5]:
-            run_dir = tmp_path / "results" / "pair1" / mode / f"seed_{seed}"
+            run_dir = tmp_path / "output" / "results" / "pair1" / mode / f"seed_{seed}"
             _write_run(run_dir, rng)
 
     import dualdocking.analysis.fairness as fairness_mod
@@ -383,7 +383,7 @@ def test_fdr_scope_primary_only(tmp_path, monkeypatch):
     for pair_id in ("core_pair", "aux_pair"):
         for mode in ("single_a", "single_b", "double"):
             for seed in [1, 2, 3, 4, 5]:
-                run_dir = tmp_path / "results" / pair_id / mode / f"seed_{seed}"
+                run_dir = tmp_path / "output" / "results" / pair_id / mode / f"seed_{seed}"
                 _write_run(run_dir, rng)
 
     import dualdocking.analysis.fairness as fairness_mod
@@ -453,7 +453,7 @@ def test_blocked_pairs_excluded(tmp_path, monkeypatch):
     # Only create runs for active_pair (blocked has no results)
     for mode in ("single_a", "single_b", "double"):
         for seed in [1, 2, 3, 4, 5]:
-            run_dir = tmp_path / "results" / "active_pair" / mode / f"seed_{seed}"
+            run_dir = tmp_path / "output" / "results" / "active_pair" / mode / f"seed_{seed}"
             _write_run(run_dir, rng)
 
     import dualdocking.analysis.fairness as fairness_mod
@@ -526,7 +526,7 @@ def test_all_nan_affinities(tmp_path, monkeypatch):
 
     # Write scored CSVs with all-NaN affinities
     for mode in ("single_a", "single_b", "double"):
-        run_dir = tmp_path / "results" / "pair1" / mode / "seed_1"
+        run_dir = tmp_path / "output" / "results" / "pair1" / mode / "seed_1"
         run_dir.mkdir(parents=True, exist_ok=True)
         df = pd.DataFrame({
             "smiles_canonical": ["C0", "C1", "C2"],

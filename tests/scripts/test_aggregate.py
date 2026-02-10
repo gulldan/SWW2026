@@ -1,10 +1,10 @@
 """Tests for scripts/aggregate.py."""
 
 import pandas as pd
-import scripts.analysis.aggregate as mod
+import scripts.s5_analyze.aggregate as mod
 import yaml
 from click.testing import CliRunner
-from scripts.analysis.aggregate import main
+from scripts.s5_analyze.aggregate import main
 
 
 def _pairs_cfg():
@@ -58,7 +58,7 @@ def test_main_aggregates(tmp_path, monkeypatch):
     (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(_experiment_cfg()))
 
     for m in ("single_a", "single_b", "double"):
-        run_dir = tmp_path / "results" / "pair1" / m / "seed_42"
+        run_dir = tmp_path / "output" / "results" / "pair1" / m / "seed_42"
         _make_scored_csv(run_dir / "scored_joined.csv")
         _write_reward_metadata(run_dir)
 
@@ -84,12 +84,12 @@ def test_quality_gate_skips_invalid_run(tmp_path, monkeypatch):
     (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(exp))
 
     # seed_42: valid
-    run_42 = tmp_path / "results" / "pair1" / "single_a" / "seed_42"
+    run_42 = tmp_path / "output" / "results" / "pair1" / "single_a" / "seed_42"
     _make_scored_csv(run_42 / "scored_joined.csv")
     _write_reward_metadata(run_42, run_valid=True)
 
     # seed_99: invalid (high invalid fraction)
-    run_99 = tmp_path / "results" / "pair1" / "single_a" / "seed_99"
+    run_99 = tmp_path / "output" / "results" / "pair1" / "single_a" / "seed_99"
     _make_scored_csv(run_99 / "scored_joined.csv")
     import json as json_mod
 

@@ -60,10 +60,10 @@ prepare_targets.py
 
 ### 1.3 Key Files on Critical Path
 
-- `src/dualdocking/scorer_boltz2.py:552-647` - `score_batch()` - the Boltz-2 scoring loop
-- `src/dualdocking/generator_freedpp.py:324-467` - `_run_freedpp()` - Docker-based FREED++ training
-- `scripts/score.py:66-89` - Sequential A/B target scoring
-- `scripts/run_full_experiment.py:245-258` - Task scheduling (defaults to serial)
+- `dualdocking/scorer_boltz2.py:552-647` - `score_batch()` - the Boltz-2 scoring loop
+- `dualdocking/generator_freedpp.py:324-467` - `_run_freedpp()` - Docker-based FREED++ training
+- `scripts/s4_score/score.py:66-89` - Sequential A/B target scoring
+- `scripts/pipeline/run_full_experiment.py:245-258` - Task scheduling (defaults to serial)
 
 ---
 
@@ -71,7 +71,7 @@ prepare_targets.py
 
 ### 2.1 Boltz-2 Scorer
 
-**Current implementation** (`src/dualdocking/scorer_boltz2.py`):
+**Current implementation** (`dualdocking/scorer_boltz2.py`):
 
 - **Subprocess-per-batch architecture** (line 386-409): Every batch of 8 molecules spawns a new `uv run boltz predict` subprocess. This means:
   - PyTorch + Boltz model loaded from disk each invocation (~10-30s overhead)
@@ -118,7 +118,7 @@ def _get_server():
 
 ### 2.2 FREED++ Generator
 
-**Current implementation** (`src/dualdocking/generator_freedpp.py:324-467`):
+**Current implementation** (`dualdocking/generator_freedpp.py:324-467`):
 
 - **Docker overhead: negligible** (<0.1% for multi-hour training). Container startup is ~1-2s.
 
@@ -167,8 +167,8 @@ GPU 1: Boltz-2 target B
 
 - **128 CPU cores on server, almost entirely idle during GPU-bound stages**
 - Only `run_full_experiment.py` has any parallelism (`ThreadPoolExecutor`), defaulting to `--parallel=1`
-- No `multiprocessing` anywhere in `src/dualdocking/` (confirmed via grep)
-- `scripts/dock_calibration.py:633` iterates ligands sequentially with `tqdm`
+- No `multiprocessing` anywhere in `dualdocking/` (confirmed via grep)
+- `scripts/s2_calibrate/dock_calibration.py:633` iterates ligands sequentially with `tqdm`
 - Bootstrap (`statistical.py:80-86`): 10K iterations in a Python loop, but only ~36 seconds total (not worth parallelizing)
 - RDKit fingerprint computation (`diversity.py:58-67`): sequential Python loop
 
@@ -195,17 +195,17 @@ GPU 1: Boltz-2 target B
 **Zero polars usage confirmed.** `polars>=1.0` is listed in `pyproject.toml:10` and `polars 1.38.1` is resolved in `uv.lock`, but grep across all of `src/` and `scripts/` finds zero `import polars` or `pl.` references. This is pure dead weight (~30 MB installed, plus import overhead if accidentally triggered).
 
 Usage inventory:
-- `src/dualdocking/statistical.py`: pandas for CSV reading/caching (justified; DataFrames passed to metric functions)
-- `src/dualdocking/generator_freedpp.py:482`: pandas for CSV parsing of FREED++ output
-- `scripts/score.py`: pandas read/write of CSVs (small: 1000 rows)
-- `scripts/aggregate.py`: pandas concat + to_parquet (appropriate)
-- `scripts/compute_metrics.py`: pandas read_csv (small files)
-- `scripts/plot_results.py:121`: pandas read_parquet (appropriate)
-- `scripts/proxy_final_correlation.py`: pandas concat of multiple CSVs
+- `dualdocking/statistical.py`: pandas for CSV reading/caching (justified; DataFrames passed to metric functions)
+- `dualdocking/generator_freedpp.py:482`: pandas for CSV parsing of FREED++ output
+- `scripts/s4_score/score.py`: pandas read/write of CSVs (small: 1000 rows)
+- `scripts/s5_analyze/aggregate.py`: pandas concat + to_parquet (appropriate)
+- `scripts/s5_analyze/compute_metrics.py`: pandas read_csv (small files)
+- `scripts/s6_report/plot_results.py:121`: pandas read_parquet (appropriate)
+- `scripts/s5_analyze/proxy_correlation.py`: pandas concat of multiple CSVs
 
 **Anti-patterns found:**
-- `scripts/summarize.py:50`: `.iterrows()` on top molecules (only 3 rows, negligible)
-- `scripts/render_molecules.py:85`: `.iterrows()` over DataFrame for molecule rendering (5-15 rows; could be `itertuples()` for 2-3x per-row speedup, but absolute gain is microseconds)
+- `scripts/s5_analyze/summarize.py:50`: `.iterrows()` on top molecules (only 3 rows, negligible)
+- `scripts/s6_report/render_molecules.py:85`: `.iterrows()` over DataFrame for molecule rendering (5-15 rows; could be `itertuples()` for 2-3x per-row speedup, but absolute gain is microseconds)
 - **No `.apply()` antipatterns found** anywhere in the codebase.
 
 **Verdict:** No severe pandas anti-patterns. Data volumes are small (1000 rows per CSV). Switching to polars would add complexity for negligible gain. The `.iterrows()` calls process <15 rows.
@@ -250,10 +250,10 @@ Total time is ~36 seconds for 10K iterations -- not a pipeline bottleneck, but a
 **AUROC Python loop** (`enrichment.py:74-85`): The trapezoidal ROC-AUC computation uses a Python `for` loop over sorted labels. This is vectorizable with `np.cumsum`, but the absolute gain is ~1ms (called on ~1000-element arrays). Not worth the code complexity.
 
 **scipy usage is minimal (scripts only):**
-- `scripts/validate_redocking.py:36-37`: `scipy.optimize.linear_sum_assignment` + `scipy.spatial.distance.cdist` -- optimal algorithms, no improvement possible.
-- `scripts/proxy_final_correlation.py:32`: `scipy.stats` for Spearman correlation.
+- `scripts/s2_calibrate/validate_redocking.py:36-37`: `scipy.optimize.linear_sum_assignment` + `scipy.spatial.distance.cdist` -- optimal algorithms, no improvement possible.
+- `scripts/s5_analyze/proxy_correlation.py:32`: `scipy.stats` for Spearman correlation.
 
-**Hotspot: scipy.spearmanr in bootstrap** (`scripts/proxy_final_correlation.py:58-60`):
+**Hotspot: scipy.spearmanr in bootstrap** (`scripts/s5_analyze/proxy_correlation.py:58-60`):
 
 ```python
 for i in range(n_bootstrap):
@@ -270,7 +270,7 @@ def _fast_spearman(x, y):
     return np.corrcoef(rx, ry)[0, 1]
 ```
 
-However, proxy_final_correlation runs once post-experiment, so this is low priority.
+However, proxy_correlation runs once post-experiment, so this is low priority.
 
 ### 4.3 rdkit Optimization
 
@@ -280,7 +280,7 @@ However, proxy_final_correlation runs once post-experiment, so this is low prior
 
 2. **Fingerprint generation** (`diversity.py:55-67`, `chembl_validation.py:121-126`): Sequential loop over SMILES. For 1000 molecules this is ~0.5s. Could use `rdFingerprintGenerator.GetFingerprints()` (bulk) or `multiprocessing.Pool` (RDKit releases the GIL in C++ ops) for >10K molecules.
 
-3. **3D embedding for docking** (`dock_calibration.py:258-275`, `scripts/rdkit_embed.py`): `AllChem.EmbedMolecule()` + `AllChem.UFFOptimizeMolecule()` -- ~0.5-2s per molecule. For 1000 ligands, this is 8-33 minutes sequentially. **This is the biggest RDKit bottleneck** and should be parallelized with `ProcessPoolExecutor`.
+3. **3D embedding for docking** (`dock_calibration.py:258-275`, `scripts/s1_prepare/rdkit_embed.py`): `AllChem.EmbedMolecule()` + `AllChem.UFFOptimizeMolecule()` -- ~0.5-2s per molecule. For 1000 ligands, this is 8-33 minutes sequentially. **This is the biggest RDKit bottleneck** and should be parallelized with `ProcessPoolExecutor`.
 
 4. **Double SMILES parsing** (`chem_sanitize.py:85-90` + `diversity.py:79-91`): The `sanitize_smiles()` function calls `canonicalize(smi)` (which internally calls `Chem.MolFromSmiles`), then immediately calls `Chem.MolFromSmiles(canon)` again on the result. Similarly, `scaffold_diversity()` calls `canonicalize()` and then `Chem.MolFromSmiles()` on each canonical SMILES. This is a ~40% reduction in RDKit parse calls if mol objects are passed through instead of re-parsing. Low absolute impact (~200ms for 1000 mols) but indicates a design inefficiency.
 
@@ -319,7 +319,7 @@ with ProcessPoolExecutor(max_workers=min(32, os.cpu_count())) as pool:
 - **JSON cache files** (`cache_io.py`): Uses `json.dumps`/`json.loads` with fcntl locking. For large caches (>100K entries), msgpack or sqlite would be faster, but current cache sizes (~1000-5000 entries per target) are fine.
 - **No unnecessary serialization**: Good. Data stays in memory within each script invocation.
 
-**One issue:** `scripts/proxy_final_correlation.py:97-128` reads `train_*.csv` files from FREED++ workspace one-by-one with `pd.read_csv()` and concatenates. If there are many epoch files, this could be slow. Consider `pd.concat([pd.read_csv(f) for f in files])` with pre-allocated list (already done -- line 128).
+**One issue:** `scripts/s5_analyze/proxy_correlation.py:97-128` reads `train_*.csv` files from FREED++ workspace one-by-one with `pd.read_csv()` and concatenates. If there are many epoch files, this could be slow. Consider `pd.concat([pd.read_csv(f) for f in files])` with pre-allocated list (already done -- line 128).
 
 ---
 
@@ -337,7 +337,7 @@ with ProcessPoolExecutor(max_workers=min(32, os.cpu_count())) as pool:
 | polars | 1.38.1 | DataFrames | **UNUSED** -- never imported anywhere |
 | pyarrow | 23.0.0 | Parquet I/O | Required by pandas for parquet |
 | scipy | 1.13.1 | Statistics | Used in 2 scripts only (redocking, correlation). Pinned by boltz. |
-| datasets | 4.5.0 (HuggingFace) | Data loading | Used in **ONE place**: `scripts/fetch_calibration_sets.py:43`. Heavyweight (~200 MB transitive deps). |
+| datasets | 4.5.0 (HuggingFace) | Data loading | Used in **ONE place**: `scripts/s0_fetch/fetch_calibration_smiles.py:43`. Heavyweight (~200 MB transitive deps). |
 | meeko | 0.5.1 | Ligand preparation | PDBQT conversion. Lightweight, no bottleneck, no alternative needed. |
 | matplotlib/seaborn | Latest | Plotting | Post-processing only |
 | loguru | 0.7+ | Logging | Throughout |
@@ -352,7 +352,7 @@ with ProcessPoolExecutor(max_workers=min(32, os.cpu_count())) as pool:
 - `polars>=1.0` (`pyproject.toml:10`): Never imported anywhere in `src/` or `scripts/`. Remove to save ~30 MB and install time. Zero risk.
 
 **Replace heavyweight single-use dep:**
-- `datasets>=2.19` (HuggingFace, `pyproject.toml:16`): Used in exactly ONE file (`scripts/fetch_calibration_sets.py:43`). Pulls in `huggingface_hub`, `tokenizers`, `xxhash`, and other transitive dependencies (~200 MB). Replace with `requests` + direct CSV download. The calibration set is a simple SMILES file, not a HuggingFace dataset requiring the datasets library's features.
+- `datasets>=2.19` (HuggingFace, `pyproject.toml:16`): Used in exactly ONE file (`scripts/s0_fetch/fetch_calibration_smiles.py:43`). Pulls in `huggingface_hub`, `tokenizers`, `xxhash`, and other transitive dependencies (~200 MB). Replace with `requests` + direct CSV download. The calibration set is a simple SMILES file, not a HuggingFace dataset requiring the datasets library's features.
 
 **Pin Boltz to specific commit:**
 - `boltz = { git = "https://github.com/jwohlwend/boltz.git" }` (`pyproject.toml:192`) -- pinned to HEAD of master. This is **fragile**: upstream breaking changes could silently break scoring and invalidate the entire cache (context hash changes with boltz version).
@@ -423,28 +423,28 @@ The Boltz-2 subprocess model means torch is imported 125+ times per target. This
 
 | # | Action | File(s) | Speedup | Risk |
 |---|--------|---------|---------|------|
-| 1.1 | **Set `--parallel=2+` default** in `run_full_experiment.py` | `scripts/run_full_experiment.py:135` | 2x on 2-GPU | Low |
+| 1.1 | **Set `--parallel=2+` default** in `run_full_experiment.py` | `scripts/pipeline/run_full_experiment.py:135` | 2x on 2-GPU | Low |
 | 1.2 | **Pin Boltz to specific git commit** | `pyproject.toml:192` | Stability | None |
 | 1.3 | **Remove unused `polars` dependency** | `pyproject.toml:10` | Faster install | None |
 | 1.4 | **Tune `num_sub_proc`** based on GPU: 12 for 4090, 24 for H100 | `configs/experiment.yaml:49` | 10-30% training | Low |
-| 1.5 | **Increase Boltz batch size to 16-32** on H100 (Boltz internally processes batch_size=1, so external batch mainly amortizes subprocess startup; LOW OOM risk) | `src/dualdocking/scorer_boltz2.py:34` | 15-30% scoring (fewer subprocess invocations) | Low |
+| 1.5 | **Increase Boltz batch size to 16-32** on H100 (Boltz internally processes batch_size=1, so external batch mainly amortizes subprocess startup; LOW OOM risk) | `dualdocking/scorer_boltz2.py:34` | 15-30% scoring (fewer subprocess invocations) | Low |
 | 1.6 | **GPU pinning for 2xH100**: `CUDA_VISIBLE_DEVICES` per stage | `generator_freedpp.py:355`, `scorer_boltz2.py:351` | 2x on 2-GPU | Low |
 
 ### Phase 2: Medium Effort (1-3 days)
 
 | # | Action | File(s) | Speedup | Risk |
 |---|--------|---------|---------|------|
-| 2.1 | **Parallel target scoring** in `score.py` | `scripts/score.py:66-89` | 2x scoring | Low |
-| 2.2 | **Parallel ligand prep** in `dock_calibration.py` | `scripts/dock_calibration.py:633` | 10-30x calibration | Low |
-| 2.3 | **Parallel Boltz targets on 2 GPUs** | `src/dualdocking/scorer_boltz2.py` | 2x scoring | Medium |
-| 2.4 | **Replace `datasets` with `requests`** in `fetch_calibration_sets.py` | `scripts/fetch_calibration_sets.py:43` | Faster install | Low |
-| 2.5 | **Pipeline GPU tasks**: generate on GPU 0 while scoring previous on GPU 1 | `scripts/run_full_experiment.py` | 1.5-2x | Medium |
-| 2.6 | **Bootstrap numpy pre-extraction**: extract columns as numpy arrays before 10K loop | `src/dualdocking/statistical.py:80-86` | 3-5x bootstrap (36s -> 7-12s) | Low |
-| 2.7 | **Eliminate double SMILES parsing**: pass mol objects instead of re-parsing canonical SMILES | `src/dualdocking/chem_sanitize.py:85-90`, `diversity.py:79-91` | ~40% fewer RDKit parse calls | Low |
+| 2.1 | **Parallel target scoring** in `score.py` | `scripts/s4_score/score.py:66-89` | 2x scoring | Low |
+| 2.2 | **Parallel ligand prep** in `dock_calibration.py` | `scripts/s2_calibrate/dock_calibration.py:633` | 10-30x calibration | Low |
+| 2.3 | **Parallel Boltz targets on 2 GPUs** | `dualdocking/scorer_boltz2.py` | 2x scoring | Medium |
+| 2.4 | **Replace `datasets` with `requests`** in `fetch_calibration_smiles.py` | `scripts/s0_fetch/fetch_calibration_smiles.py:43` | Faster install | Low |
+| 2.5 | **Pipeline GPU tasks**: generate on GPU 0 while scoring previous on GPU 1 | `scripts/pipeline/run_full_experiment.py` | 1.5-2x | Medium |
+| 2.6 | **Bootstrap numpy pre-extraction**: extract columns as numpy arrays before 10K loop | `dualdocking/statistical.py:80-86` | 3-5x bootstrap (36s -> 7-12s) | Low |
+| 2.7 | **Eliminate double SMILES parsing**: pass mol objects instead of re-parsing canonical SMILES | `dualdocking/chem_sanitize.py:85-90`, `diversity.py:79-91` | ~40% fewer RDKit parse calls | Low |
 
 **Sketch for parallel target scoring (2.1):**
 ```python
-# scripts/score.py -- replace sequential loop with parallel
+# scripts/s4_score/score.py -- replace sequential loop with parallel
 from concurrent.futures import ThreadPoolExecutor
 
 def _score_target(target_id, smiles_list, scores_path, force, label):
@@ -466,10 +466,10 @@ with ThreadPoolExecutor(max_workers=2) as pool:
 
 | # | Action | File(s) | Speedup | Risk |
 |---|--------|---------|---------|------|
-| 3.1 | **Persistent Boltz-2 server** (eliminate subprocess reload) | New: `src/dualdocking/boltz_server.py` | 3-8x scoring | High (requires Boltz Python API) |
+| 3.1 | **Persistent Boltz-2 server** (eliminate subprocess reload) | New: `dualdocking/boltz_server.py` | 3-8x scoring | High (requires Boltz Python API) |
 | 3.2 | **Affinity-only Boltz model** (skip structure prediction) | Requires upstream Boltz changes | 2-3x scoring | High |
 | 3.3 | **Multi-stage Docker build** | `docker/freedpp/Dockerfile` | -3 GB image | Medium |
-| 3.4 | **GPU task scheduler** for 2xH100 | New: `src/dualdocking/gpu_scheduler.py` | Optimal utilization | Medium |
+| 3.4 | **GPU task scheduler** for 2xH100 | New: `dualdocking/gpu_scheduler.py` | Optimal utilization | Medium |
 | 3.5 | **`torch.compile` for Boltz-2** | Upstream Boltz or monkey-patch | 1.2-2x inference | Medium (compile time) |
 
 **Sketch for persistent Boltz server (3.1):**

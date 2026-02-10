@@ -7,10 +7,10 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-import scripts.analysis.proxy_final_correlation as mod
+import scripts.s5_analyze.proxy_correlation as mod
 import yaml
 from click.testing import CliRunner
-from scripts.analysis.proxy_final_correlation import main
+from scripts.s5_analyze.proxy_correlation import main
 
 
 def _pairs_cfg():
@@ -75,7 +75,7 @@ def _setup(tmp_path, *, include_docking_b=False):
     rng = np.random.default_rng(42)
     for mode in ("single_a", "double"):
         for seed in (1, 2):
-            run_dir = tmp_path / "results" / "pair1" / mode / f"seed_{seed}"
+            run_dir = tmp_path / "output" / "results" / "pair1" / mode / f"seed_{seed}"
             smiles = _write_scored(run_dir, rng)
             _write_training_csvs(run_dir, smiles, rng, include_docking_b=include_docking_b)
 
@@ -83,7 +83,7 @@ def _setup(tmp_path, *, include_docking_b=False):
 def _invoke(extra_args=None):
     runner = CliRunner()
     args = [
-        "--results-root", "results",
+        "--results-root", "output/results",
         "--pairs-config", "configs/pairs.yaml",
         "--experiment-config", "configs/experiment.yaml",
     ]

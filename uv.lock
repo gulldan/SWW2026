@@ -717,6 +717,7 @@ name = "dualdocking"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "boltz", extra = ["cuda"] },
     { name = "click" },
     { name = "datasets" },
@@ -747,6 +748,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.9" },
     { name = "boltz", extras = ["cuda"], git = "https://github.com/jwohlwend/boltz.git?rev=cb04aeccdd480fd4db707f0bbafde538397fa2ac" },
     { name = "click", specifier = ">=8.1" },
     { name = "datasets", specifier = ">=2.19" },

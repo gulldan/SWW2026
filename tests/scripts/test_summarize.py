@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import yaml
 from click.testing import CliRunner
-from scripts.analysis.summarize import _build_report, _score_distribution_block, _top_molecules_block, main
+from scripts.s5_analyze.summarize import _build_report, _score_distribution_block, _top_molecules_block, main
 
 
 def _make_df(n: int = 5, pair: str = "pair1", mode: str = "single_a") -> pd.DataFrame:
@@ -131,7 +131,7 @@ def test_main_cli(tmp_path, monkeypatch):
     }
     (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(exp))
 
-    import scripts.analysis.summarize as mod
+    import scripts.s5_analyze.summarize as mod
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
 
     runner = CliRunner()

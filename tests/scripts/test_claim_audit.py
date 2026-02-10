@@ -5,8 +5,8 @@ import json
 import yaml
 from click.testing import CliRunner
 
-import scripts.validation.claim_audit as mod
-from scripts.validation.claim_audit import main
+import scripts.s7_audit.claim_audit as mod
+from scripts.s7_audit.claim_audit import main
 
 _CORE_PAIRS = ["CDK2_ERK2", "AChE_BChE", "BACE1_GSK3B", "AChE_BACE1", "GSK3B_CDK5"]
 
@@ -358,7 +358,7 @@ def test_evidence_map_populated(tmp_path, monkeypatch):
 
 def test_check_significance_with_none_p_value_adjusted():
     """_check_significance must handle p_value_adjusted=None (auxiliary pairs)."""
-    from scripts.validation.claim_audit import _check_significance
+    from scripts.s7_audit.claim_audit import _check_significance
 
     # Auxiliary pair entry: p_value_adjusted is None, should fall back to p_value_raw
     entry = {
@@ -439,7 +439,7 @@ def test_core_pair_with_set_blocked_excluded(tmp_path, monkeypatch):
     configs.mkdir(parents=True, exist_ok=True)
     (configs / "pairs.yaml").write_text(yaml.dump({"pairs": pairs}))
 
-    from scripts.validation.claim_audit import _load_core_pairs
+    from scripts.s7_audit.claim_audit import _load_core_pairs
     core = _load_core_pairs(configs / "pairs.yaml")
     assert "CDK2_ERK2" not in core
     assert len(core) == 4

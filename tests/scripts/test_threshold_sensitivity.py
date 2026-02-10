@@ -7,10 +7,10 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-import scripts.analysis.threshold_sensitivity as mod
+import scripts.s5_analyze.threshold_sensitivity as mod
 import yaml
 from click.testing import CliRunner
-from scripts.analysis.threshold_sensitivity import main
+from scripts.s5_analyze.threshold_sensitivity import main
 
 
 def _pairs_cfg():
@@ -62,14 +62,14 @@ def _setup(tmp_path, *, double_mean=-1.5, single_mean=-0.5):
     for mode in ("single_a", "single_b", "double"):
         mean = double_mean if mode == "double" else single_mean
         for seed in [1, 2, 3, 4, 5]:
-            run_dir = tmp_path / "results" / "pair1" / mode / f"seed_{seed}"
+            run_dir = tmp_path / "output" / "results" / "pair1" / mode / f"seed_{seed}"
             _write_run(run_dir, rng, mean=mean)
 
 
 def _invoke(extra_args=None):
     runner = CliRunner()
     args = [
-        "--results-root", "results",
+        "--results-root", "output/results",
         "--pairs-config", "configs/pairs.yaml",
         "--experiment-config", "configs/experiment.yaml",
         "--metrics-config", "configs/metrics.yaml",

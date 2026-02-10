@@ -20,7 +20,7 @@ uv sync --group dev
 
 # Verify
 uv run pytest tests/ -v
-uv run ruff check src/ scripts/ docker/
+uv run ruff check dualdocking/ scripts/ docker/
 ```
 
 Boltz-2 is installed from source via `pyproject.toml` (`boltz[cuda]` git dependency).
@@ -32,7 +32,7 @@ environment, so it runs in an isolated Docker container.
 
 ```bash
 # Fetch data files copied into the image
-uv run python scripts/fetch/fetch_freed_data.py
+uv run python scripts/s0_fetch/fetch_freed_fragments.py
 
 # Build the image (from repo root)
 docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
@@ -46,13 +46,13 @@ Reward normalization in FREED++ requires per-target mean/std from a reference SM
 
 ```bash
 # Download calibration SMILES (MOSES by default)
-uv run python scripts/fetch/fetch_calibration_sets.py
+uv run python scripts/s0_fetch/fetch_calibration_smiles.py
 
 # Dock calibration set against all targets (GPU)
-uv run python scripts/validation/dock_calibration.py
+uv run python scripts/s2_calibrate/dock_calibration.py
 
 # Compute normalization.yaml
-uv run python scripts/validation/calibrate_normalization.py
+uv run python scripts/s2_calibrate/compute_normalization.py
 ```
 
 Parameters are in `configs/calibration.yaml`. Generated stats go to `configs/normalization.yaml`.
@@ -63,7 +63,7 @@ For baseline comparison with druglike molecules from ZINC:
 
 ```bash
 # One-shot: fetch archive + convert to Parquet + sample 1000 SMILES
-uv run python scripts/prep/prepare_data_dependencies.py \
+uv run python scripts/s1_prepare/prepare_all.py \
   --fetch-baseline \
   --baseline-url "https://huggingface.co/datasets/Pixelatory/ZINC20-Druglike/resolve/main/zinc-druglike-cano.tar.xz?download=true" \
   --convert-baseline --sample-baseline
@@ -72,13 +72,13 @@ uv run python scripts/prep/prepare_data_dependencies.py \
 Or step by step:
 
 ```bash
-uv run python scripts/fetch/fetch_baseline_zinc.py --url "https://<host>/zinc-druglike-cano.tar.xz"
-uv run python scripts/prep/convert_baseline_to_parquet.py \
-  --input data/baseline/zinc-druglike-cano.tar.xz \
-  --output data/baseline/zinc-druglike-cano.parquet --column smiles
-uv run python scripts/prep/sample_baseline_from_parquet.py \
-  --input data/baseline/zinc-druglike-cano.parquet \
-  --output data/baseline/zinc_druglike_baseline_1000_seed42.smi \
+uv run python scripts/s0_fetch/fetch_zinc_baseline.py --url "https://<host>/zinc-druglike-cano.tar.xz"
+uv run python scripts/s1_prepare/convert_baseline_parquet.py \
+  --input output/data/baseline/zinc-druglike-cano.tar.xz \
+  --output output/data/baseline/zinc-druglike-cano.parquet --column smiles
+uv run python scripts/s1_prepare/sample_baseline.py \
+  --input output/data/baseline/zinc-druglike-cano.parquet \
+  --output output/data/baseline/zinc_druglike_baseline_1000_seed42.smi \
   --n 1000 --seed 42 --column smiles
 ```
 

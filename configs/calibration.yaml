@@ -1,5 +1,5 @@
 selected: moses
-output_path: data/calibration/zinc_druglike_calibration_1000_v2024.smi
+output_path: output/data/calibration/zinc_druglike_calibration_1000_v2024.smi
 sample:
   n: 1000
   seed: 137

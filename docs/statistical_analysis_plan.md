@@ -8,7 +8,7 @@
 | **Date** | 2026-02-08 |
 | **Status** | FROZEN (amended v1.1 — see Section 11) |
 | **Pre-registration ref** | `docs/preregistration.md` (commit `f2eceb2`) |
-| **Pipeline entry point** | `scripts/compute_metrics.py` |
+| **Pipeline entry point** | `scripts/s5_analyze/compute_metrics.py` |
 
 ---
 
@@ -45,15 +45,15 @@ results/{pair}/{mode}/seed_{seed}/
       └── reward_metadata.json  # Invalid/timeout fractions
 ```
 
-**Gating order** (implemented in `scripts/compute_metrics.py:101-132`):
+**Gating order** (implemented in `scripts/s5_analyze/compute_metrics.py:101-132`):
 
 1. **Existence gate:** `scored_joined.csv` must exist.
 2. **Fairness gate:** `validate_fairness(run_dir)` checks n_molecules in
    [990, 1010] and duplication_rate < 0.20
-   (`src/dualdocking/fairness.py:44-86`).
+   (`dualdocking/fairness.py:44-86`).
 3. **Quality gate:** `validate_reward_quality(run_dir)` checks
    invalid_fraction <= 0.10 and timeout_fraction <= 0.05
-   (`src/dualdocking/fairness.py:89-167`).
+   (`dualdocking/fairness.py:89-167`).
 
 Runs failing gate 2 (fairness) trigger hard abort (exit 1).
 Runs failing gate 3 (quality) are excluded from analysis with a warning.
@@ -108,7 +108,7 @@ Additional secondary metrics (reported but not formally tested):
 
 ### 3.3 Exploratory Endpoints
 
-- Spearman rho (docking vs Boltz-2) per target — `scripts/proxy_final_correlation.py`
+- Spearman rho (docking vs Boltz-2) per target — `scripts/s5_analyze/proxy_correlation.py`
 - Tanimoto overlap with ChEMBL dual-actives
 - Internal diversity (inter-mode)
 - Boltz-2 `affinity_probability_binary`
@@ -150,7 +150,7 @@ For each contrast (e.g., H1a: `double` vs `single_a` on a given pair):
 | CI level | 95% | Convention |
 | p-value type | One-sided | Directional: H1 is double > single (goal.md line 99) |
 
-Implementation: `src/dualdocking/statistical.py:44-171`
+Implementation: `dualdocking/statistical.py:44-171`
 (`hierarchical_bootstrap_test()`; includes fast numpy path for column-mean metrics).
 
 ### 4.2 Multiple Testing Correction
@@ -167,7 +167,7 @@ Implementation: `src/dualdocking/statistical.py:44-171`
 2. For rank i out of n tests: `p_adj[i] = min(p_adj[i+1], p_raw[i] * n / i)`.
 3. Clip to [0, 1].
 
-Implementation: `src/dualdocking/statistical.py:174-197` (`fdr_correction()`).
+Implementation: `dualdocking/statistical.py:174-197` (`fdr_correction()`).
 
 Applied in: `compute_metrics.py:297-316` (primary family FDR + secondary/auxiliary marking).
 
@@ -194,7 +194,7 @@ where `n_greater` = number of pairs where treat > ctrl,
 | < 0.474 | Medium |
 | >= 0.474 | Large |
 
-Implementation: `src/dualdocking/statistical.py:200-211` (`cliffs_delta()`).
+Implementation: `dualdocking/statistical.py:200-211` (`cliffs_delta()`).
 
 #### 4.3.2 Cohen's d (Secondary)
 
@@ -206,7 +206,7 @@ d = (mean_treat - mean_ctrl) / sqrt(pooled_var)
 
 **Interpretation:** 0.2 small, 0.5 medium, 0.8 large (Cohen 1988).
 
-Implementation: `src/dualdocking/statistical.py:214-229` (`cohens_d()`).
+Implementation: `dualdocking/statistical.py:214-229` (`cohens_d()`).
 
 ### 4.4 Significance Decision Rule
 
@@ -254,7 +254,7 @@ The primary conclusion is considered robust if the success criterion (5.1)
 holds at all three pre-registered thresholds: T = {-1.0, 0.0, +1.0}
 (100 nM, 1 uM, 10 uM).
 
-Implementation: `scripts/threshold_sensitivity.py`.
+Implementation: `scripts/s5_analyze/threshold_sensitivity.py`.
 
 ## 6. Claim Language Rules
 
@@ -326,20 +326,20 @@ manual computation steps required.
 
 | SAP Section | Code Location | Function/Block |
 |-------------|---------------|----------------|
-| 2.2 Fairness gate | `src/dualdocking/fairness.py:44-86` | `validate_fairness()` |
-| 2.2 Quality gate | `src/dualdocking/fairness.py:89-167` | `validate_reward_quality()` |
-| 2.3 Missing data | `scripts/compute_metrics.py:207-226` | Completeness check |
-| 3.1 hr_both | `scripts/compute_metrics.py:169` | `(aff_a <= thr_a) & (aff_b <= thr_b)` |
+| 2.2 Fairness gate | `dualdocking/fairness.py:44-86` | `validate_fairness()` |
+| 2.2 Quality gate | `dualdocking/fairness.py:89-167` | `validate_reward_quality()` |
+| 2.3 Missing data | `scripts/s5_analyze/compute_metrics.py:207-226` | Completeness check |
+| 3.1 hr_both | `scripts/s5_analyze/compute_metrics.py:169` | `(aff_a <= thr_a) & (aff_b <= thr_b)` |
 | 3.1 Thresholds | `configs/metrics.yaml:13-43` | `T_A = T_B = 0.0` |
-| 4.1 Bootstrap | `src/dualdocking/statistical.py:44-171` | `hierarchical_bootstrap_test()` |
-| 4.2 FDR | `src/dualdocking/statistical.py:174-197` | `fdr_correction()` |
-| 4.3.1 Cliff's delta | `src/dualdocking/statistical.py:200-211` | `cliffs_delta()` |
-| 4.3.2 Cohen's d | `src/dualdocking/statistical.py:214-229` | `cohens_d()` |
-| 4.4 Significance rule | `scripts/compute_metrics.py:302-306` | Conjunctive criterion |
-| 5.2 No-degradation guard | `scripts/compute_metrics.py:318-350` | Degradation Cliff's delta |
-| 5.3 Threshold sensitivity | `scripts/threshold_sensitivity.py` | Full script |
-| 6.x Claim audit | `scripts/claim_audit.py` | Full script |
-| Proxy-final correlation | `scripts/proxy_final_correlation.py` | Full script |
+| 4.1 Bootstrap | `dualdocking/statistical.py:44-171` | `hierarchical_bootstrap_test()` |
+| 4.2 FDR | `dualdocking/statistical.py:174-197` | `fdr_correction()` |
+| 4.3.1 Cliff's delta | `dualdocking/statistical.py:200-211` | `cliffs_delta()` |
+| 4.3.2 Cohen's d | `dualdocking/statistical.py:214-229` | `cohens_d()` |
+| 4.4 Significance rule | `scripts/s5_analyze/compute_metrics.py:302-306` | Conjunctive criterion |
+| 5.2 No-degradation guard | `scripts/s5_analyze/compute_metrics.py:318-350` | Degradation Cliff's delta |
+| 5.3 Threshold sensitivity | `scripts/s5_analyze/threshold_sensitivity.py` | Full script |
+| 6.x Claim audit | `scripts/s7_audit/claim_audit.py` | Full script |
+| Proxy-final correlation | `scripts/s5_analyze/proxy_correlation.py` | Full script |
 
 ### Output Artifacts
 
@@ -368,13 +368,13 @@ manual computation steps required.
 
 ```bash
 # Primary analysis
-uv run python scripts/compute_metrics.py
+uv run python scripts/s5_analyze/compute_metrics.py
 
 # Threshold sensitivity
-uv run python scripts/threshold_sensitivity.py
+uv run python scripts/s5_analyze/threshold_sensitivity.py
 
 # Proxy-final correlation
-uv run python scripts/proxy_final_correlation.py
+uv run python scripts/s5_analyze/proxy_correlation.py
 ```
 
 All scripts read from `configs/` and `results/`, write to `report/`.

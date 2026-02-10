@@ -2,9 +2,9 @@
 
 import numpy as np
 import pandas as pd
-import scripts.viz.plot_results as mod
+import scripts.s6_report.plot_results as mod
 from click.testing import CliRunner
-from scripts.viz.plot_results import main, plot_score_comparison
+from scripts.s6_report.plot_results import main, plot_score_comparison
 
 
 def _make_df(n=5):

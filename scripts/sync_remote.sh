@@ -127,9 +127,7 @@ rsync_code() {
         --exclude='.venv' \
         --exclude='__pycache__' \
         --exclude='*.pyc' \
-        --exclude='data/' \
-        --exclude='cache/' \
-        --exclude='results/' \
+        --exclude='output/' \
         --exclude='report/data/' \
         --exclude='report/figures/' \
         --exclude='report/*.log' \
@@ -181,29 +179,31 @@ rsync_data() {
 
     ok "Модельный кеш синхронизирован"
 
-    step "Синхронизация данных (data/)"
+    step "Синхронизация данных (output/data/)"
 
     rsync -avz --relative \
         $DRY_RUN \
         --compress \
         --partial \
         --progress \
-        --include='data/***' \
+        --include='output/data/***' \
+        --include='output/' \
         --exclude='*' \
         "$PROJECT_DIR/./" \
         "$REMOTE_HOST:$REMOTE_PATH/"
 
     ok "Данные синхронизированы"
 
-    step "Синхронизация MSA-кеша (cache/boltz_msa/)"
+    step "Синхронизация MSA-кеша (output/cache/boltz_msa/)"
 
     rsync -avz --relative \
         $DRY_RUN \
         --compress \
         --partial \
         --progress \
-        --include='cache/boltz_msa/***' \
-        --include='cache/' \
+        --include='output/cache/boltz_msa/***' \
+        --include='output/cache/' \
+        --include='output/' \
         --exclude='*' \
         "$PROJECT_DIR/./" \
         "$REMOTE_HOST:$REMOTE_PATH/"
@@ -265,11 +265,11 @@ summary() {
         echo "  # Если первый запуск — сначала выполните --full"
     fi
     echo "  # Запуск NIM Boltz-2 (по инстансу на каждую GPU):"
-    echo "  ./scripts/run/start_boltz_nim.sh"
+    echo "  ./scripts/s4_score/start_boltz_nim.sh"
     echo "  # Запуск эксперимента:"
-    echo "  uv run python scripts/run/run_full_experiment.py"
+    echo "  uv run python scripts/pipeline/run_full_experiment.py"
     echo "  # Остановка NIM после завершения:"
-    echo "  ./scripts/run/start_boltz_nim.sh stop"
+    echo "  ./scripts/s4_score/start_boltz_nim.sh stop"
 }
 
 # ─── Main ────────────────────────────────────────────────────────────────────

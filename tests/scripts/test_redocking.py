@@ -8,13 +8,13 @@ import pytest
 
 class TestSymmetricRmsd:
     def test_identical_coords(self):
-        from scripts.validation.validate_redocking import symmetric_rmsd
+        from scripts.s2_calibrate.validate_redocking import symmetric_rmsd
 
         coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
         assert symmetric_rmsd(coords, coords) == pytest.approx(0.0, abs=1e-10)
 
     def test_known_displacement(self):
-        from scripts.validation.validate_redocking import symmetric_rmsd
+        from scripts.s2_calibrate.validate_redocking import symmetric_rmsd
 
         a = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
         b = np.array([[1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
@@ -22,7 +22,7 @@ class TestSymmetricRmsd:
         assert symmetric_rmsd(a, b) == pytest.approx(1.0, abs=1e-10)
 
     def test_shuffled_atoms(self):
-        from scripts.validation.validate_redocking import symmetric_rmsd
+        from scripts.s2_calibrate.validate_redocking import symmetric_rmsd
 
         a = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]])
         # Same atoms but shuffled order
@@ -30,7 +30,7 @@ class TestSymmetricRmsd:
         assert symmetric_rmsd(a, b) == pytest.approx(0.0, abs=1e-10)
 
     def test_atom_count_mismatch_raises(self):
-        from scripts.validation.validate_redocking import symmetric_rmsd
+        from scripts.s2_calibrate.validate_redocking import symmetric_rmsd
 
         a = np.array([[0.0, 0.0, 0.0]])
         b = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
@@ -40,14 +40,14 @@ class TestSymmetricRmsd:
 
 class TestCentroidDistance:
     def test_same_centroid(self):
-        from scripts.validation.validate_redocking import centroid_distance
+        from scripts.s2_calibrate.validate_redocking import centroid_distance
 
         a = np.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
         b = np.array([[0.5, 0.5, 0.0], [1.5, -0.5, 0.0]])
         assert centroid_distance(a, b) == pytest.approx(0.0, abs=1e-10)
 
     def test_known_distance(self):
-        from scripts.validation.validate_redocking import centroid_distance
+        from scripts.s2_calibrate.validate_redocking import centroid_distance
 
         a = np.array([[0.0, 0.0, 0.0]])
         b = np.array([[3.0, 4.0, 0.0]])
@@ -56,7 +56,7 @@ class TestCentroidDistance:
 
 class TestParseSdfCoords:
     def test_simple_sdf(self):
-        from scripts.validation.validate_redocking import parse_sdf_coords
+        from scripts.s2_calibrate.validate_redocking import parse_sdf_coords
 
         sdf = textwrap.dedent("""\
             mol
@@ -77,7 +77,7 @@ class TestParseSdfCoords:
         np.testing.assert_allclose(coords[1], [4.0, 5.0, 6.0])
 
     def test_empty_sdf(self):
-        from scripts.validation.validate_redocking import parse_sdf_coords
+        from scripts.s2_calibrate.validate_redocking import parse_sdf_coords
 
         assert parse_sdf_coords("") is None
         assert parse_sdf_coords("short\ntext") is None
@@ -116,7 +116,7 @@ class TestExtractLigandInfo:
 
 class TestCollectBlockedTargetIds:
     def test_identifies_blocked(self):
-        from scripts.validation.validate_redocking import _collect_blocked_target_ids
+        from scripts.s2_calibrate.validate_redocking import _collect_blocked_target_ids
 
         pairs = {
             "A_B": {
@@ -134,7 +134,7 @@ class TestCollectBlockedTargetIds:
         assert blocked == {"C", "D"}
 
     def test_no_blocked(self):
-        from scripts.validation.validate_redocking import _collect_blocked_target_ids
+        from scripts.s2_calibrate.validate_redocking import _collect_blocked_target_ids
 
         pairs = {
             "A_B": {
@@ -150,7 +150,7 @@ class TestWriteCsv:
     def test_csv_output(self, tmp_path):
         import csv as csv_mod
 
-        from scripts.validation.validate_redocking import (
+        from scripts.s2_calibrate.validate_redocking import (
             STATUS_FAIL,
             STATUS_PASS,
             STATUS_SKIPPED_APO,
@@ -195,7 +195,7 @@ class TestWriteCsv:
 
 class TestRedockResultStatus:
     def test_status_constants(self):
-        from scripts.validation.validate_redocking import (
+        from scripts.s2_calibrate.validate_redocking import (
             STATUS_ERROR,
             STATUS_FAIL,
             STATUS_PASS,
@@ -210,7 +210,7 @@ class TestRedockResultStatus:
         assert STATUS_ERROR == "error"
 
     def test_result_to_dict_includes_status(self):
-        from scripts.validation.validate_redocking import (
+        from scripts.s2_calibrate.validate_redocking import (
             STATUS_PASS,
             RedockResult,
             _result_to_dict,

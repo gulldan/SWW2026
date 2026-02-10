@@ -7,10 +7,10 @@ experiment:
 
 data_sources:
   calibration_set:
-    path: "data/calibration/zinc_druglike_calibration_1000_v2024.smi"
+    path: "output/data/calibration/zinc_druglike_calibration_1000_v2024.smi"
     sha256: "ee4f11d1f9d56aeeadaf8a23a47dc40787225c745c880b42396a87096662a19b"
   baseline_set:
-    path: "data/baseline/zinc_druglike_baseline_1000_seed42.smi"
+    path: "output/data/baseline/zinc_druglike_baseline_1000_seed42.smi"
     sha256: "647b619f6807972a4645e5820b4aa542e9ba6de9616c092143ce1c07f62bad10"
 
 configs:
@@ -33,7 +33,7 @@ configs:
 pairs_freeze:
   freeze_date: "2026-02-07"
   human_only: true
-  organism_gate: "src/dualdocking/config.py: load_pairs()"
+  organism_gate: "dualdocking/config.py: load_pairs()"
   core:
     - CDK2_ERK2    # 1HCL / 4QTA, Homo / Homo
     - AChE_BChE    # 4EY7 / 4BDS, Homo / Homo

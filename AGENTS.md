@@ -28,7 +28,7 @@ All documents describe the **same experiment** and must stay consistent. When ch
 | `configs/pairs.yaml`    | `docs/selection_criteria.md`, `report/chapters/04_experimental_protocol.tex`     |
 | `configs/metrics.yaml`  | `docs/goal.md` (thresholds), `report/chapters/04_experimental_protocol.tex`      |
 | `configs/experiment.yaml` | `docs/goal.md`, `report/chapters/03_methods_notes.tex`                         |
-| `src/dualdocking/**/*.py` | Corresponding `tests/test_*.py`, `docs/goal.md` if behavior changes            |
+| `dualdocking/**/*.py`   | Corresponding `tests/test_*.py`, `docs/goal.md` if behavior changes            |
 | `docs/goal.md`          | `report/chapters/` (methods, protocol, limitations)                              |
 | `report/references.bib` | All `\cite{}` in `report/chapters/*.tex`                                         |
 | Install/Docker/pipeline | `docs/setup.md`, `docs/pipeline.md`                                             |
@@ -55,7 +55,7 @@ All other documents (`report/`, `docs/selection_criteria.md`, `README.md`, `conf
 
 1. **`docs/goal.md`** — supreme authority: hypothesis, endpoints, success criteria, notation. **Read-only without user approval.**
 2. `configs/*.yaml` — ground truth for runtime parameters (must agree with goal.md)
-3. `src/dualdocking/` (all subpackages) — ground truth for computation logic (must implement what goal.md specifies)
+3. `dualdocking/` (all subpackages) — ground truth for computation logic (must implement what goal.md specifies)
 4. `docs/selection_criteria.md` — ground truth for pair selection rationale
 5. `report/chapters/*.tex` — narrative must reflect the above, never contradict
 6. `README.md` — operational guide, may simplify but must not misrepresent
@@ -65,24 +65,23 @@ All other documents (`report/`, `docs/selection_criteria.md`, `README.md`, `conf
 ## Build & Test Commands
 
 ```bash
-# Install dependencies
-uv sync --extra dev
-uv pip install -r requirements-boltz.txt
+# Install all dependencies (boltz is a pinned git dep, included automatically)
+uv sync --group dev
 
-# Run full test suite (220 tests, ~7 min)
+# Run full test suite (396 tests, ~7 min)
 uv run pytest tests/ -v
 
 # Run a single test file
 uv run pytest tests/test_objectives.py -v
 
 # Linting (must pass with zero warnings)
-uv run ruff check src/ scripts/ docker/
+uv run ruff check dualdocking/ scripts/ docker/
 
 # Type checking (must pass with zero errors)
-uv run ty check src/
+uv run ty check dualdocking/
 
 # Auto-format
-uv run ruff format src/ scripts/
+uv run ruff format dualdocking/ scripts/
 
 # Docker build (FREED++ generator)
 docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
@@ -91,7 +90,7 @@ docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 ## Project Architecture
 
 ```
-src/dualdocking/              # Core library (subpackage layout)
+dualdocking/                  # Core library (at project root, no src/ wrapper)
   config.py                   #   YAML config loading & validation
   scoring/                    #   Scoring & docking subpackage
     objectives.py             #     Multi-objective functions (min, harmonic, Pareto, etc.)
@@ -112,22 +111,26 @@ src/dualdocking/              # Core library (subpackage layout)
   reporting/                  #   Reporting subpackage
     run_manifest.py           #     Lifecycle tracking for experiment runs
     latex_report.py           #     LaTeX report generation
-scripts/                      # CLI entry points (organized by stage)
-  fetch/                      #   Data fetching scripts
-  prep/                       #   Preparation scripts
-  run/                        #   Experiment execution scripts
-  analysis/                   #   Analysis scripts
-  validation/                 #   Validation scripts
-  viz/                        #   Visualization scripts
-  smoke/                      #   Smoke tests
+scripts/                      # CLI entry points (organized by pipeline stage)
+  s0_fetch/                   #   Data download (PDB, FASTA, FREED fragments, ZINC, ChEMBL)
+  s1_prepare/                 #   Target preparation (PDB -> PDBQT, binding box, MSA)
+  s2_calibrate/               #   Calibration and validation
+  s3_generate/                #   Molecule generation (FREED++)
+  s4_score/                   #   Affinity scoring (Boltz-2)
+  s5_analyze/                 #   Statistical analysis (aggregate, metrics, correlation)
+  s6_report/                  #   Visualization and manuscript (plots, molecules, LaTeX)
+  s7_audit/                   #   Post-hoc verification (claim traceability)
+  pipeline/                   #   End-to-end orchestrators (full experiment, pilot, post)
+  smoke/                      #   Smoke tests (Boltz-2 health check, reward capping)
 tests/                        # pytest suite, monkeypatch-heavy
 configs/                      # YAML: pairs.yaml, metrics.yaml, experiment.yaml
 docker/freedpp/               # Dockerfile + dual_reward_patch.py monkey-patch
-data/                         # Runtime data (gitignored): targets/, calibration/, baseline/
-cache/                        # Boltz-2 score cache (gitignored), keyed by context hash
-results/                      # Experiment outputs (gitignored)
-report/                       # LaTeX manuscript (chapters/, figures/, references.bib)
 docs/                         # goal.md (spec), selection_criteria.md, tasks.md
+report/                       # LaTeX manuscript (chapters/, figures/, templates/)
+output/                       # Runtime data (gitignored)
+  data/                       #   Target structures, calibration, baseline
+  cache/                      #   Boltz-2 score cache, keyed by context hash
+  results/                    #   Experiment outputs
 ```
 
 ### Data Flow
@@ -138,7 +141,7 @@ Stage 0 (fetch) → Generation (FREED++, 3 modes × 5 pairs × 5 seeds) → Scor
 
 - **Python 3.12**, package manager `uv`, build system `hatchling`
 - **Ruff**: `select = ["ALL"]` with curated ignores, line-length 130, Google docstrings, double quotes
-- **Type checker**: `ty` in strict mode (`src/` only; tests and scripts excluded)
+- **Type checker**: `ty` in strict mode (`dualdocking/` only; tests and scripts excluded)
 - **lower_is_better = True everywhere** — docking scores are negative (more negative = better binding). Utility = −score.
 - All objective functions convert scores to utilities before aggregation
 - Tchebycheff is the exception: works directly in score-space (abs is symmetric)
@@ -152,12 +155,21 @@ Stage 0 (fetch) → Generation (FREED++, 3 modes × 5 pairs × 5 seeds) → Scor
 
 ### Cache System
 
-Boltz-2 scores use a disk cache segmented by target: `cache/{target}.{ctx[:8]}.json`
+Boltz-2 scores use a disk cache segmented by target: `output/cache/{target}.{ctx[:8]}.json`
 
 - Cache key v2: `SHA256(target || smi || ctx_hash || seq_hash || msa_hash)`
 - Context hash includes: Boltz version, CLI args, accelerator, Docker digest
 - I/O: `fcntl.flock` for locking, atomic write via temp file + `os.replace`
 - Module-level `_CONTEXT_HASH` is lazily cached; tests must reset it via `monkeypatch.setattr(mod, "_CONTEXT_HASH", None)`
+
+### NIM Boltz-2 Backend
+
+`scoring/boltz2.py` supports two backends controlled by the `BOLTZ_BACKEND` env var:
+
+- **`cli`** (default) — runs Boltz-2 as a subprocess via the `boltz` CLI
+- **`nim`** — calls a persistent NVIDIA NIM container via REST API (`BOLTZ_NIM_URL` env var, default `http://localhost:8000`)
+
+NIM and CLI backends produce separate cache contexts (different context hashes) so their cached scores never collide. The NIM path skips MSA (the server handles it internally).
 
 ## Testing Patterns
 
@@ -177,10 +189,10 @@ Boltz-2 scores use a disk cache segmented by target: `cache/{target}.{ctx[:8]}.j
 
 ## Security & Boundaries
 
-- **Never commit** `data/`, `cache/`, `results/`, `.env`, or credential files (all gitignored)
+- **Never commit** `output/`, `.env`, or credential files (all gitignored)
 - Docker container runs as non-root; GPU passthrough via `--gpus all`
 - `scoring/cache_io.py` uses `fcntl.flock` — safe for concurrent single-machine access, NOT for NFS
-- External API calls (ChEMBL, PDB) are only in `scripts/` and `data/chembl_validation.py`, never in core library
+- External API calls (ChEMBL, PDB) are only in `scripts/` and `dualdocking/data/chembl_validation.py`, never in core scoring/generation
 
 ## Experiment Design (Context for Changes)
 

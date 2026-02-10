@@ -509,6 +509,7 @@ def nim_server(monkeypatch):
     url = f"http://127.0.0.1:{port}"
     monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "nim")
     monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", url)
+    monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", [url])
 
     yield server
     server.shutdown()
@@ -524,6 +525,7 @@ class TestNimHealthCheck:
 
     def test_health_no_server(self, monkeypatch):
         monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://127.0.0.1:1")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://127.0.0.1:1"])
         assert _nim_health_check() is False
 
 
@@ -561,6 +563,7 @@ class TestNimPredictAffinity:
 
     def test_connection_refused_returns_nan(self, monkeypatch):
         monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://127.0.0.1:1")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://127.0.0.1:1"])
         score = _nim_predict_affinity("MKTAY", "CCO")
         assert math.isnan(score)
 
@@ -609,29 +612,31 @@ class TestNimScoringContext:
         # NIM context
         monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
         monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "nim")
-        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://localhost:8000")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://localhost:8000"])
         h_nim = _scoring_context_hash()
 
         assert h_cli != h_nim
 
-    def test_nim_context_changes_with_url(self, monkeypatch):
+    def test_nim_context_same_across_urls(self, monkeypatch):
+        """NIM context hash is independent of URLs (round-robin is implementation detail)."""
         monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "nim")
 
-        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://host1:8000")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://host1:8000"])
         h1 = _scoring_context_hash()
 
         monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
-        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://host2:8000")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://host2:8000"])
         h2 = _scoring_context_hash()
 
-        assert h1 != h2
+        assert h1 == h2
 
     def test_nim_scoring_context_info(self, monkeypatch):
         monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "nim")
-        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://localhost:8000")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://localhost:8000"])
+        monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
         info = get_scoring_context_info()
         assert info["backend"] == "nim"
-        assert info["nim_url"] == "http://localhost:8000"
+        assert info["nim_urls"] == ["http://localhost:8000"]
         assert "cache_context_hash" in info
 
 
@@ -662,6 +667,7 @@ class TestNimScoreBatchE2E:
         # Second call should hit cache (even if server is down)
         nim_server.shutdown()
         monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://127.0.0.1:1")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://127.0.0.1:1"])
         scores2 = mod.score_batch("tgt", ["CCO", "CCCO"])
         assert scores2[0] == pytest.approx(-6.1)
         assert scores2[1] == pytest.approx(-6.1)

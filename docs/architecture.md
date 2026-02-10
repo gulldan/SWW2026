@@ -32,7 +32,7 @@ sequences:
   - protein:
       id: A
       sequence: "MENFQKVEKIGE..."
-      msa: cache/boltz_msa/CDK2.csv
+      msa: output/cache/boltz_msa/CDK2.csv
   - ligand:
       id: B
       smiles: 'CC(=O)Oc1ccccc1C(=O)O'
@@ -46,14 +46,14 @@ properties:
 ```bash
 # Offline scoring (MSA pre-computed):
 uv run boltz predict input.yaml \
-  --out_dir cache/boltz_runs/{target_id}/{hash} \
+  --out_dir output/cache/boltz_runs/{target_id}/{hash} \
   --model boltz2 --accelerator gpu \
   --recycling_steps 3 --sampling_steps 200 --diffusion_samples 4 \
   --sampling_steps_affinity 200 --diffusion_samples_affinity 5 --override
 
 # Online MSA warmup (for prepare_targets.py --prepare-all):
 uv run boltz predict warmup.yaml \
-  --out_dir cache/boltz_msa/{target_id} \
+  --out_dir output/cache/boltz_msa/{target_id} \
   --model boltz2 --accelerator gpu --use_msa_server
 ```
 
@@ -71,7 +71,7 @@ uv run boltz predict warmup.yaml \
 
 ### Cache
 
-Disk cache segmented by target: `cache/{target}.{ctx[:8]}.json`.
+Disk cache segmented by target: `output/cache/{target}.{ctx[:8]}.json`.
 
 - Key: `SHA256(target || smi || ctx_hash || seq_hash || msa_hash)`
 - Context includes: Boltz version, CLI args, accelerator, Docker digest
@@ -86,7 +86,7 @@ Runs in Docker due to dependency conflicts (Python 3.10, PyTorch 1.12, DGL 0.9).
 ### Data Flow
 
 ```
-scripts/run/generate.py
+scripts/s3_generate/generate.py
   -> generation.freedpp.generate(config)
       1. _ensure_docker_image()       # build if absent
       2. _prepare_receptor()          # PDB -> PDBQT + binding box
@@ -107,7 +107,7 @@ Where `z_X = (d_X - mu_X) / sigma_X` (per-target z-score from calibration).
 
 ### Model Cache
 
-Trained models saved in `cache/freedpp_models/{hash}/`.
+Trained models saved in `output/cache/freedpp_models/{hash}/`.
 Hash includes: reward mode, targets, epochs, steps_per_epoch, seed, etc.
 Rerun with same params uses `--commands "sample"` (minutes vs hours).
 
@@ -125,16 +125,16 @@ task status, timestamps, and config hashes.
 
 ## Offline Principle
 
-All external data is fetched once during `scripts/fetch/stage0_fetch.py`.
+All external data is fetched once during `scripts/s0_fetch/fetch_all.py`.
 After that, the entire pipeline (generation, scoring, analysis) runs offline.
 
 | Data | Location | Source |
 |------|----------|--------|
-| Protein sequences | `data/targets/{id}.fasta` | UniProt |
-| PDB structures | `data/targets/{pair}/{A,B}/` | RCSB |
-| MSA | `cache/boltz_msa/{id}.csv` | ColabFold API |
+| Protein sequences | `output/data/targets/{id}.fasta` | UniProt |
+| PDB structures | `output/data/targets/{pair}/{A,B}/` | RCSB |
+| MSA | `output/cache/boltz_msa/{id}.csv` | ColabFold API |
 | Boltz checkpoints | `~/.boltz/` | Auto on first run |
-| Score cache | `cache/{target}.{ctx}.json` | Computed |
+| Score cache | `output/cache/{target}.{ctx}.json` | Computed |
 
 ## Troubleshooting
 
