@@ -22,6 +22,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -95,19 +96,43 @@ def _auto_num_sub_proc() -> int:
     env = os.getenv("FREEDPP_NUM_SUB_PROC")
     if env is not None:
         return int(env)
+
+    vram_gb: float | None = None
+
+    # Attempt 1: torch.cuda (fast, in-process)
     try:
         import torch
 
         if torch.cuda.is_available():
             vram_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
-            if vram_gb >= 80:  # H100 80 GB / A100 80 GB
-                return 24
-            if vram_gb >= 40:  # A6000 48 GB
-                return 12
-            return 8  # RTX 4090 24 GB and smaller
     except Exception:
-        logger.debug("GPU detection failed for num_sub_proc, using default=8")
-    return 8  # safe default for any GPU
+        pass
+
+    # Attempt 2: nvidia-smi (works even without CUDA-enabled torch)
+    if vram_gb is None:
+        try:
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits", "--id=0"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                vram_gb = float(result.stdout.strip().split("\n")[0]) / 1024
+        except Exception:
+            pass
+
+    if vram_gb is None:
+        logger.debug("GPU VRAM detection failed for num_sub_proc, using default=8")
+        return 8
+
+    logger.debug("GPU VRAM detected: {:.1f} GB", vram_gb)
+    if vram_gb >= 76:  # H100/H800 80 GB / A100 80 GB (nvidia-smi reports ~79.x GiB)
+        return 24
+    if vram_gb >= 38:  # A6000 48 GB / A100 40 GB
+        return 12
+    return 8  # RTX 4090 24 GB and smaller
 
 
 def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
@@ -388,6 +413,8 @@ def _run_freedpp(
         "--rm",
         "--gpus",
         gpu_flag,
+        "-e",
+        "PYTHONUNBUFFERED=1",
         "-v",
         f"{workspace}:/workspace",
     ]
@@ -467,20 +494,60 @@ def _run_freedpp(
         if "train" in commands:
             epoch_bar = tqdm(total=config.epochs, desc="FREED++ обучение", unit="epoch")
 
+        train_start = time.monotonic()
+        last_epoch_logged = -1
+        line_count = 0
+
+        # Multiple patterns to catch FREED++ epoch/iteration progress
+        _epoch_re = re.compile(
+            r"[Ee](?:poch|pisode)\s*[:\[#]?\s*(\d+)"  # Epoch 1, Episode 1, epoch: 1
+            r"|#(\d+)"  # #1, #001
+            r"|\[(\d+)/\d+\]"  # [1/200]
+            r"|[Ii]ter(?:ation)?\s*[:\[#]?\s*(\d+)"  # Iter 1, Iteration: 1
+        )
+        _noise_patterns = ("DeprecationWarning", "SyntaxWarning", "FutureWarning", "UserWarning", "warnings.warn")
+
         for line in process.stdout:  # type: ignore[union-attr]
             stripped = line.rstrip()
             log_file.write(f"[{_ts()}] {stripped}\n")
             log_file.flush()
-            # Парсинг прогресса эпох из вывода FREED++
-            if epoch_bar is not None and ("epoch" in stripped.lower() or "Epoch" in stripped):
-                # Пытаемся извлечь номер эпохи
-                match = re.search(r"[Ee]poch\s*[:\[]?\s*(\d+)", stripped)
+            line_count += 1
+
+            # Skip noisy warnings
+            if any(pat in stripped for pat in _noise_patterns):
+                stderr_lines.append(line)
+                continue
+
+            # Парсинг прогресса эпох/эпизодов из вывода FREED++
+            if epoch_bar is not None:
+                match = _epoch_re.search(stripped)
                 if match:
-                    epoch_num = int(match.group(1))
+                    # Take first non-None group
+                    epoch_num = int(next(g for g in match.groups() if g is not None))
                     epoch_bar.n = min(epoch_num, config.epochs)
                     epoch_bar.refresh()
-            # Показываем ключевые строки в логе
-            if any(kw in stripped.lower() for kw in ("error", "epoch", "sample", "train", "reward", "saving")):
+                    log_interval = max(1, config.epochs // 10)
+                    if epoch_num > 0 and epoch_num % log_interval == 0 and epoch_num != last_epoch_logged:
+                        last_epoch_logged = epoch_num
+                        elapsed = time.monotonic() - train_start
+                        sec_per_epoch = elapsed / epoch_num
+                        remaining = (config.epochs - epoch_num) * sec_per_epoch
+                        logger.info(
+                            "[FREED++] Epoch {}/{} — {:.0f}s elapsed, ~{:.0f}m remaining ({:.1f}s/epoch)",
+                            epoch_num,
+                            config.epochs,
+                            elapsed,
+                            remaining / 60,
+                            sec_per_epoch,
+                        )
+                elif line_count % 500 == 0:
+                    # Fallback: show line count in postfix if no epoch pattern matched yet
+                    elapsed = time.monotonic() - train_start
+                    epoch_bar.set_postfix_str(f"{line_count} lines, {elapsed:.0f}s")
+
+            # Показываем ключевые строки в логе (без warnings-шума)
+            low = stripped.lower()
+            if any(kw in low for kw in ("error", "sample", "saving", "loss", "score", "result")):
                 logger.info("[FREED++] {}", stripped)
             stderr_lines.append(line)
 

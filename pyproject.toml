@@ -19,6 +19,7 @@ dependencies = [
     "scipy",
     "tqdm>=4.66",
     "loguru>=0.7",
+    "aiohttp>=3.9",
     "boltz[cuda]",
 ]
 

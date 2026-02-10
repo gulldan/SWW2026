@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
@@ -12,6 +13,7 @@ from pathlib import Path
 import click
 import yaml
 from loguru import logger
+from tqdm import tqdm
 
 from dualdocking.config import load_experiment, load_pairs
 from dualdocking.reporting.run_manifest import (
@@ -144,23 +146,34 @@ def _prepare_commands(prepare_freed_data: bool, prepare_baseline: bool, baseline
     return [cmd]
 
 
+# Module-level scorer config (set in main() from experiment.yaml)
+_SCORER_BACKEND: str = "cli"
+_NIM_URLS: list[str] = ["http://localhost:8000"]
+
+
 def _run_cmd(cmd: list[str], log_path: Path, gpu_id: int | None = None) -> None:
     env = dict(os.environ)
     if gpu_id is not None:
         env["FREEDPP_CUDA_DEVICE"] = str(gpu_id)
         env["BOLTZ_CUDA_DEVICE"] = str(gpu_id)
+    # Boltz-2 backend routing
+    env["BOLTZ_BACKEND"] = _SCORER_BACKEND
+    if _SCORER_BACKEND == "nim":
+        # Pass ALL NIM URLs for round-robin across GPU instances
+        env["BOLTZ_NIM_URLS"] = ",".join(_NIM_URLS)
+        env["BOLTZ_NIM_URL"] = _NIM_URLS[0]  # fallback for single-URL code paths
     _log_to_file(log_path, f"[{_ts()}] RUN (gpu={gpu_id}): {' '.join(cmd)}")
     result = subprocess.run(  # noqa: S603
         cmd,
         cwd=str(PROJECT_ROOT),
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr,
         text=True,
         env=env,
         check=False,
     )
     if result.returncode != 0:
-        combined = (result.stdout or "") + (result.stderr or "")
-        _log_to_file(log_path, f"[{_ts()}] ERROR (rc={result.returncode}):\n{combined[-4000:]}")
+        _log_to_file(log_path, f"[{_ts()}] ERROR (rc={result.returncode}):\n{(result.stdout or '')[-4000:]}")
         raise RuntimeError(f"Command failed (rc={result.returncode}): {' '.join(cmd)}")
     if result.stdout:
         _log_to_file(log_path, f"[{_ts()}] OUT: {result.stdout[-2000:]}")
@@ -180,36 +193,46 @@ def _run_one(
             skip_task(mf_path, task_id=tid)
         return
 
+    gpu_tag = f" [GPU {gpu_id}]" if gpu_id is not None else ""
+
     # --- Generate stage ---
     if generated.exists() and resume:
         logger.info("[RESUME] {} {} seed_{} (generated.csv exists)", pair, mode, seed)
         if mf_path:
             update_task(mf_path, task_id=tid, stage="generate", status="skipped")
     else:
+        logger.info("[GENERATE]{} {} {} seed_{} — started", gpu_tag, pair, mode, seed)
         if mf_path:
             update_task(mf_path, task_id=tid, stage="generate", status="running")
         t0 = time.monotonic()
         try:
             _run_cmd(_command_generate(pair, mode, seed), log_path, gpu_id=gpu_id)
         except RuntimeError as exc:
+            logger.error("[GENERATE]{} {} {} seed_{} — FAILED ({:.0f}s)", gpu_tag, pair, mode, seed, time.monotonic() - t0)
             if mf_path:
                 update_task(mf_path, task_id=tid, stage="generate", status="failed", error=str(exc))
             raise
+        elapsed = time.monotonic() - t0
+        logger.info("[GENERATE]{} {} {} seed_{} — done ({:.0f}s)", gpu_tag, pair, mode, seed, elapsed)
         if mf_path:
-            update_task(mf_path, task_id=tid, stage="generate", status="completed", duration_seconds=time.monotonic() - t0)
+            update_task(mf_path, task_id=tid, stage="generate", status="completed", duration_seconds=elapsed)
 
     # --- Score stage ---
+    logger.info("[SCORE]{} {} {} seed_{} — started", gpu_tag, pair, mode, seed)
     if mf_path:
         update_task(mf_path, task_id=tid, stage="score", status="running")
     t0 = time.monotonic()
     try:
         _run_cmd(_command_score(pair, mode, seed), log_path, gpu_id=gpu_id)
     except RuntimeError as exc:
+        logger.error("[SCORE]{} {} {} seed_{} — FAILED ({:.0f}s)", gpu_tag, pair, mode, seed, time.monotonic() - t0)
         if mf_path:
             update_task(mf_path, task_id=tid, stage="score", status="failed", error=str(exc))
         raise
+    elapsed = time.monotonic() - t0
+    logger.info("[SCORE]{} {} {} seed_{} — done ({:.0f}s)", gpu_tag, pair, mode, seed, elapsed)
     if mf_path:
-        update_task(mf_path, task_id=tid, stage="score", status="completed", duration_seconds=time.monotonic() - t0)
+        update_task(mf_path, task_id=tid, stage="score", status="completed", duration_seconds=elapsed)
 
 
 @click.command()
@@ -270,12 +293,24 @@ def main(
     with_post: bool,
     latex_mode: str,
 ) -> None:
+    global _SCORER_BACKEND, _NIM_URLS
+
     if parallel <= 0:
         parallel = _detect_gpu_count()
         logger.info("Auto-detected {} GPU(s) → --parallel={}", parallel, parallel)
 
     exp_cfg = load_experiment(PROJECT_ROOT / "configs")
     all_pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
+
+    # Configure scorer backend from experiment.yaml
+    scorer_cfg = exp_cfg.get("scorer", {})
+    _SCORER_BACKEND = scorer_cfg.get("backend", "cli").lower()
+    if _SCORER_BACKEND == "nim":
+        nim_cfg = scorer_cfg.get("nim", {})
+        _NIM_URLS = nim_cfg.get("urls", ["http://localhost:8000"])
+        logger.info("Scorer backend: NIM ({} instance(s): {})", len(_NIM_URLS), ", ".join(_NIM_URLS))
+    else:
+        logger.info("Scorer backend: CLI (boltz predict subprocess)")
     modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
     all_seeds = exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
 
@@ -324,36 +359,59 @@ def main(
         resume=resume,
     )
 
-    for cmd in prep_cmds:
-        _run_cmd(cmd, log_path)
+    if prep_cmds:
+        logger.info("[PREP] Checking data dependencies...")
+        for cmd in prep_cmds:
+            _run_cmd(cmd, log_path)
+        logger.info("[PREP] Data dependencies ready")
 
     # Ensure normalization calibration for all pairs before dispatching tasks
-    calibrated_pairs: set[str] = set()
-    for pair_id, _mode, _seed in tasks:
-        if pair_id not in calibrated_pairs:
-            _ensure_calibrated(pair_id, pairs[pair_id], log_path)
-            calibrated_pairs.add(pair_id)
+    unique_pairs = list(dict.fromkeys(p for p, _m, _s in tasks))
+    logger.info("[CALIBRATION] Checking {} pair(s): {}", len(unique_pairs), ", ".join(unique_pairs))
+    for pair_id in unique_pairs:
+        _ensure_calibrated(pair_id, pairs[pair_id], log_path)
+    logger.info("[CALIBRATION] All pairs calibrated")
 
     n_gpus = _detect_gpu_count()
+    total = len(tasks)
+    n_completed = 0
+    n_failed = 0
+
+    logger.info("Starting {} tasks (parallel={}, GPUs={})", total, parallel, n_gpus)
 
     run_failed = False
     if parallel <= 1:
-        for pair_id, mode, seed in tasks:
+        pbar = tqdm(tasks, desc="Tasks", unit="task", dynamic_ncols=True)
+        for pair_id, mode, seed in pbar:
+            pbar.set_postfix_str(f"{pair_id}/{mode}/seed_{seed}", refresh=True)
             try:
                 _run_one(pair_id, mode, seed, log_path, resume, mf_path, gpu_id=0 if n_gpus == 1 else None)
+                n_completed += 1
             except RuntimeError:
+                n_failed += 1
                 run_failed = True
+        pbar.set_postfix_str(f"done={n_completed} failed={n_failed}")
+        pbar.close()
     else:
         with ThreadPoolExecutor(max_workers=parallel) as executor:
-            futures = []
+            futures = {}
             for i, (pair_id, mode, seed) in enumerate(tasks):
                 gid = i % n_gpus if n_gpus > 1 else None
-                futures.append(executor.submit(_run_one, pair_id, mode, seed, log_path, resume, mf_path, gpu_id=gid))
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except RuntimeError:
-                    run_failed = True
+                fut = executor.submit(_run_one, pair_id, mode, seed, log_path, resume, mf_path, gpu_id=gid)
+                futures[fut] = f"{pair_id}/{mode}/seed_{seed}"
+            with tqdm(total=total, desc="Tasks", unit="task", dynamic_ncols=True) as pbar:
+                for future in as_completed(futures):
+                    tid_label = futures[future]
+                    try:
+                        future.result()
+                        n_completed += 1
+                    except RuntimeError:
+                        n_failed += 1
+                        run_failed = True
+                    pbar.update(1)
+                    pbar.set_postfix_str(f"done={n_completed} failed={n_failed}")
+
+    logger.info("All tasks finished: {} completed, {} failed out of {}", n_completed, n_failed, total)
 
     if not with_post:
         _log_to_file(log_path, f"[{_ts()}] POST-SKIP (stage1 only)")
@@ -361,8 +419,13 @@ def main(
         return
 
     _log_to_file(log_path, f"[{_ts()}] POST-START")
-    for cmd in _post_commands(latex_mode):
+    post_cmds = _post_commands(latex_mode)
+    post_names = ["aggregate", "metrics", "plots", "render_molecules", "summarize", "latex"]
+    for i, cmd in enumerate(tqdm(post_cmds, desc="Post-pipeline", unit="step", dynamic_ncols=True)):
+        step_name = post_names[i] if i < len(post_names) else cmd[-1]
+        logger.info("[POST] {} — started", step_name)
         _run_cmd(cmd, log_path)
+        logger.info("[POST] {} — done", step_name)
     _log_to_file(log_path, f"[{_ts()}] POST-DONE")
     finalize_manifest(mf_path, status="failed" if run_failed else "completed")
 

@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -45,17 +46,42 @@ def _auto_batch_size() -> int:
     env = os.getenv("BOLTZ_BATCH_SIZE")
     if env is not None:
         return int(env)
+
+    vram_gb: float | None = None
+
+    # Attempt 1: torch.cuda (fast, in-process)
     try:
         import torch
 
         if torch.cuda.is_available():
             vram_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
-            if vram_gb >= 48:  # H100 80 GB / A100 40–80 GB
-                return 128
-            if vram_gb >= 20:  # RTX 4090 24 GB / A5000 24 GB
-                return 64
     except Exception:
+        pass
+
+    # Attempt 2: nvidia-smi (works even without CUDA-enabled torch)
+    if vram_gb is None:
+        try:
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits", "--id=0"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                vram_gb = float(result.stdout.strip().split("\n")[0]) / 1024
+        except Exception:
+            pass
+
+    if vram_gb is None:
         logger.debug("GPU detection failed for batch size, using default={}", _DEFAULT_BATCH_SIZE)
+        return _DEFAULT_BATCH_SIZE
+
+    logger.debug("GPU VRAM detected for batch size: {:.1f} GB", vram_gb)
+    if vram_gb >= 46:  # H100/H800 80 GB / A100 40-80 GB (nvidia-smi reports ~79.x GiB)
+        return 128
+    if vram_gb >= 20:  # RTX 4090 24 GB / A5000 24 GB
+        return 64
     return _DEFAULT_BATCH_SIZE
 
 
@@ -90,10 +116,13 @@ _FREEDPP_DOCKER_IMAGE = "dualdocking/freedpp:latest"
 # NIM backend configuration
 # ---------------------------------------------------------------------------
 _BOLTZ_BACKEND: str = os.getenv("BOLTZ_BACKEND", "cli").lower()
+# Multiple NIM URLs for round-robin (comma-separated) or single URL
 _BOLTZ_NIM_URL: str = os.getenv("BOLTZ_NIM_URL", "http://localhost:8000")
+_BOLTZ_NIM_URLS: list[str] = [u.strip() for u in os.getenv("BOLTZ_NIM_URLS", _BOLTZ_NIM_URL).split(",") if u.strip()]
 _NIM_PREDICT_ENDPOINT = "/biology/mit/boltz2/predict"
 _NIM_HEALTH_ENDPOINT = "/v1/health/ready"
 _NIM_TIMEOUT = 300  # seconds per molecule via NIM
+_NIM_CONCURRENCY = int(os.getenv("NIM_CONCURRENCY", "1"))
 
 # NIM prediction params — mirrors _BOLTZ_CLI_ARGS_BASE values.
 # step_scale=1.5: boltz2 model default (CLI uses 1.5; NIM defaults to 1.638 if unset).
@@ -225,11 +254,12 @@ def _scoring_context_hash() -> str:
 
     if _BOLTZ_BACKEND == "nim":
         nim_params_str = json.dumps(_NIM_PREDICT_PARAMS, sort_keys=True)
-        blob = f"nim||{_BOLTZ_NIM_URL}||{nim_params_str}".encode()
+        # Context hash based on params only (not URLs, since round-robin is an implementation detail)
+        blob = f"nim||{nim_params_str}".encode()
         _CONTEXT_HASH = hashlib.sha256(blob).hexdigest()[:16]
         logger.info(
-            "Scoring context (NIM): url={}, params_hash={}... -> ctx={}",
-            _BOLTZ_NIM_URL,
+            "Scoring context (NIM): urls={}, params_hash={}... -> ctx={}",
+            _BOLTZ_NIM_URLS,
             hashlib.sha256(nim_params_str.encode()).hexdigest()[:8],
             _CONTEXT_HASH,
         )
@@ -265,7 +295,8 @@ def get_scoring_context_info() -> dict:
         return {
             "cache_context_hash": get_cache_context_hash(),
             "backend": "nim",
-            "nim_url": _BOLTZ_NIM_URL,
+            "nim_urls": _BOLTZ_NIM_URLS,
+            "nim_concurrency": _NIM_CONCURRENCY,
             "nim_params_hash": hashlib.sha256(nim_params_str.encode()).hexdigest()[:16],
         }
     boltz_ver = _boltz_version()
@@ -552,19 +583,29 @@ def _run_boltz_predict_dir(
 
     result = subprocess.run(  # noqa: S603
         cmd,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
         timeout=timeout,
         cwd=str(PROJECT_ROOT),
         env=_boltz_env(device=device),
         check=False,
     )
+    # Показываем ключевые строки Boltz stderr в логе (без шума warnings)
+    _boltz_noise = ("DeprecationWarning", "SyntaxWarning", "FutureWarning", "UserWarning", "warnings.warn")
+    if result.stderr:
+        for line in result.stderr.splitlines():
+            if any(pat in line for pat in _boltz_noise):
+                continue
+            low = line.lower()
+            if any(kw in low for kw in ("error", "running", "predict", "loaded", "sampling", "progress")):
+                logger.info("[Boltz-2] {}", line.rstrip())
     return result
 
 
 def _nim_health_check() -> bool:
     """Check if NIM Boltz-2 server is ready."""
-    url = f"{_BOLTZ_NIM_URL.rstrip('/')}{_NIM_HEALTH_ENDPOINT}"
+    url = f"{_BOLTZ_NIM_URLS[0].rstrip('/')}{_NIM_HEALTH_ENDPOINT}"
     try:
         req = urllib.request.Request(url)  # noqa: S310
         with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
@@ -577,7 +618,7 @@ _NIM_MAX_RETRIES = 2  # total attempts = 1 + retries
 
 
 def _nim_predict_affinity(sequence: str, smiles: str) -> float:
-    """Score one molecule via NIM REST API.
+    """Score one molecule via NIM REST API (sync, for single-molecule use).
 
     Returns log10(IC50 in μM), or NaN on failure.
     NIM returns two values from two affinity models — we average them.
@@ -585,7 +626,7 @@ def _nim_predict_affinity(sequence: str, smiles: str) -> float:
     """
     import time
 
-    url = f"{_BOLTZ_NIM_URL.rstrip('/')}{_NIM_PREDICT_ENDPOINT}"
+    url = f"{_BOLTZ_NIM_URLS[0].rstrip('/')}{_NIM_PREDICT_ENDPOINT}"
 
     payload: dict = {
         "polymers": [{"id": "A", "molecule_type": "protein", "sequence": sequence}],
@@ -641,6 +682,100 @@ def _nim_predict_affinity(sequence: str, smiles: str) -> float:
         return float("nan")
 
 
+def _parse_nim_affinity(result: dict, smiles: str) -> float:
+    """Extract affinity score from NIM response JSON."""
+    try:
+        affinities = result["affinities"]["B"]
+        pred_values = affinities["affinity_pred_value"]
+        return float(np.mean(pred_values))
+    except (KeyError, TypeError, IndexError) as exc:
+        logger.error("Failed to parse NIM affinity for SMILES {}: {}", smiles, exc)
+        return float("nan")
+
+
+async def _nim_predict_batch_async(
+    sequence: str,
+    smiles_indices: list[tuple[int, str]],
+) -> list[tuple[int, float]]:
+    """Score molecules via NIM using async HTTP with round-robin across NIM instances.
+
+    Sends concurrent requests to all available NIM URLs using aiohttp.
+    Concurrency is bounded by ``_NIM_CONCURRENCY`` semaphore per NIM instance.
+    """
+    import asyncio
+
+    import aiohttp
+
+    n_urls = len(_BOLTZ_NIM_URLS)
+    urls = [f"{u.rstrip('/')}{_NIM_PREDICT_ENDPOINT}" for u in _BOLTZ_NIM_URLS]
+    # Semaphore per NIM instance to avoid overloading a single worker
+    semaphores = [asyncio.Semaphore(_NIM_CONCURRENCY) for _ in range(n_urls)]
+    timeout = aiohttp.ClientTimeout(total=_NIM_TIMEOUT)
+    results: list[tuple[int, float]] = []
+
+    async def _predict_one(
+        session: aiohttp.ClientSession,
+        idx: int,
+        smi: str,
+        url_idx: int,
+    ) -> tuple[int, float]:
+        payload = {
+            "polymers": [{"id": "A", "molecule_type": "protein", "sequence": sequence}],
+            "ligands": [{"id": "B", "smiles": smi, "predict_affinity": True}],
+            **_NIM_PREDICT_PARAMS,
+        }
+
+        last_error: Exception | None = None
+        for attempt in range(_NIM_MAX_RETRIES + 1):
+            async with semaphores[url_idx]:
+                try:
+                    async with session.post(urls[url_idx], json=payload) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            return idx, _parse_nim_affinity(data, smi)
+                        body = (await resp.text())[:500]
+                        # 422 with "No GPU available" is a queue timeout — retryable
+                        # True client errors (400, 404, etc.) are not retryable
+                        if resp.status >= 400 and resp.status < 500 and "GPU available" not in body:
+                            logger.error("NIM HTTP {} for SMILES {}: {}", resp.status, smi, body)
+                            return idx, float("nan")
+                        last_error = Exception(f"HTTP {resp.status}: {body}")
+                        logger.warning(
+                            "NIM HTTP {} for SMILES {} (attempt {}/{}): {}",
+                            resp.status,
+                            smi,
+                            attempt + 1,
+                            _NIM_MAX_RETRIES + 1,
+                            body[:100],
+                        )
+                except (TimeoutError, aiohttp.ClientError, OSError) as exc:
+                    last_error = exc
+                    logger.warning(
+                        "NIM async request failed for SMILES {} (attempt {}/{}): {}",
+                        smi,
+                        attempt + 1,
+                        _NIM_MAX_RETRIES + 1,
+                        exc,
+                    )
+
+            if attempt < _NIM_MAX_RETRIES:
+                await asyncio.sleep(1.0 * (attempt + 1))
+
+        logger.error("NIM exhausted {} retries for SMILES {}: {}", _NIM_MAX_RETRIES + 1, smi, last_error)
+        return idx, float("nan")
+
+    connector = aiohttp.TCPConnector(limit=_NIM_CONCURRENCY * n_urls, limit_per_host=_NIM_CONCURRENCY)
+    async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+        tasks = []
+        for i, (idx, smi) in enumerate(smiles_indices):
+            url_idx = i % n_urls  # round-robin across NIM instances
+            tasks.append(_predict_one(session, idx, smi, url_idx))
+
+        results = await asyncio.gather(*tasks)
+
+    return list(results)
+
+
 def _score_batch_internal_nim(
     target_id: str,  # noqa: ARG001
     smiles_list: list[str],
@@ -649,26 +784,49 @@ def _score_batch_internal_nim(
     *,
     device: str | None = None,  # noqa: ARG001
 ) -> list[float]:
-    """Score a batch via NIM (one HTTP request per molecule).
+    """Score a batch via NIM using async HTTP requests with round-robin.
 
-    NIM only allows one ligand with predict_affinity=true per request,
-    so we loop over molecules sequentially.
+    Sends concurrent requests to all available NIM instances (``BOLTZ_NIM_URLS``).
+    Each NIM has a concurrency semaphore to prevent overloading.
     """
+    import asyncio
+
     scores = [float("nan")] * len(smiles_list)
 
-    valid_indices: list[int] = []
+    valid_pairs: list[tuple[int, str]] = []
     for idx, smi in enumerate(smiles_list):
         if _validate_smiles(smi):
-            valid_indices.append(idx)
+            valid_pairs.append((idx, _neutralize_smiles(smi)))
         else:
             logger.warning("Invalid SMILES or too large (>{} atoms): {}", MAX_LIGAND_ATOMS, smi)
 
-    if not valid_indices:
+    if not valid_pairs:
         return scores
 
-    for idx in valid_indices:
-        smi = _neutralize_smiles(smiles_list[idx])
-        scores[idx] = _nim_predict_affinity(sequence, smi)
+    logger.debug(
+        "NIM async batch: {} molecules, {} NIM URL(s), concurrency={}",
+        len(valid_pairs),
+        len(_BOLTZ_NIM_URLS),
+        _NIM_CONCURRENCY,
+    )
+
+    # Run async event loop from sync context
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is not None and loop.is_running():
+        # Already inside an event loop (e.g. Jupyter) — use nest_asyncio or thread
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            results = pool.submit(asyncio.run, _nim_predict_batch_async(sequence, valid_pairs)).result()
+    else:
+        results = asyncio.run(_nim_predict_batch_async(sequence, valid_pairs))
+
+    for idx, score in results:
+        scores[idx] = score
 
     return scores
 
@@ -937,6 +1095,9 @@ def score_batch(
 
     # Группируем в батчи
     num_batches = (len(to_score) + batch_size - 1) // batch_size
+    scoring_start = time.monotonic()
+    scored_so_far = 0
+
     for batch_idx in tqdm(range(num_batches), desc=f"Boltz-2 [{target_id}]", unit="batch"):
         start = batch_idx * batch_size
         end = min(start + batch_size, len(to_score))
@@ -945,16 +1106,37 @@ def score_batch(
         # Извлекаем SMILES для батча
         batch_smiles = [smi for _, smi in batch]
 
+        batch_t0 = time.monotonic()
         # Скорим батч за один вызов boltz predict
         batch_scores = _score_batch_internal(target_id, batch_smiles, sequence, msa_path, device=device)
+        batch_elapsed = time.monotonic() - batch_t0
 
         # Записываем результаты
+        batch_ok = 0
         for i, (idx, smi) in enumerate(batch):
             s = batch_scores[i]
             scores[idx] = s
             if not np.isnan(s):
                 key = _cache_key(target_id, smi, ctx_hash=ctx, seq_hash=seq_hash, msa_hash=msa_hash)
                 cache[key] = s
+                batch_ok += 1
+
+        scored_so_far += len(batch)
+        total_elapsed = time.monotonic() - scoring_start
+        mol_per_sec = scored_so_far / total_elapsed if total_elapsed > 0 else 0
+        remaining_mol = len(to_score) - scored_so_far
+        eta_min = (remaining_mol / mol_per_sec / 60) if mol_per_sec > 0 else 0
+        logger.info(
+            "[Boltz-2] [{}] Batch {}/{} — {}/{} scored, {:.0f}s, {:.2f} mol/s, ETA ~{:.0f}m",
+            target_id,
+            batch_idx + 1,
+            num_batches,
+            batch_ok,
+            len(batch),
+            batch_elapsed,
+            mol_per_sec,
+            eta_min,
+        )
 
         # Сохраняем кеш после каждого батча (не после каждой молекулы)
         if use_cache:

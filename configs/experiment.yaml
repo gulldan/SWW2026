@@ -66,5 +66,13 @@ quality_gate:
 # Настройки скорера (Boltz-2)
 scorer:
   name: "Boltz-2"
+  backend: nim                    # "cli" (subprocess boltz predict) или "nim" (REST API, быстрее)
   cache_enabled: true
   timeout_seconds: 300
+  nim:
+    # По одному NIM-инстансу на каждую GPU для параллельного скоринга
+    # GPU 0 → порт 8000, GPU 1 → порт 8001
+    base_port: 8000
+    urls:
+      - "http://localhost:8000"   # GPU 0
+      - "http://localhost:8001"   # GPU 1

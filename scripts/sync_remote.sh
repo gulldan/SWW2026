@@ -119,46 +119,26 @@ ensure_artifacts() {
 rsync_code() {
     step "Синхронизация кода и конфигов"
 
-    rsync -avz --relative \
+    rsync -avzc \
         $DRY_RUN \
         --progress \
-        --include='scripts/***' \
-        --include='src/***' \
-        --include='configs/***' \
-        --include='tests/***' \
-        --include='docs/***' \
-        --include='templates/***' \
-        --include='report/chapters/***' \
-        --include='report/manuscript.tex' \
-        --include='report/references.bib' \
-        --include='report/' \
-        --include='docker/freedpp/Dockerfile' \
-        --include='docker/freedpp/*.py' \
-        --include='docker/freedpp/*.sh' \
-        --include='docker/freedpp/data/***' \
-        --include='docker/freedpp/' \
-        --include='docker/boltz2/boltz2nim.sh' \
-        --include='docker/boltz2/' \
-        --include='docker/' \
-        --include='pyproject.toml' \
-        --include='uv.lock' \
-        --include='.python-version' \
-        --include='.gitignore' \
-        --include='README.md' \
-        --include='AGENTS.md' \
-        --include='CLAUDE.md' \
-        --exclude='.venv/***' \
-        --exclude='__pycache__/***' \
+        --itemize-changes \
+        --exclude='.git' \
+        --exclude='.venv' \
+        --exclude='__pycache__' \
         --exclude='*.pyc' \
-        --exclude='data/***' \
-        --exclude='cache/***' \
-        --exclude='results/***' \
+        --exclude='data/' \
+        --exclude='cache/' \
+        --exclude='results/' \
+        --exclude='report/data/' \
+        --exclude='report/figures/' \
+        --exclude='report/*.log' \
         --exclude='docker/**/*.tar*' \
-        --exclude='docker/**/cache/***' \
+        --exclude='docker/**/cache/' \
         --exclude='.env' \
         --exclude='*.key' \
-        --exclude='*' \
-        "$PROJECT_DIR/./" \
+        --exclude='*.egg-info' \
+        "$PROJECT_DIR/" \
         "$REMOTE_HOST:$REMOTE_PATH/"
 
     ok "Код и конфиги синхронизированы"
@@ -284,7 +264,12 @@ summary() {
     if [[ "$MODE" == "code" ]]; then
         echo "  # Если первый запуск — сначала выполните --full"
     fi
+    echo "  # Запуск NIM Boltz-2 (по инстансу на каждую GPU):"
+    echo "  ./scripts/run/start_boltz_nim.sh"
+    echo "  # Запуск эксперимента:"
     echo "  uv run python scripts/run/run_full_experiment.py"
+    echo "  # Остановка NIM после завершения:"
+    echo "  ./scripts/run/start_boltz_nim.sh stop"
 }
 
 # ─── Main ────────────────────────────────────────────────────────────────────
