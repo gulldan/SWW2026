@@ -10,7 +10,7 @@ Usage::
 from __future__ import annotations
 
 import json
-import subprocess
+import os
 import sys
 import time
 from datetime import UTC, datetime
@@ -22,28 +22,103 @@ from loguru import logger
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-def _run_cmd(cmd: list[str]) -> str:
-    """Run a shell command and return its stripped stdout/stderr.
+def _resolve_git_dir(repo_root: Path) -> Path | None:
+    """Resolve the real Git directory for a repository root.
+
+    Supports both standard repos (``.git/`` directory) and worktrees
+    (``.git`` file pointing to ``gitdir: ...``).
 
     Args:
-        cmd: Command and arguments to execute.
+        repo_root: Repository root path.
 
     Returns:
-        Stripped output string, or empty string on failure.
+        Path to the Git metadata directory, or ``None`` if unavailable.
     """
+    dot_git = repo_root / ".git"
+    if dot_git.is_dir():
+        return dot_git
+    if not dot_git.is_file():
+        return None
+
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
-    except FileNotFoundError:
+        text = dot_git.read_text().strip()
+    except OSError:
+        return None
+    if not text.startswith("gitdir:"):
+        return None
+
+    gitdir_token = text.split(":", 1)[1].strip()
+    gitdir = Path(gitdir_token)
+    if not gitdir.is_absolute():
+        gitdir = (repo_root / gitdir).resolve()
+    return gitdir if gitdir.exists() else None
+
+
+def _read_git_ref(git_dir: Path, ref: str) -> str:
+    """Read a full commit hash from a git ref.
+
+    Args:
+        git_dir: Git metadata directory.
+        ref: Ref path, e.g. ``"refs/heads/main"``.
+
+    Returns:
+        Commit hash string, or ``""`` if unresolved.
+    """
+    ref_path = git_dir / ref
+    try:
+        if ref_path.exists():
+            return ref_path.read_text().strip()
+    except OSError:
         return ""
-    if result.returncode != 0:
+
+    packed_refs = git_dir / "packed-refs"
+    if not packed_refs.exists():
         return ""
-    return (result.stdout or result.stderr or "").strip()
+    try:
+        for line in packed_refs.read_text().splitlines():
+            if not line or line.startswith(("#", "^")):
+                continue
+            parts = line.strip().split()
+            if len(parts) == 2 and parts[1] == ref:
+                return parts[0]
+    except OSError:
+        return ""
+    return ""
+
+
+def _short_commit(hash_text: str) -> str:
+    """Normalize and shorten a commit hash for metadata output.
+
+    Args:
+        hash_text: Candidate full commit hash.
+
+    Returns:
+        Short hash (7 chars) or ``"unknown"`` if invalid.
+    """
+    token = hash_text.strip()
+    if len(token) < 7:
+        return "unknown"
+    if not all(ch in "0123456789abcdefABCDEF" for ch in token):
+        return "unknown"
+    return token[:7].lower()
 
 
 def _git_commit() -> str:
-    """Return the short SHA of the current git HEAD."""
-    out = _run_cmd(["git", "rev-parse", "--short", "HEAD"])
-    return out.splitlines()[0] if out else "unknown"
+    """Return the short SHA of the current git HEAD without shelling out."""
+    git_dir = _resolve_git_dir(PROJECT_ROOT)
+    if git_dir is None:
+        return "unknown"
+
+    head_path = git_dir / "HEAD"
+    try:
+        head = head_path.read_text().strip()
+    except OSError:
+        return "unknown"
+
+    if head.startswith("ref:"):
+        ref = head.split(":", 1)[1].strip()
+        return _short_commit(_read_git_ref(git_dir, ref))
+    return _short_commit(head)
 
 
 def _master_config_field(path: str) -> str:
@@ -74,24 +149,20 @@ def _master_config_field(path: str) -> str:
 
 
 def _docker_image_digest(image: str) -> str:
-    """Retrieve the Docker image digest (or ID) for provenance tracking.
+    """Retrieve FREED++ docker digest from static config metadata.
+
+    Runtime Docker inspection is intentionally avoided here to keep
+    generation metadata collection side-effect free.
 
     Args:
-        image: Docker image name/tag (e.g. ``"dualdocking/freedpp:latest"``).
+        image: Docker image name/tag (currently informational).
 
     Returns:
-        Image digest hash, image ID, or value from master_config as fallback.
+        Digest string from ``master_config.yaml`` or ``"unknown"``.
     """
-    out = _run_cmd(["docker", "image", "inspect", image, "--format", "{{index .RepoDigests 0}}"])
-    if "@" in out:
-        return out.split("@")[-1]
-    if out:
-        return out
-    # Local builds often have no RepoDigests; fall back to image ID.
-    image_id = _run_cmd(["docker", "image", "inspect", image, "--format", "{{.Id}}"])
-    if image_id:
-        return image_id
-    return _master_config_field("software.docker_image_digest")
+    _ = image
+    digest = _master_config_field("software.docker_image_digest")
+    return digest or "unknown"
 
 
 def _boltz_version() -> str:
@@ -105,20 +176,36 @@ def _boltz_version() -> str:
 
 
 def _hardware_info() -> dict[str, str]:
-    """Detect GPU name and CUDA version from system tools.
+    """Detect GPU and CUDA version from torch runtime state.
 
     Returns:
         Dict with ``"gpu"`` and ``"cuda_version"`` keys.
     """
-    gpu = _run_cmd(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"]) or "unknown"
-    cuda = _run_cmd(["nvcc", "--version"])
-    if cuda:
-        # Extract release number if possible
-        for line in cuda.splitlines():
-            if "release" in line:
-                cuda = line.strip().split("release")[-1].split(",")[0].strip()
-                break
-    return {"gpu": gpu, "cuda_version": cuda or "unknown"}
+    try:
+        import torch
+    except Exception:
+        return {"gpu": "unknown", "cuda_version": "unknown"}
+
+    if not torch.cuda.is_available():
+        return {"gpu": "unknown", "cuda_version": torch.version.cuda or "unknown"}
+
+    gpu_count = torch.cuda.device_count()
+    if gpu_count <= 0:
+        return {"gpu": "unknown", "cuda_version": torch.version.cuda or "unknown"}
+
+    device_token = os.environ.get("FREEDPP_CUDA_DEVICE") or os.environ.get("CUDA_VISIBLE_DEVICES", "0")
+    try:
+        requested_idx = int(device_token.split(",", 1)[0])
+    except ValueError:
+        requested_idx = 0
+    if requested_idx < 0 or requested_idx >= gpu_count:
+        requested_idx = 0
+
+    try:
+        gpu_name = torch.cuda.get_device_name(requested_idx)
+    except Exception:
+        gpu_name = "unknown"
+    return {"gpu": gpu_name, "cuda_version": torch.version.cuda or "unknown"}
 
 
 def _normalization_meta() -> tuple[str, str]:

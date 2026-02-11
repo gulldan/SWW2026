@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -58,8 +57,6 @@ _PROGRAM_ALIASES: dict[str, str] = {
     "unidock_gpu": "unidock",
 }
 
-_ALLOWED_BINARIES: set[str] = {"unidock", "qvina02"}
-
 
 def _resolve_program(program: str, override: str | None = None) -> str:
     """Resolve a docking program name to its binary.
@@ -77,23 +74,16 @@ def _resolve_program(program: str, override: str | None = None) -> str:
 
 
 def _docking_version(program: str) -> str:
-    """Query a docking binary for its version string.
+    """Return docking version fallback without probing external binaries.
 
     Args:
-        program: Binary name or absolute path to query.
+        program: Binary name or absolute path.
 
     Returns:
-        First line of the ``--version`` output, or ``"unknown"``.
+        ``"unknown"`` (runtime version probing is intentionally disabled).
     """
-    try:
-        binary = program
-        if binary not in _ALLOWED_BINARIES and not Path(binary).is_absolute():
-            return "unknown"
-        result = subprocess.run([binary, "--version"], capture_output=True, text=True, check=False)  # noqa: S603
-        output = (result.stdout or result.stderr or "").strip()
-        return output.splitlines()[0] if output else "unknown"
-    except Exception:
-        return "unknown"
+    _ = program
+    return "unknown"
 
 
 def _load_scores(scores_dir: Path, target_id: str) -> np.ndarray:
@@ -195,6 +185,11 @@ def main(
     if docking_version is None:
         binary = _resolve_program(docking_program, docking_binary)
         docking_version = _docking_version(binary)
+        if docking_version == "unknown":
+            logger.warning(
+                "Docking version unavailable from manifest/override for binary '{}'; writing docking_version=unknown.",
+                binary,
+            )
 
     normalization = {
         "version": "1.0",
