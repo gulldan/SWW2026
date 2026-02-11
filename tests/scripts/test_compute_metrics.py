@@ -55,6 +55,7 @@ def _write_run(run_dir: Path, rng: np.random.Generator) -> None:
         }
     )
     df.to_csv(run_dir / "scored_joined.csv", index=False)
+    df.to_parquet(run_dir / "scored_joined.parquet", index=False)
 
 
 def _setup_full(tmp_path, seeds=None, missing_seeds=None):
@@ -169,12 +170,12 @@ class TestDefaultFullSetup:
             assert isinstance(check["degraded"], bool)
 
     def test_is_hit_a_b_columns_created(self):
-        """_load_scored_csv adds is_hit_a and is_hit_b columns."""
+        """_load_scored adds is_hit_a and is_hit_b columns."""
         assert self.result.exit_code == 0, self.result.output
 
-        # Verify by reading a scored CSV and checking the load function
+        # Verify by reading scored data and checking the load function
         run_dir = self.tmp_path / "output" / "results" / "pair1" / "double" / "seed_1"
-        df = mod._load_scored_csv(run_dir / "scored_joined.csv", 0.0, 0.0)
+        df = mod._load_scored(run_dir / "scored_joined.csv", 0.0, 0.0)
         assert "is_hit_a" in df.columns
         assert "is_hit_b" in df.columns
         assert "is_hit_both" in df.columns
@@ -535,6 +536,7 @@ def test_all_nan_affinities(tmp_path, monkeypatch):
             "is_hit_both": [False] * 3,
         })
         df.to_csv(run_dir / "scored_joined.csv", index=False)
+        df.to_parquet(run_dir / "scored_joined.parquet", index=False)
 
     import dualdocking.analysis.fairness as fairness_mod
 

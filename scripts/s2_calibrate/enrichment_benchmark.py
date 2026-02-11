@@ -15,7 +15,6 @@ Usage::
 
 from __future__ import annotations
 
-import csv
 import json
 import random
 import shutil
@@ -162,24 +161,26 @@ def _resolve_pdb_path_or_download(
         return dest
 
 
-def _load_decoy_scores(scores_path: Path) -> list[float]:
-    """Load docking scores from a calibration CSV file.
+def _load_decoy_scores(scores_stem: Path) -> list[float]:
+    """Load docking scores from a calibration Parquet or CSV file.
+
+    Tries ``{stem}.parquet`` first, then ``{stem}.csv`` for backward
+    compatibility.
 
     Args:
-        scores_path: Path to the CSV file with a ``score`` column.
+        scores_stem: Path without extension (e.g.
+            ``calibration/scores/CDK2``).
 
     Returns:
         List of parsed docking scores.
     """
-    scores: list[float] = []
-    with scores_path.open() as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            try:
-                scores.append(float(row["score"]))
-            except (ValueError, KeyError):
-                continue
-    return scores
+    from dualdocking.data.io_utils import read_df
+
+    try:
+        df = read_df(scores_stem)
+    except FileNotFoundError:
+        return []
+    return [float(v) for v in df["score"].dropna()]
 
 
 def _load_active_smiles(
@@ -332,20 +333,20 @@ def _dock_smiles_list(
     return scores, prep_failures + dock_failures
 
 
-def _save_active_scores(scores: list[float], smiles: list[str], path: Path) -> None:
-    """Save active docking scores to CSV.
+def _save_active_scores(scores: list[float], smiles: list[str], stem: Path) -> None:
+    """Save active docking scores to Parquet (with CSV fallback).
 
     Args:
         scores: Docking scores.
         smiles: Corresponding SMILES strings.
-        path: Output CSV path.
+        stem: Output path without extension.
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["smiles", "score"])
-        for smi, score in zip(smiles, scores):
-            writer.writerow([smi, f"{score:.6f}"])
+    import pandas as pd
+
+    from dualdocking.data.io_utils import write_df
+
+    df = pd.DataFrame({"smiles": smiles, "score": scores})
+    write_df(df, stem, csv_too=True)
 
 
 def _make_roc_figure(
@@ -473,9 +474,11 @@ def _load_or_dock_decoys(  # noqa: PLR0913
     """
     from dualdocking.scoring.binding_box import extract_binding_box
 
-    decoy_scores_path = calibration_scores_dir / f"{tid}.csv"
-    if decoy_scores_path.exists():
-        scores = _load_decoy_scores(decoy_scores_path)
+    decoy_scores_stem = calibration_scores_dir / tid
+    from dualdocking.data.io_utils import stem_exists
+
+    if stem_exists(decoy_scores_stem):
+        scores = _load_decoy_scores(decoy_scores_stem)
         logger.info("Loaded {} decoy scores for {} from calibration", len(scores), tid)
         return scores
 
@@ -516,12 +519,12 @@ def _load_or_dock_decoys(  # noqa: PLR0913
         batch_size,
     )
 
-    decoy_scores_path.parent.mkdir(parents=True, exist_ok=True)
-    with decoy_scores_path.open("w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["score"])
-        for s in scores:
-            writer.writerow([f"{s:.6f}"])
+    import pandas as pd
+
+    from dualdocking.data.io_utils import write_df
+
+    df = pd.DataFrame({"score": scores})
+    write_df(df, decoy_scores_stem, csv_too=True)
     logger.info("Saved {} decoy scores for {}", len(scores), tid)
     return scores
 
@@ -561,20 +564,19 @@ def _load_or_dock_actives(  # noqa: PLR0913
     """
     from dualdocking.scoring.binding_box import extract_binding_box
 
-    active_scores_path = scores_dir / f"{tid}_actives.csv"
+    active_scores_stem = scores_dir / f"{tid}_actives"
     active_smiles = _load_active_smiles(tid, chembl_dir, max_actives, seed)
 
-    if active_scores_path.exists() and skip_docking:
-        data: list[float] = []
-        with active_scores_path.open() as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                try:
-                    data.append(float(row["score"]))
-                except (ValueError, KeyError):
-                    continue
-        logger.info("Loaded {} active scores for {} from cache", len(data), tid)
-        return data
+    from dualdocking.data.io_utils import read_df, stem_exists
+
+    if stem_exists(active_scores_stem) and skip_docking:
+        try:
+            df = read_df(active_scores_stem)
+            data: list[float] = [float(v) for v in df["score"].dropna()]
+            logger.info("Loaded {} active scores for {} from cache", len(data), tid)
+            return data
+        except Exception:
+            logger.debug("Failed to load cached active scores for {}, will re-dock", tid)
 
     if skip_docking:
         return f"No active scores for {tid} and --skip-docking set"
@@ -607,7 +609,7 @@ def _load_or_dock_actives(  # noqa: PLR0913
     if success_rate < 0.80:
         logger.warning("Active docking success rate {:.1%} < 80% for {}", success_rate, tid)
 
-    _save_active_scores(scores, active_smiles[: len(scores)], active_scores_path)
+    _save_active_scores(scores, active_smiles[: len(scores)], active_scores_stem)
     logger.info("Saved {} active scores for {}", len(scores), tid)
     return scores
 
@@ -777,10 +779,11 @@ def main(  # noqa: PLR0913
         )
         logger.info("[SKIP] {} — blocked pair", tid)
 
+    from dualdocking.data.io_utils import stem_exists
+
     active_targets = [t for t in all_target_ids if t not in blocked_ids]
     need_docker = not skip_docking and any(
-        not (scores_dir / f"{tid}_actives.csv").exists() or not (calibration_scores_dir / f"{tid}.csv").exists()
-        for tid in active_targets
+        not stem_exists(scores_dir / f"{tid}_actives") or not stem_exists(calibration_scores_dir / tid) for tid in active_targets
     )
 
     if need_docker:
@@ -864,9 +867,11 @@ def _dry_run_report(
             n_actives = len(actives)
         except Exception:
             n_actives = 0
-        decoy_path = calibration_scores_dir / f"{tid}.csv"
-        n_decoys = len(_load_decoy_scores(decoy_path)) if decoy_path.exists() else 0
-        has_active_scores = (scores_dir / f"{tid}_actives.csv").exists()
+        from dualdocking.data.io_utils import stem_exists
+
+        decoy_stem = calibration_scores_dir / tid
+        n_decoys = len(_load_decoy_scores(decoy_stem)) if stem_exists(decoy_stem) else 0
+        has_active_scores = stem_exists(scores_dir / f"{tid}_actives")
         click.echo(
             f"  {tid:<10} PDB={pdb_id:<5} actives={n_actives:>4} "
             f"decoys={n_decoys:>5} active_scores={'YES' if has_active_scores else 'NO'}"
@@ -1099,16 +1104,20 @@ def _write_outputs(
     json_path.write_text(json.dumps(manifest, indent=2))
     logger.info("JSON results saved to {}", json_path)
 
-    csv_path = PROJECT_ROOT / csv_output
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    with csv_path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-        writer.writeheader()
-        for r in results:
-            d = asdict(r)
-            d["pdb_id"] = target_pdb_map.get(r.target_id, TARGET_PDB_MAP.get(r.target_id, ""))
-            writer.writerow({k: d.get(k, "") for k in CSV_COLUMNS})
-    logger.info("CSV results saved to {}", csv_path)
+    import pandas as pd
+
+    from dualdocking.data.io_utils import write_df
+
+    rows = []
+    for r in results:
+        d = asdict(r)
+        d["pdb_id"] = target_pdb_map.get(r.target_id, TARGET_PDB_MAP.get(r.target_id, ""))
+        rows.append({k: d.get(k, "") for k in CSV_COLUMNS})
+    df = pd.DataFrame(rows, columns=CSV_COLUMNS)
+    # csv_output has .csv extension — strip to get stem
+    csv_stem = (PROJECT_ROOT / csv_output).with_suffix("")
+    write_df(df, csv_stem, csv_too=True)
+    logger.info("Results saved to {}.parquet (+.csv)", csv_stem)
 
     _make_summary_figure(
         [asdict(r) for r in results],

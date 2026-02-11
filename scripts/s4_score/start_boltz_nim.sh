@@ -15,7 +15,7 @@ set -euo pipefail
 # Требования:
 #   - Docker с nvidia runtime
 #   - Образ nvcr.io/nim/mit/boltz2:1.5.0 (или docker load из boltz2_1.5.0.tar)
-#   - Кеш моделей в docker/boltz2/cache/ (подготовить через docker/boltz2/boltz2nim.sh)
+#   - Кеш моделей в output/cache/boltz_nim/ (подготовить через docker/boltz2/boltz2nim.sh)
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -30,7 +30,7 @@ error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 NIM_IMAGE="nvcr.io/nim/mit/boltz2:1.5.0"
-NIM_CACHE="$PROJECT_DIR/docker/boltz2/cache"
+NIM_CACHE="$PROJECT_DIR/output/cache/boltz_nim"
 BASE_PORT=8000
 CONTAINER_PREFIX="boltz2_nim_gpu"
 

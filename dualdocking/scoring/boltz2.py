@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 CACHE_DIR = PROJECT_ROOT / "output" / "cache"
+SCORE_CACHE_DIR = CACHE_DIR / "boltz_scores"
 DATA_DIR = PROJECT_ROOT / "output" / "data" / "targets"
 MSA_CACHE_DIR = CACHE_DIR / "boltz_msa"
 
@@ -403,7 +404,7 @@ def prune_stale_cache() -> int:
     """
     ctx_prefix = _scoring_context_hash()[:8]
     removed = 0
-    for f in CACHE_DIR.glob("*.json"):
+    for f in SCORE_CACHE_DIR.glob("*.json"):
         if f.suffix == ".lock":
             continue
         # Current-context files have pattern: {target_id}.{ctx[:8]}.json
@@ -456,9 +457,10 @@ def _cache_path(target_id: str) -> Path:
         target_id: Target identifier.
 
     Returns:
-        Path like ``CACHE_DIR/{target_id}.{ctx[:8]}.json``.
+        Path like ``SCORE_CACHE_DIR/{target_id}.{ctx[:8]}.json``.
     """
-    return CACHE_DIR / f"{target_id}.{_scoring_context_hash()[:8]}.json"
+    SCORE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return SCORE_CACHE_DIR / f"{target_id}.{_scoring_context_hash()[:8]}.json"
 
 
 def _load_cache(target_id: str) -> dict[str, float]:

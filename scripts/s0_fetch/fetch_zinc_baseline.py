@@ -16,7 +16,9 @@ from loguru import logger
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 DEFAULT_OUTPUT: Path = PROJECT_ROOT / "output" / "data" / "baseline" / "zinc-druglike-cano.tar.xz"
-DEFAULT_URL: str = "https://huggingface.co/datasets/Pixelatory/ZINC20-Druglike/resolve/main/zinc-druglike-cano.tar.xz?download=true"
+DEFAULT_URL: str = (
+    "https://huggingface.co/datasets/Pixelatory/ZINC20-Druglike/resolve/main/zinc-druglike-cano.tar.xz?download=true"
+)
 DEFAULT_URL_ENV: str = "ZINC_BASELINE_URL"
 
 

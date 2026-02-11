@@ -21,7 +21,7 @@ else
 fi
 
 # 4) Готовим локальный кеш (рядом со скриптом в docker/cache)
-export LOCAL_NIM_CACHE="$SCRIPT_DIR/cache"
+export LOCAL_NIM_CACHE="$(cd "$SCRIPT_DIR/../.." && pwd)/output/cache/boltz_nim"
 mkdir -p "$LOCAL_NIM_CACHE"
 chmod 777 "$LOCAL_NIM_CACHE"
 
@@ -57,4 +57,4 @@ docker stop boltz2_cache_prep
 
 # Итого для переноса на другую машину нужны:
 #   docker/boltz2/boltz2_1.5.0.tar  - образ (docker load -i boltz2_1.5.0.tar)
-#   docker/boltz2/cache/             - кеш моделей (монтировать как -v ...:/opt/nim/.cache)
+#   output/cache/boltz_nim/           - кеш моделей (монтировать как -v ...:/opt/nim/.cache)

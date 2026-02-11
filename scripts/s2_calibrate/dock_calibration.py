@@ -7,7 +7,6 @@ score CSV files for downstream normalization.
 
 from __future__ import annotations
 
-import csv
 import json
 import random
 import re
@@ -1115,12 +1114,13 @@ def main(  # noqa: PLR0913, PLR0915
             if failures:
                 logger.warning("{} docking failures for target {}", failures, target)
 
+            import pandas as pd
+
+            from dualdocking.data.io_utils import write_df
+
             scores_path.parent.mkdir(parents=True, exist_ok=True)
-            with scores_path.open("w", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow(["score"])
-                for score in scores:
-                    writer.writerow([f"{score:.6f}"])
+            _scores_df = pd.DataFrame({"score": [round(s, 6) for s in scores]})
+            write_df(_scores_df, scores_path.with_suffix(""), csv_too=True)
 
             logger.info("Scores -> {} (n={})", scores_path, len(scores))
 

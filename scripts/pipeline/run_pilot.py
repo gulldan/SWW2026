@@ -34,8 +34,8 @@ PILOT_SEEDS: str = "42,137"
 def _verify_pilot_artifacts(pair: str, seeds: list[int]) -> list[str]:
     """Check that the pilot produced all expected non-empty artifacts.
 
-    Verifies ``generated.csv`` and ``scored_joined.csv`` for every
-    (mode, seed) combination, plus Stage 2 report artifacts
+    Verifies ``generated.parquet/.csv`` and ``scored_joined.parquet/.csv``
+    for every (mode, seed) combination, plus Stage 2 report artifacts
     (``metrics.json``, ``stats.json``).
 
     Args:
@@ -51,18 +51,26 @@ def _verify_pilot_artifacts(pair: str, seeds: list[int]) -> list[str]:
     for mode in ("single_a", "single_b", "double"):
         for seed in seeds:
             run_dir = results_root / pair / mode / f"seed_{seed}"
-            scored = run_dir / "scored_joined.csv"
-            generated = run_dir / "generated.csv"
+            from dualdocking.data.io_utils import stem_exists
 
-            if not generated.exists():
-                issues.append(f"Missing: {generated.relative_to(PROJECT_ROOT)}")
-            elif generated.stat().st_size < 100:
-                issues.append(f"Too small: {generated.relative_to(PROJECT_ROOT)}")
+            scored_stem = run_dir / "scored_joined"
+            generated_stem = run_dir / "generated"
 
-            if not scored.exists():
-                issues.append(f"Missing: {scored.relative_to(PROJECT_ROOT)}")
-            elif scored.stat().st_size < 100:
-                issues.append(f"Too small: {scored.relative_to(PROJECT_ROOT)}")
+            if not stem_exists(generated_stem):
+                issues.append(f"Missing: {run_dir.relative_to(PROJECT_ROOT)}/generated.parquet")
+            else:
+                pq = generated_stem.with_suffix(".parquet")
+                actual = pq if pq.exists() else generated_stem.with_suffix(".csv")
+                if actual.stat().st_size < 100:
+                    issues.append(f"Too small: {actual.relative_to(PROJECT_ROOT)}")
+
+            if not stem_exists(scored_stem):
+                issues.append(f"Missing: {run_dir.relative_to(PROJECT_ROOT)}/scored_joined.parquet")
+            else:
+                pq = scored_stem.with_suffix(".parquet")
+                actual = pq if pq.exists() else scored_stem.with_suffix(".csv")
+                if actual.stat().st_size < 100:
+                    issues.append(f"Too small: {actual.relative_to(PROJECT_ROOT)}")
 
     # Stage 2 artifacts
     report = PROJECT_ROOT / "report"

@@ -558,10 +558,15 @@ def main(
     out_path.write_text(json.dumps([_result_to_dict(r) for r in results], indent=2))
     logger.info("JSON results saved to {}", out_path)
 
-    # Write CSV.
-    csv_path = PROJECT_ROOT / csv_output
-    _write_csv(results, csv_path)
-    logger.info("CSV results saved to {}", csv_path)
+    # Write Parquet (+ CSV for compatibility).
+    import pandas as pd
+
+    from dualdocking.data.io_utils import write_df
+
+    metrics_df = pd.DataFrame([_result_to_dict(r) for r in results])
+    metrics_stem = (PROJECT_ROOT / csv_output).with_suffix("")
+    write_df(metrics_df, metrics_stem, csv_too=True)
+    logger.info("Metrics saved to {}", metrics_stem.with_suffix(".parquet"))
 
     # --- Summary table ---
     click.echo("\n--- Re-docking Validation Summary ---")

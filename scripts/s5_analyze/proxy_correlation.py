@@ -78,10 +78,10 @@ def _bootstrap_correlation(
 
 
 def _load_boltz_scores(scored_csv: Path) -> pd.DataFrame:
-    """Load Boltz-2 affinities from ``scored_joined.csv``.
+    """Load Boltz-2 affinities from ``scored_joined``.
 
     Args:
-        scored_csv: Path to the scored CSV file.
+        scored_csv: Stem path (without extension) to ``scored_joined``.
 
     Returns:
         DataFrame with columns ``smiles_canonical``, ``affinity_a``, ``affinity_b``.
@@ -89,7 +89,9 @@ def _load_boltz_scores(scored_csv: Path) -> pd.DataFrame:
     Raises:
         ValueError: If ``smiles_canonical`` is missing and cannot be derived.
     """
-    df = pd.read_csv(scored_csv)
+    from dualdocking.data.io_utils import read_df
+
+    df = read_df(scored_csv)
     if "affinity_a" not in df.columns and "score_a" in df.columns:
         df = df.rename(columns={"score_a": "affinity_a"})
     if "affinity_b" not in df.columns and "score_b" in df.columns:
@@ -191,6 +193,7 @@ def main(
         output_json: Output JSON path relative to project root.
     """
     from dualdocking.config import load_experiment, load_pairs
+    from dualdocking.data.io_utils import stem_exists
 
     pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
     exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
@@ -212,11 +215,11 @@ def main(
 
             for seed in seeds:
                 run_dir = results_root_path / pair_id / mode / f"seed_{seed}"
-                scored_path = run_dir / "scored_joined.csv"
-                if not scored_path.exists():
+                scored_stem = run_dir / "scored_joined"
+                if not stem_exists(scored_stem):
                     continue
 
-                boltz_df = _load_boltz_scores(scored_path)
+                boltz_df = _load_boltz_scores(scored_stem)
                 docking_df = _load_docking_scores(run_dir)
 
                 total_boltz += len(boltz_df)
@@ -326,8 +329,10 @@ def main(
     json_path.parent.mkdir(parents=True, exist_ok=True)
 
     if rows:
-        pd.DataFrame(rows).to_csv(csv_path, index=False)
-        logger.info("CSV -> {}", csv_path)
+        from dualdocking.data.io_utils import write_df
+
+        write_df(pd.DataFrame(rows), csv_path.with_suffix(""))
+        logger.info("Data -> {}", csv_path.with_suffix(".parquet"))
     else:
         logger.warning("No proxy-final pairs found (no docking data available)")
 

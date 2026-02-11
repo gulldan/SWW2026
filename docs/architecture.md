@@ -71,7 +71,7 @@ uv run boltz predict warmup.yaml \
 
 ### Cache
 
-Disk cache segmented by target: `output/cache/{target}.{ctx[:8]}.json`.
+Disk cache segmented by target: `output/cache/boltz_scores/{target}.{ctx[:8]}.json`.
 
 - Key: `SHA256(target || smi || ctx_hash || seq_hash || msa_hash)`
 - Context includes: Boltz version, CLI args, accelerator, Docker digest
@@ -134,7 +134,9 @@ After that, the entire pipeline (generation, scoring, analysis) runs offline.
 | PDB structures | `output/data/targets/{pair}/{A,B}/` | RCSB |
 | MSA | `output/cache/boltz_msa/{id}.csv` | ColabFold API |
 | Boltz checkpoints | `~/.boltz/` | Auto on first run |
-| Score cache | `output/cache/{target}.{ctx}.json` | Computed |
+| Score cache | `output/cache/boltz_scores/{target}.{ctx}.json` | Computed |
+| NIM model cache | `output/cache/boltz_nim/` | NIM container |
+| FREED++ models | `output/cache/freedpp_models/{key}/` | Generation |
 
 ## Troubleshooting
 
@@ -162,7 +164,7 @@ docker image inspect dualdocking/freedpp:latest --format '{{.Id}}'
 ```
 results/
 ├── {pair}/
-│   ├── single_a/        # generated.csv, scores_A.csv, scores_B.csv, scored_joined.csv
+│   ├── single_a/        # generated.parquet, scores_A.parquet, scores_B.parquet, scored_joined.parquet
 │   ├── single_b/
 │   └── double/
 

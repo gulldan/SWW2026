@@ -39,6 +39,7 @@ def _write_scored(run_dir: Path, rng: np.random.Generator, n: int = 20) -> list[
         "affinity_b": rng.normal(-0.5, 0.5, n),
     })
     df.to_csv(run_dir / "scored_joined.csv", index=False)
+    df.to_parquet(run_dir / "scored_joined.parquet", index=False)
     return smiles
 
 
@@ -118,19 +119,19 @@ class TestDefaultSetup:
         """Script runs and produces CSV + JSON."""
         assert self.result.exit_code == 0, self.result.output
 
-        csv_path = self.tmp_path / "report" / "data" / "proxy_final_corr.csv"
+        csv_path = self.tmp_path / "report" / "data" / "proxy_final_corr.parquet"
         json_path = self.tmp_path / "report" / "data" / "proxy_final_corr.json"
         assert csv_path.exists()
         assert json_path.exists()
 
-        df = pd.read_csv(csv_path)
+        df = pd.read_parquet(csv_path)
         assert len(df) > 0
         assert "spearman_rho" in df.columns
         assert "pearson_r" in df.columns
 
     def test_correlation_columns(self):
         """CSV has all expected columns."""
-        df = pd.read_csv(self.tmp_path / "report" / "data" / "proxy_final_corr.csv")
+        df = pd.read_parquet(self.tmp_path / "report" / "data" / "proxy_final_corr.parquet")
         expected_cols = {
             "pair", "mode", "target", "n",
             "spearman_rho", "spearman_ci_lo", "spearman_ci_hi",
@@ -152,14 +153,14 @@ class TestDefaultSetup:
 
     def test_join_rate_less_than_one(self):
         """Training data has 80% overlap -> join rate < 1.0."""
-        df = pd.read_csv(self.tmp_path / "report" / "data" / "proxy_final_corr.csv")
+        df = pd.read_parquet(self.tmp_path / "report" / "data" / "proxy_final_corr.parquet")
         for _, row in df.iterrows():
             assert row["join_rate"] <= 1.0
             assert row["join_rate"] > 0.0
 
     def test_spearman_within_bounds(self):
         """Spearman rho is within [-1, 1]."""
-        df = pd.read_csv(self.tmp_path / "report" / "data" / "proxy_final_corr.csv")
+        df = pd.read_parquet(self.tmp_path / "report" / "data" / "proxy_final_corr.parquet")
         for _, row in df.iterrows():
             assert -1.0 <= row["spearman_rho"] <= 1.0
             assert -1.0 <= row["pearson_r"] <= 1.0

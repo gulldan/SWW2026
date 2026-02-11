@@ -72,7 +72,7 @@ def test_cache_key_different():
 
 
 def test_load_save_cache(tmp_path, monkeypatch, _stable_context):
-    monkeypatch.setattr(mod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(mod, "SCORE_CACHE_DIR", tmp_path)
     cache = {"abc123": 1.5, "def456": -2.3}
     _save_cache("tgt", cache)
     loaded = _load_cache("tgt")
@@ -80,7 +80,7 @@ def test_load_save_cache(tmp_path, monkeypatch, _stable_context):
 
 
 def test_load_cache_missing(tmp_path, monkeypatch, _stable_context):
-    monkeypatch.setattr(mod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(mod, "SCORE_CACHE_DIR", tmp_path)
     assert _load_cache("nonexistent") == {}
 
 
@@ -150,7 +150,7 @@ def test_parse_affinity_missing(tmp_path):
 
 def test_save_cache_filters_nan(tmp_path, monkeypatch, _stable_context):
     """NaN values must not be persisted to disk."""
-    monkeypatch.setattr(mod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(mod, "SCORE_CACHE_DIR", tmp_path)
     cache = {"good": -5.2, "bad": float("nan"), "also_good": 1.0}
     _save_cache("tgt", cache)
     # Find the written file (context-segmented name)
@@ -164,7 +164,7 @@ def test_save_cache_filters_nan(tmp_path, monkeypatch, _stable_context):
 
 def test_load_cache_filters_nan(tmp_path, monkeypatch, _stable_context):
     """NaN values in cache file are filtered out on load."""
-    monkeypatch.setattr(mod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(mod, "SCORE_CACHE_DIR", tmp_path)
     cache = {"good": -5.2, "int_val": 3}
     _save_cache("tgt2", cache)
     loaded = _load_cache("tgt2")
@@ -308,14 +308,14 @@ class TestCachePath:
         p = _cache_path("CDK2")
         ctx = _scoring_context_hash()
         assert p.name == f"CDK2.{ctx[:8]}.json"
-        assert p.parent == mod.CACHE_DIR
+        assert p.parent == mod.SCORE_CACHE_DIR
 
 
 class TestPruneStaleCache:
     """Test stale cache pruning."""
 
     def test_prune_stale_cache(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(mod, "CACHE_DIR", tmp_path)
+        monkeypatch.setattr(mod, "SCORE_CACHE_DIR", tmp_path)
         monkeypatch.setattr(mod, "_boltz_version", lambda: "1.0")
         monkeypatch.setattr(mod, "_docker_digest", lambda: "d1")
         monkeypatch.setenv("BOLTZ_ACCELERATOR", "cpu")
@@ -356,7 +356,10 @@ class TestOldCacheNotReusedE2E:
         msa_dir = cache_dir / "boltz_msa"
         msa_dir.mkdir()
 
+        score_cache_dir = cache_dir / "boltz_scores"
+        score_cache_dir.mkdir()
         monkeypatch.setattr(mod, "CACHE_DIR", cache_dir)
+        monkeypatch.setattr(mod, "SCORE_CACHE_DIR", score_cache_dir)
         monkeypatch.setattr(mod, "DATA_DIR", data_dir)
         monkeypatch.setattr(mod, "MSA_CACHE_DIR", msa_dir)
 
@@ -375,7 +378,7 @@ class TestOldCacheNotReusedE2E:
         old_key = _cache_key("tgt", "CCO", ctx_hash=ctx1, seq_hash=seq_hash, msa_hash=msa_hash)
 
         # Write an entry to the old context cache file
-        old_cache_file = cache_dir / f"tgt.{ctx1[:8]}.json"
+        old_cache_file = score_cache_dir / f"tgt.{ctx1[:8]}.json"
         old_cache_file.write_text(json.dumps({old_key: -5.0}))
 
         # --- Phase 2: change Boltz version → new context ---
@@ -385,7 +388,7 @@ class TestOldCacheNotReusedE2E:
         ctx2 = _scoring_context_hash()
         assert ctx1 != ctx2
 
-        new_cache_file = cache_dir / f"tgt.{ctx2[:8]}.json"
+        new_cache_file = score_cache_dir / f"tgt.{ctx2[:8]}.json"
 
         # Mock _score_batch_internal to return known scores
         def fake_score_batch_internal(target_id, smiles_list, sequence, msa_path, *, device=None):
@@ -646,10 +649,13 @@ class TestNimScoreBatchE2E:
     def test_score_batch_nim_with_cache(self, tmp_path, monkeypatch, nim_server):
         cache_dir = tmp_path / "cache"
         cache_dir.mkdir()
+        score_cache_dir = cache_dir / "boltz_scores"
+        score_cache_dir.mkdir()
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
         monkeypatch.setattr(mod, "CACHE_DIR", cache_dir)
+        monkeypatch.setattr(mod, "SCORE_CACHE_DIR", score_cache_dir)
         monkeypatch.setattr(mod, "DATA_DIR", data_dir)
         monkeypatch.setattr(mod, "MSA_CACHE_DIR", tmp_path / "msa")
 

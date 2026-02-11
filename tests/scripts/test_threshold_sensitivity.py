@@ -49,6 +49,7 @@ def _write_run(
         }
     )
     df.to_csv(run_dir / "scored_joined.csv", index=False)
+    df.to_parquet(run_dir / "scored_joined.parquet", index=False)
 
 
 def _setup(tmp_path, *, double_mean=-1.5, single_mean=-0.5):
@@ -111,12 +112,12 @@ class TestDefaultSetup:
         """Script runs and produces both CSV and JSON outputs."""
         assert self.result.exit_code == 0, self.result.output
 
-        csv_path = self.tmp_path / "report" / "data" / "threshold_sensitivity.csv"
+        csv_path = self.tmp_path / "report" / "data" / "threshold_sensitivity.parquet"
         json_path = self.tmp_path / "report" / "data" / "threshold_sensitivity.json"
         assert csv_path.exists()
         assert json_path.exists()
 
-        df = pd.read_csv(csv_path)
+        df = pd.read_parquet(csv_path)
         assert len(df) > 0
         assert "threshold" in df.columns
         assert "pair" in df.columns
@@ -149,7 +150,7 @@ class TestDefaultSetup:
 
     def test_csv_has_all_modes(self):
         """CSV rows cover all 3 modes for each pair-threshold combo."""
-        df = pd.read_csv(self.tmp_path / "report" / "data" / "threshold_sensitivity.csv")
+        df = pd.read_parquet(self.tmp_path / "report" / "data" / "threshold_sensitivity.parquet")
         for thr in [-1.0, 0.0, 1.0]:
             modes_present = set(df[df["threshold"] == thr]["mode"].unique())
             assert {"single_a", "single_b", "double"} == modes_present

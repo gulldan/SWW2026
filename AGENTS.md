@@ -155,7 +155,7 @@ Stage 0 (fetch) → Generation (FREED++, 3 modes × 5 pairs × 5 seeds) → Scor
 
 ### Cache System
 
-Boltz-2 scores use a disk cache segmented by target: `output/cache/{target}.{ctx[:8]}.json`
+Boltz-2 scores use a disk cache segmented by target: `output/cache/boltz_scores/{target}.{ctx[:8]}.json`
 
 - Cache key v2: `SHA256(target || smi || ctx_hash || seq_hash || msa_hash)`
 - Context hash includes: Boltz version, CLI args, accelerator, Docker digest

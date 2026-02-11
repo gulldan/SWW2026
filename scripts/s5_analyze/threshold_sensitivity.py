@@ -46,11 +46,11 @@ def _sem(values: list[float]) -> float:
     return float(np.std(arr, ddof=1) / np.sqrt(len(arr)))
 
 
-def _load_scored_csv(path: Path) -> pd.DataFrame:
-    """Load scored CSV, keeping raw affinity columns only.
+def _load_scored(path: Path) -> pd.DataFrame:
+    """Load scored data (Parquet with CSV fallback), keeping raw affinity columns only.
 
     Args:
-        path: Path to ``scored_joined.csv``.
+        path: Stem path (without extension) to ``scored_joined``.
 
     Returns:
         Deduplicated DataFrame with ``affinity_a``, ``affinity_b``,
@@ -59,7 +59,9 @@ def _load_scored_csv(path: Path) -> pd.DataFrame:
     Raises:
         ValueError: If ``smiles_canonical`` is missing and cannot be derived.
     """
-    df = pd.read_csv(path)
+    from dualdocking.data.io_utils import read_df
+
+    df = read_df(path)
     if "affinity_a" not in df.columns and "score_a" in df.columns:
         df = df.rename(columns={"score_a": "affinity_a"})
     if "affinity_b" not in df.columns and "score_b" in df.columns:
@@ -135,6 +137,7 @@ def main(
         hierarchical_bootstrap_test,
     )
     from dualdocking.config import load_experiment, load_metrics, load_pairs
+    from dualdocking.data.io_utils import stem_exists
 
     pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
     exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
@@ -158,8 +161,8 @@ def main(
             raw_data[pair_id][mode] = {}
             for seed in seeds:
                 run_dir = results_root_path / pair_id / mode / f"seed_{seed}"
-                scored_path = run_dir / "scored_joined.csv"
-                if not scored_path.exists():
+                scored_stem = run_dir / "scored_joined"
+                if not stem_exists(scored_stem):
                     continue
 
                 fairness = validate_fairness(run_dir)
@@ -176,7 +179,7 @@ def main(
                     logger.warning("Quality gate fail: {}", run_dir)
                     continue
 
-                raw_data[pair_id][mode][seed] = _load_scored_csv(scored_path)
+                raw_data[pair_id][mode][seed] = _load_scored(scored_stem)
 
     # Completeness check
     missing_list = [
@@ -211,6 +214,7 @@ def main(
             Returns:
                 Callable that computes dual hit rate on a DataFrame.
             """
+
             def _fn(frame: pd.DataFrame) -> float:
                 return _compute_hr_both(frame, threshold)
 
@@ -339,8 +343,10 @@ def main(
     json_path.parent.mkdir(parents=True, exist_ok=True)
 
     if rows:
-        pd.DataFrame(rows).to_csv(csv_path, index=False)
-        logger.info("CSV -> {}", csv_path)
+        from dualdocking.data.io_utils import write_df
+
+        write_df(pd.DataFrame(rows), csv_path.with_suffix(""))
+        logger.info("Data -> {}", csv_path.with_suffix(".parquet"))
     else:
         logger.warning("No data to write to CSV (no results found)")
 

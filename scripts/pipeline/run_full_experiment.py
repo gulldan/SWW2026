@@ -263,15 +263,15 @@ def _run_one(
 ) -> None:
     """Run the generate + score pipeline for a single (pair, mode, seed) task.
 
-    Skips entirely if ``scored_joined.csv`` already exists. In resume mode,
-    also skips generation if ``generated.csv`` exists.
+    Skips entirely if ``scored_joined`` already exists (Parquet or CSV). In
+    resume mode, also skips generation if ``generated`` exists (Parquet or CSV).
 
     Args:
         pair: Target pair identifier.
         mode: Experiment mode (``single_a``, ``single_b``, or ``double``).
         seed: Random seed for the run.
         log_path: Path to the experiment log file.
-        resume: If ``True``, skip generation when ``generated.csv`` exists.
+        resume: If ``True``, skip generation when ``generated`` already exists (Parquet or CSV).
         mf_path: Path to the run manifest file, or ``None`` to skip tracking.
         gpu_id: CUDA device index for this task, or ``None`` for default.
 
@@ -279,12 +279,14 @@ def _run_one(
         RuntimeError: If either the generate or score subprocess fails.
     """
     run_dir = PROJECT_ROOT / "output" / "results" / pair / mode / f"seed_{seed}"
-    scored = run_dir / "scored_joined.csv"
-    generated = run_dir / "generated.csv"
+    scored = run_dir / "scored_joined"
+    generated = run_dir / "generated"
     tid = f"{pair}/{mode}/seed_{seed}"
 
-    if scored.exists():
-        logger.info("[SKIP] {} {} seed_{} (scored_joined.csv exists)", pair, mode, seed)
+    from dualdocking.data.io_utils import stem_exists
+
+    if stem_exists(scored):
+        logger.info("[SKIP] {} {} seed_{} (scored_joined exists)", pair, mode, seed)
         if mf_path:
             skip_task(mf_path, task_id=tid)
         return
@@ -292,8 +294,8 @@ def _run_one(
     gpu_tag = f" [GPU {gpu_id}]" if gpu_id is not None else ""
 
     # --- Generate stage ---
-    if generated.exists() and resume:
-        logger.info("[RESUME] {} {} seed_{} (generated.csv exists)", pair, mode, seed)
+    if stem_exists(generated) and resume:
+        logger.info("[RESUME] {} {} seed_{} (generated exists)", pair, mode, seed)
         if mf_path:
             update_task(mf_path, task_id=tid, stage="generate", status="skipped")
     else:
@@ -398,7 +400,7 @@ def main(
     Args:
         dry_run: Print commands without executing.
         parallel: Number of parallel tasks (0 = auto-detect from GPU count).
-        resume: Skip generation for runs where ``generated.csv`` exists.
+        resume: Skip generation for runs where ``generated`` already exists (Parquet or CSV).
         pair: Filter to specific pair(s); empty tuple means all pairs.
         seeds_override: Comma-separated seed list, or ``None`` for config default.
         prepare_freed_data: Fetch FREED++ data dependencies before running.

@@ -1,12 +1,13 @@
 """Score generated molecules against both targets of a pair using Boltz-2.
 
-Reads molecules from ``results/<pair>/<mode>/seed_<seed>/generated.csv``,
-scores against both targets, and writes ``scores_A.csv``, ``scores_B.csv``,
-and ``scored_joined.csv``.
+Reads molecules from ``results/<pair>/<mode>/seed_<seed>/generated.parquet``
+(with CSV fallback), scores against both targets, and writes
+``scores_A.parquet``, ``scores_B.parquet``, and ``scored_joined.parquet``
+(plus CSV copies for compatibility).
 
-Supports checkpointing: if ``scores_A.csv`` already exists, target A scoring
-is skipped.  The Boltz-2 disk cache (``cache/{target_id}.json``) is saved
-incrementally on interruption.
+Supports checkpointing: if ``scores_A.parquet`` (or ``.csv``) already exists,
+target A scoring is skipped.  The Boltz-2 disk cache
+(``cache/{target_id}.json``) is saved incrementally on interruption.
 """
 
 from __future__ import annotations
@@ -57,7 +58,7 @@ def _score_one_target(
     Args:
         target_id: Target identifier (e.g. ``"CDK2"``).
         smiles_list: SMILES strings to score.
-        scores_path: Path to write/read the per-target score CSV.
+        scores_path: Path to write/read the per-target score Parquet (with CSV fallback).
         force: If ``True``, re-score even when checkpoint exists.
         label: Short label for logging (``"A"`` or ``"B"``).
         device: CUDA device identifier for parallel scoring.
@@ -65,17 +66,22 @@ def _score_one_target(
     Returns:
         Tuple of ``(label, scores_array)``.
     """
+    from dualdocking.data.io_utils import stem_exists
     from dualdocking.scoring.boltz2 import score_batch
 
-    if not force and scores_path.exists():
+    if not force and stem_exists(scores_path.with_suffix("")):
         logger.info("Чекпоинт: скоры мишени {} уже существуют ({}), пропускаем", target_id, scores_path)
-        saved = pd.read_csv(scores_path)
+        from dualdocking.data.io_utils import read_df
+
+        saved = read_df(scores_path.with_suffix(""))
         return label, saved["score"].to_numpy()
 
     logger.info("Скоринг {} молекул по мишени {} (device={})", len(smiles_list), target_id, device)
     scores = score_batch(target_id, smiles_list, device=device)
 
-    pd.DataFrame({"smiles": smiles_list, "score": scores}).to_csv(scores_path, index=False)
+    from dualdocking.data.io_utils import write_df
+
+    write_df(pd.DataFrame({"smiles": smiles_list, "score": scores}), scores_path.with_suffix(""), csv_too=True)
     logger.info("Скоры мишени {} сохранены: {}", target_id, scores_path)
     return label, scores
 
@@ -95,6 +101,12 @@ def _score_one_target(
     show_default=True,
     help="Parallel target scoring: 'auto' enables when >=2 GPUs detected, 'on'/'off' force.",
 )
+@click.option(
+    "--molecules",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to molecule file (.parquet/.csv/.smi). Overrides generated.parquet.",
+)
 def main(
     pair: str,
     mode: str,
@@ -104,12 +116,13 @@ def main(
     force: bool,
     prune_cache: bool,
     parallel_scoring: str,
+    molecules: str | None,
 ) -> None:
     """Score molecules against both targets and compute combined objectives.
 
     Loads generated SMILES, runs Boltz-2 affinity prediction for each target,
     computes hit flags and combined objective scores, then writes
-    ``scored_joined.csv`` and ``scoring_context.json``.
+    ``scored_joined.parquet`` (plus CSV copy) and ``scoring_context.json``.
 
     Args:
         pair: Pair identifier from ``configs/pairs.yaml``.
@@ -120,6 +133,7 @@ def main(
         force: Re-score even if checkpoint CSVs exist.
         prune_cache: Remove stale Boltz-2 cache files before scoring.
         parallel_scoring: Parallel scoring mode (``auto``/``on``/``off``).
+        molecules: Optional path to molecule file overriding generated output.
     """
     from dualdocking.config import load_experiment, load_pairs
     from dualdocking.scoring.boltz2 import get_scoring_context_info, prune_stale_cache
@@ -135,15 +149,20 @@ def main(
         sys.exit(1)
 
     pair_cfg = pairs[pair]
+    from dualdocking.data.io_utils import read_df, read_molecules, stem_exists
+
     result_dir = PROJECT_ROOT / "output" / "results" / pair / mode / f"seed_{seed}"
-    mol_path = result_dir / "generated.csv"
 
-    if not mol_path.exists():
-        logger.error("Молекулы не найдены: {}", mol_path)
-        sys.exit(1)
-
-    df = pd.read_csv(mol_path)
-    smiles_list = df["smiles"].tolist()
+    if molecules:
+        smiles_list = read_molecules(Path(molecules))
+        logger.info("Загружено {} молекул из {}", len(smiles_list), molecules)
+    else:
+        generated_stem = result_dir / "generated"
+        if not stem_exists(generated_stem):
+            logger.error("Молекулы не найдены: {}.parquet/.csv", generated_stem)
+            sys.exit(1)
+        gen_df = read_df(generated_stem)
+        smiles_list = gen_df["smiles"].tolist()
 
     target_a_id = pair_cfg["target_a"]["id"]
     target_b_id = pair_cfg["target_b"]["id"]
@@ -241,7 +260,9 @@ def main(
         if obj.is_primary:
             primary_col = obj.column_name
     joined = joined.sort_values(primary_col)
-    joined.to_csv(result_dir / "scored_joined.csv", index=False)
+    from dualdocking.data.io_utils import write_df
+
+    write_df(joined, result_dir / "scored_joined", csv_too=True)
 
     # Write scoring context metadata
     import json as _json

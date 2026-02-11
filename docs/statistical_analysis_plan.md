@@ -39,15 +39,15 @@ Within-seed molecule-level resampling is handled by the hierarchical bootstrap.
 
 ```
 results/{pair}/{mode}/seed_{seed}/
-  ├── generated.csv             # FREED++ output SMILES
-  ├── scored_joined.csv         # Boltz-2 affinities (affinity_a, affinity_b)
+  ├── generated.parquet         # FREED++ output SMILES (Parquet with CSV fallback)
+  ├── scored_joined.parquet     # Boltz-2 affinities (affinity_a, affinity_b)
   └── freedpp_workspace/
       └── reward_metadata.json  # Invalid/timeout fractions
 ```
 
 **Gating order** (implemented in `scripts/s5_analyze/compute_metrics.py:101-132`):
 
-1. **Existence gate:** `scored_joined.csv` must exist.
+1. **Existence gate:** `scored_joined.parquet` must exist (CSV fallback supported).
 2. **Fairness gate:** `validate_fairness(run_dir)` checks n_molecules in
    [990, 1010] and duplication_rate < 0.20
    (`dualdocking/fairness.py:44-86`).

@@ -60,7 +60,7 @@ def test_verify_all_present(tmp_path, monkeypatch):
 
 
 def test_verify_missing_scored(tmp_path, monkeypatch):
-    """Missing scored_joined.csv → reported."""
+    """Missing scored_joined → reported."""
     import scripts.pipeline.run_pilot as mod
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
@@ -68,7 +68,7 @@ def test_verify_missing_scored(tmp_path, monkeypatch):
 
     issues = _verify_pilot_artifacts("CDK2_ERK2", [42, 137])
     assert len(issues) == 1
-    assert "scored_joined.csv" in issues[0]
+    assert "scored_joined" in issues[0]
 
 
 def test_verify_missing_metrics(tmp_path, monkeypatch):

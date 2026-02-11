@@ -97,10 +97,10 @@ def _docking_version(program: str) -> str:
 
 
 def _load_scores(scores_dir: Path, target_id: str) -> np.ndarray:
-    """Load calibration docking scores from a CSV file.
+    """Load calibration docking scores from a Parquet or CSV file.
 
     Args:
-        scores_dir: Directory containing per-target score CSVs.
+        scores_dir: Directory containing per-target score files.
         target_id: Target identifier (filename stem).
 
     Returns:
@@ -109,13 +109,13 @@ def _load_scores(scores_dir: Path, target_id: str) -> np.ndarray:
     Raises:
         FileNotFoundError: If the score file does not exist.
     """
-    path = scores_dir / f"{target_id}.csv"
-    if not path.exists():
-        raise FileNotFoundError(f"Scores not found for {target_id}: {path}")
-    data = np.loadtxt(path, delimiter=",", skiprows=1)
-    if data.ndim == 0:
-        data = np.array([float(data)])
-    return data.astype(float)
+    from dualdocking.data.io_utils import read_df, stem_exists
+
+    stem = scores_dir / target_id
+    if not stem_exists(stem):
+        raise FileNotFoundError(f"Scores not found for {target_id}: tried {stem}.parquet and {stem}.csv")
+    df = read_df(stem)
+    return df["score"].to_numpy(dtype=float)
 
 
 @click.command()

@@ -170,9 +170,9 @@ rsync_data() {
         --compress \
         --partial \
         --progress \
-        --include='docker/boltz2/cache/***' \
-        --include='docker/boltz2/' \
-        --include='docker/' \
+        --include='output/cache/boltz_nim/***' \
+        --include='output/cache/' \
+        --include='output/' \
         --exclude='*' \
         "$PROJECT_DIR/./" \
         "$REMOTE_HOST:$REMOTE_PATH/"

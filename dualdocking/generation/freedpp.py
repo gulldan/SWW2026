@@ -754,7 +754,7 @@ def generate(config: GenerationConfig) -> list[str]:
         7. Run FREED++ in Docker
         8. Parse output SMILES
         9. Cache trained model
-        10. Write output CSV
+        10. Write output (Parquet + CSV)
 
     Args:
         config: Generation configuration specifying targets, reward mode,
@@ -894,12 +894,16 @@ def generate(config: GenerationConfig) -> list[str]:
             logger.info("Модель сохранена в кеш: {}", cache_dest)
     pbar.update(1)
 
-    # 10. Write output CSV
-    pbar.set_postfix_str("Запись CSV")
+    # 10. Write output
+    pbar.set_postfix_str("Запись результатов")
     config.output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = config.output_dir / "generated.csv"
-    out_path.write_text("smiles\n" + "\n".join(smiles) + "\n")
-    logger.info("Сгенерировано {} молекул -> {}", len(smiles), out_path)
+    import pandas as pd
+
+    from dualdocking.data.io_utils import write_df
+
+    _gen_df = pd.DataFrame({"smiles": smiles})
+    write_df(_gen_df, config.output_dir / "generated", csv_too=True)
+    logger.info("Сгенерировано {} молекул -> {}", len(smiles), config.output_dir / "generated.parquet")
     pbar.close()
 
     return smiles

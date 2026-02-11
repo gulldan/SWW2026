@@ -210,7 +210,7 @@ docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 
 **When does the cache reset?** The Boltz-2 cache key includes a context hash computed from: Boltz version, CLI arguments, GPU accelerator type, and Docker digest. Changing any of these produces a new cache file, so old cached scores are never mixed with new settings.
 
-**Force re-score**: Delete the relevant cache file in `output/cache/{target}.{ctx[:8]}.json`, or change a Boltz-2 parameter.
+**Force re-score**: Delete the relevant cache file in `output/cache/boltz_scores/{target}.{ctx[:8]}.json`, or change a Boltz-2 parameter.
 
 **NaN scores are never cached.** Failed molecules retry on every run automatically.
 

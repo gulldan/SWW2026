@@ -24,6 +24,7 @@ def _make_scored_csv(path, n=3):
     })
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
+    df.to_parquet(path.with_suffix(".parquet"), index=False)
 
 
 def _write_reward_metadata(run_dir, *, run_valid=True):

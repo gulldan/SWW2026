@@ -1,6 +1,7 @@
 """Compute summary metrics and hierarchical bootstrap statistics.
 
-Reads ``results/<pair>/<mode>/seed_<seed>/scored_joined.csv`` and writes:
+Reads ``results/<pair>/<mode>/seed_<seed>/scored_joined.parquet`` (with CSV
+fallback) and writes:
 
 - ``report/metrics.json`` — per-pair per-mode summary (mean/SEM).
 - ``report/stats.json`` — statistical tests with FDR correction, degradation
@@ -40,11 +41,11 @@ def _sem(values: list[float]) -> float:
     return float(np.std(arr, ddof=1) / np.sqrt(len(arr)))
 
 
-def _load_scored_csv(path: Path, thr_a: float, thr_b: float) -> pd.DataFrame:
-    """Load a scored CSV, add hit flags, deduplicate by canonical SMILES.
+def _load_scored(path: Path, thr_a: float, thr_b: float) -> pd.DataFrame:
+    """Load scored data (Parquet with CSV fallback), add hit flags, deduplicate by canonical SMILES.
 
     Args:
-        path: Path to ``scored_joined.csv``.
+        path: Stem path (without extension) to ``scored_joined``.
         thr_a: Hit threshold for target A (lower is better).
         thr_b: Hit threshold for target B (lower is better).
 
@@ -55,7 +56,9 @@ def _load_scored_csv(path: Path, thr_a: float, thr_b: float) -> pd.DataFrame:
     Raises:
         ValueError: If ``smiles_canonical`` is missing and cannot be derived.
     """
-    df = pd.read_csv(path)
+    from dualdocking.data.io_utils import read_df
+
+    df = read_df(path)
 
     # Backward compatibility: rename legacy columns
     if "affinity_a" not in df.columns and "score_a" in df.columns:
@@ -186,6 +189,7 @@ def main(
         hierarchical_bootstrap_test,
     )
     from dualdocking.config import load_experiment, load_metrics, load_pairs
+    from dualdocking.data.io_utils import stem_exists
     from dualdocking.scoring.objectives import parse_objectives_config
 
     all_pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
@@ -212,9 +216,9 @@ def main(
             data[pair_id][mode] = {}
             for seed in seeds:
                 run_dir = results_root_path / pair_id / mode / f"seed_{seed}"
-                scored_path = run_dir / "scored_joined.csv"
-                if not scored_path.exists():
-                    logger.warning("Missing scored_joined.csv: {}", scored_path)
+                scored_stem = run_dir / "scored_joined"
+                if not stem_exists(scored_stem):
+                    logger.warning("Missing scored_joined: {}", scored_stem)
                     continue
 
                 fairness = validate_fairness(run_dir)
@@ -231,7 +235,7 @@ def main(
                     logger.warning("Quality gate failed for {}: {}", run_dir, reward_quality["issues"])
                     continue
 
-                df = _load_scored_csv(scored_path, thr_a, thr_b)
+                df = _load_scored(scored_stem, thr_a, thr_b)
                 data[pair_id][mode][seed] = df
 
     # Summary metrics

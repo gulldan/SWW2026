@@ -74,7 +74,7 @@ def validate_fairness(results_dir: str | Path) -> dict[str, Any]:
 
     Args:
         results_dir: Path to a single run's results directory containing
-            ``generated.csv``.
+            ``generated.parquet`` (or ``generated.csv`` fallback).
 
     Returns:
         Dict with keys ``budget_consistent``, ``issues``, ``n_molecules``,
@@ -83,9 +83,11 @@ def validate_fairness(results_dir: str | Path) -> dict[str, Any]:
     results_path = Path(results_dir)
     issues: list[str] = []
 
-    generated_csv = results_path / "generated.csv"
-    if not generated_csv.exists():
-        issues.append(f"generated.csv не найден: {generated_csv}")
+    from dualdocking.data.io_utils import read_df, stem_exists
+
+    generated_stem = results_path / "generated"
+    if not stem_exists(generated_stem):
+        issues.append(f"generated.parquet/csv не найден в {results_path}")
         return {
             "budget_consistent": False,
             "issues": issues,
@@ -95,8 +97,18 @@ def validate_fairness(results_dir: str | Path) -> dict[str, Any]:
         }
 
     # Read smiles
-    lines = generated_csv.read_text().strip().splitlines()
-    smiles = [line.split(",")[0] for line in lines[1:] if line.strip()]
+    try:
+        gen_df = read_df(generated_stem)
+        smiles = gen_df["smiles"].tolist()
+    except Exception as exc:
+        issues.append(f"Ошибка чтения generated: {exc}")
+        return {
+            "budget_consistent": False,
+            "issues": issues,
+            "n_molecules": 0,
+            "n_molecules_unique": 0,
+            "duplication_rate": 1.0,
+        }
 
     n_total, n_unique = _deduplicate(smiles)
     duplication_rate = 0.0 if n_total == 0 else 1.0 - (n_unique / n_total)

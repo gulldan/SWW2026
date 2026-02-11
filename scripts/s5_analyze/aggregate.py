@@ -34,6 +34,7 @@ def main(config: str, experiment_config: str, output: str) -> None:
         output: Output Parquet file path relative to project root.
     """
     from dualdocking.config import load_experiment, load_pairs
+    from dualdocking.data.io_utils import read_df, stem_exists
 
     all_pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
     # Exclude blocked pairs from aggregation (they have no results).
@@ -51,9 +52,9 @@ def main(config: str, experiment_config: str, output: str) -> None:
         for mode in modes:
             for seed in seeds:
                 run_dir = PROJECT_ROOT / "output" / "results" / pair_id / mode / f"seed_{seed}"
-                path = run_dir / "scored_joined.csv"
-                if not path.exists():
-                    logger.warning("Отсутствует: {}", path)
+                scored_stem = run_dir / "scored_joined"
+                if not stem_exists(scored_stem):
+                    logger.warning("Отсутствует: {}", scored_stem)
                     continue
                 rq = validate_reward_quality(
                     run_dir,
@@ -63,12 +64,12 @@ def main(config: str, experiment_config: str, output: str) -> None:
                 if not rq["run_valid"]:
                     logger.warning("Quality gate failed, skipping {}: {}", run_dir, rq["issues"])
                     continue
-                df = pd.read_csv(path)
+                df = read_df(scored_stem)
                 df["pair"] = pair_id
                 df["mode"] = mode
                 df["seed"] = seed
                 frames.append(df)
-                logger.info("Загружено {} строк из {}", len(df), path)
+                logger.info("Загружено {} строк из {}", len(df), scored_stem)
 
     if not frames:
         logger.error("Результаты не найдены. Сначала запустите генерацию и скоринг.")
