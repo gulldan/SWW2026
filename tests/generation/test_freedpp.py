@@ -266,7 +266,7 @@ def test_ensure_docker_image_uses_stage0_fetch_script(tmp_path: Path, monkeypatc
     docker_calls: list[list[str]] = []
     fetch_calls: list[list[str]] = []
 
-    def _fake_subprocess_run(cmd, **kwargs):  # noqa: ANN001, ANN003, ARG001
+    def _fake_subprocess_run(cmd, **kwargs):
         docker_calls.append(cmd)
         if cmd[:3] == ["docker", "image", "inspect"]:
             return SimpleNamespace(returncode=1, stdout="", stderr="No such image")
@@ -274,7 +274,7 @@ def test_ensure_docker_image_uses_stage0_fetch_script(tmp_path: Path, monkeypatc
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    def _fake_run_project_command(cmd, **kwargs):  # noqa: ANN001, ANN003, ARG001
+    def _fake_run_project_command(cmd, **kwargs):
         fetch_calls.append(cmd)
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 

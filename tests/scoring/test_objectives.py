@@ -1,11 +1,10 @@
 """Tests for dual-target objective functions."""
 
-import pytest
 import numpy as np
+import pytest
 
 from dualdocking.scoring.objectives import (
     ObjectiveKind,
-    ObjectiveSpec,
     combined_geometric,
     combined_harmonic,
     combined_min,

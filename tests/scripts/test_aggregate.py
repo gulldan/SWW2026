@@ -1,9 +1,10 @@
 """Tests for scripts/aggregate.py."""
 
 import pandas as pd
-import scripts.s5_analyze.aggregate as mod
 import yaml
 from click.testing import CliRunner
+
+import scripts.s5_analyze.aggregate as mod
 from scripts.s5_analyze.aggregate import main
 
 

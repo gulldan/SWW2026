@@ -9,12 +9,7 @@ import multiprocessing
 import os
 from pathlib import Path
 
-import numpy as np
-import pytest
-
-from dualdocking.scoring import cache_io
 from dualdocking.scoring.cache_io import load_cache, save_cache
-
 
 # ---------------------------------------------------------------------------
 # Basic roundtrip

@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
-import pytest
 import yaml
 from click.testing import CliRunner
 
@@ -67,7 +64,6 @@ def test_dry_run_analyze(tmp_path, monkeypatch):
     _setup_configs(tmp_path)
 
     # Create prereqs for analyze stage
-    import json
     import pandas as pd
 
     for mode in ("single_a", "single_b", "double"):

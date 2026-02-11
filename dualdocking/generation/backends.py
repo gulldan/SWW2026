@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
-GenerationMode = Literal["single_a", "single_b", "double"]
+GenerationMode = Literal["single_a", "single_b", "double", "linear_equal", "biased_a", "selective_a"]
 
 
 @dataclass(frozen=True)
@@ -117,7 +117,7 @@ def _freedpp_backend(request: GenerationRequest) -> list[str]:
     use_model_cache_default = True
 
     second_target_id: str | None = None
-    if request.mode in {"single_b", "double"}:
+    if request.mode in {"single_b", "double", "linear_equal", "biased_a", "selective_a"}:
         second_target_id = _target_id(request.pair_config, "target_b")
 
     gen_config = GenerationConfig(

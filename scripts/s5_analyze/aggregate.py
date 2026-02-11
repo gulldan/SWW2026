@@ -65,6 +65,21 @@ def main(config: str, experiment_config: str, output: str) -> None:
                     logger.warning("Quality gate failed, skipping {}: {}", run_dir, rq["issues"])
                     continue
                 df = read_df(scored_stem)
+                # Backward compat: ensure filter columns exist
+                filter_cols = ["passes_lipinski", "passes_qed", "passes_pains", "passes_sa", "passes_veber", "passes_all_filters"]
+                for col in filter_cols:
+                    if col not in df.columns:
+                        df[col] = True
+
+                # Merge GNINA cross-validation scores if available
+                gnina_stem = run_dir / "gnina_scores"
+                if stem_exists(gnina_stem):
+                    gnina_df = read_df(gnina_stem)
+                    gnina_cols = [c for c in gnina_df.columns if c.startswith("gnina_")]
+                    if "smiles" in gnina_df.columns and gnina_cols:
+                        df = df.merge(gnina_df[["smiles", *gnina_cols]], on="smiles", how="left")
+                        logger.debug("Merged {} GNINA columns from {}", len(gnina_cols), gnina_stem)
+
                 df["pair"] = pair_id
                 df["mode"] = mode
                 df["seed"] = seed

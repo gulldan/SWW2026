@@ -475,7 +475,7 @@ class _NimHandler(BaseHTTPRequestHandler):
     status_code: int = 200
     health_ready: bool = True
 
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         if self.path == "/v1/health/ready":
             body = b"true" if self.health_ready else b"false"
             self.send_response(200)
@@ -485,7 +485,7 @@ class _NimHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404)
 
-    def do_POST(self):  # noqa: N802
+    def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         _payload = self.rfile.read(length)
         self.send_response(self.status_code)

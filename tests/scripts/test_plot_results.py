@@ -2,8 +2,9 @@
 
 import numpy as np
 import pandas as pd
-import scripts.s6_report.plot_results as mod
 from click.testing import CliRunner
+
+import scripts.s6_report.plot_results as mod
 from scripts.s6_report.plot_results import main, plot_score_comparison
 
 

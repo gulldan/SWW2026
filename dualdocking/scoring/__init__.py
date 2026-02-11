@@ -32,6 +32,15 @@ cache_io
     - ``load_cache()``           -- read cache file under flock
     - ``save_cache()``           -- atomic read-merge-write under flock
 
+gnina
+    GNINA CNN-based molecular docking scorer (optional cross-validation).
+    Runs in full docking mode (not score-only) for independent pose generation.
+    Produces CNN pose score, CNN affinity, and Vina/smina score per molecule.
+
+    - ``GninaResult``            -- frozen dataclass (cnn_score, cnn_affinity, vina_score)
+    - ``generate_conformer()``   -- 3D conformer generation via RDKit ETKDGv3
+    - ``score_batch()``          -- dock and score SMILES via Docker GNINA (v1.1 pinned)
+
 binding_box
     PDB binding-site extraction from co-crystallized ligands.
 

@@ -274,6 +274,32 @@ def main(
         if obj.is_primary:
             primary_col = obj.column_name
     joined = joined.sort_values(primary_col)
+
+    # Drug-likeness filters (analytical only, does not affect RL reward)
+    filter_cfg_path = PROJECT_ROOT / "configs" / "filters.yaml"
+    if filter_cfg_path.exists():
+        from dualdocking.data.filters import compute_filters, load_filter_config
+
+        filter_cfg = load_filter_config(filter_cfg_path)
+        filter_results, filter_stats = compute_filters(smiles_list, filter_cfg)
+        joined["passes_lipinski"] = [r.passes_lipinski for r in filter_results]
+        joined["passes_qed"] = [r.passes_qed for r in filter_results]
+        joined["passes_pains"] = [r.passes_pains for r in filter_results]
+        joined["passes_sa"] = [r.passes_sa for r in filter_results]
+        joined["passes_veber"] = [r.passes_veber for r in filter_results]
+        joined["passes_all_filters"] = [r.passes_all for r in filter_results]
+        joined["mw"] = [r.mw for r in filter_results]
+        joined["logp"] = [r.logp for r in filter_results]
+        joined["qed_score"] = [r.qed_score for r in filter_results]
+        joined["sa_score"] = [r.sa_score for r in filter_results]
+        joined["rotatable_bonds"] = [r.rotatable_bonds for r in filter_results]
+        joined["tpsa"] = [r.tpsa for r in filter_results]
+
+        import json as _json_filters
+
+        (result_dir / "filter_stats.json").write_text(_json_filters.dumps(filter_stats.to_dict(), indent=2))
+        logger.info("Filter stats -> {}", result_dir / "filter_stats.json")
+
     from dualdocking.data.io_utils import write_df
 
     write_df(joined, result_dir / "scored_joined", csv_too=True)

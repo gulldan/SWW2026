@@ -15,7 +15,7 @@ def test_step_docker_build_uses_repo_root_context(monkeypatch) -> None:
 
     captured: dict[str, list[str]] = {}
 
-    def _fake_run(cmd, *, dry_run, timeout=None, label=""):  # noqa: ARG001
+    def _fake_run(cmd, *, dry_run, timeout=None, label=""):
         captured["cmd"] = cmd
         return True
 
@@ -32,7 +32,7 @@ def test_step_fetch_freed_data_uses_inprocess_runner(monkeypatch) -> None:
     monkeypatch.setattr(mod, "PROJECT_ROOT", Path("/repo"))
     captured: dict[str, object] = {}
 
-    def _fake_run(cmd, **kwargs):  # noqa: ANN001, ANN003
+    def _fake_run(cmd, **kwargs):
         captured["cmd"] = cmd
         captured["kwargs"] = kwargs
         return True
@@ -51,7 +51,7 @@ def test_step_prepare_targets_uses_inprocess_runner(monkeypatch) -> None:
     monkeypatch.setattr(mod, "PROJECT_ROOT", Path("/repo"))
     captured: dict[str, object] = {}
 
-    def _fake_run(cmd, **kwargs):  # noqa: ANN001, ANN003
+    def _fake_run(cmd, **kwargs):
         captured["cmd"] = cmd
         captured["kwargs"] = kwargs
         return True

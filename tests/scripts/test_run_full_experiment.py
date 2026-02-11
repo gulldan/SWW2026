@@ -81,7 +81,7 @@ def test_run_cmd_sets_boltz_env_for_builtin_engine(tmp_path, monkeypatch) -> Non
     """Boltz-specific env vars should be set only for built-in boltz2 engine."""
     captured: dict[str, dict[str, str]] = {}
 
-    def _fake_run_project_command(cmd, **kwargs):  # noqa: ANN001, ARG001
+    def _fake_run_project_command(cmd, **kwargs):
         captured["env"] = kwargs["env"]
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
@@ -105,7 +105,7 @@ def test_run_cmd_clears_boltz_env_for_external_engine(tmp_path, monkeypatch) -> 
     """External scorer engines must not inherit forced Boltz routing env vars."""
     captured: dict[str, dict[str, str]] = {}
 
-    def _fake_run_project_command(cmd, **kwargs):  # noqa: ANN001, ARG001
+    def _fake_run_project_command(cmd, **kwargs):
         captured["env"] = kwargs["env"]
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 

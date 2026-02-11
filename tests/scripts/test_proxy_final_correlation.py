@@ -7,9 +7,10 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-import scripts.s5_analyze.proxy_correlation as mod
 import yaml
 from click.testing import CliRunner
+
+import scripts.s5_analyze.proxy_correlation as mod
 from scripts.s5_analyze.proxy_correlation import main
 
 

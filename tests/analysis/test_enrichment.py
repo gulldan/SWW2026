@@ -13,7 +13,6 @@ from dualdocking.analysis.enrichment import (
     compute_roc_curve,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -199,12 +198,12 @@ class TestComputeRocCurve:
 
     def test_monotonic_tpr(self) -> None:
         scores, labels = _random_separation()
-        fpr, tpr = compute_roc_curve(scores, labels)
+        _fpr, tpr = compute_roc_curve(scores, labels)
         assert np.all(np.diff(tpr) >= 0)
 
     def test_monotonic_fpr(self) -> None:
         scores, labels = _random_separation()
-        fpr, tpr = compute_roc_curve(scores, labels)
+        fpr, _tpr = compute_roc_curve(scores, labels)
         assert np.all(np.diff(fpr) >= 0)
 
     def test_length(self) -> None:

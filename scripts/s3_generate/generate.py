@@ -232,7 +232,11 @@ def _master_config_version() -> str:
 
 @click.command()
 @click.option("--pair", required=True, help="ID пары из configs/pairs.yaml")
-@click.option("--mode", type=click.Choice(["single_a", "single_b", "double"]), required=True)
+@click.option(
+    "--mode",
+    type=click.Choice(["single_a", "single_b", "double", "linear_equal", "biased_a", "selective_a"]),
+    required=True,
+)
 @click.option("--n-molecules", default=None, type=int, help="Кол-во молекул (default из experiment.yaml)")
 @click.option("--seed", default=42, type=int)
 @click.option("--epochs", default=None, type=int, help="Эпохи FREED++ (default из experiment.yaml)")

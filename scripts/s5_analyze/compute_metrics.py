@@ -148,97 +148,153 @@ def _compute_degradation_guard(
     return degradation_out
 
 
-@click.command()
-@click.option("--results-root", default="output/results", help="Root directory with results")
-@click.option("--pairs-config", default="configs/pairs.yaml")
-@click.option("--experiment-config", default="configs/experiment.yaml")
-@click.option("--metrics-config", default="configs/metrics.yaml")
-@click.option("--output-metrics", default="report/metrics.json")
-@click.option("--output-stats", default="report/stats.json")
-@click.option("--allow-incomplete/--no-allow-incomplete", default=True, help="Allow missing pair-mode-seed combos")
-def main(
-    results_root: str,
-    pairs_config: str,
-    experiment_config: str,
-    metrics_config: str,
-    output_metrics: str,
-    output_stats: str,
-    allow_incomplete: bool,
-) -> None:
-    """Compute per-pair metrics and run hierarchical bootstrap comparisons.
+def _compute_sensitivity_analyses(
+    pairs: dict[str, dict],
+    modes: list[str],
+    data: dict[str, dict[str, dict[int, pd.DataFrame]]],
+    metric_hr_both_fn: object,
+) -> dict[str, object]:
+    """Compute sensitivity analyses (SAP Section 9).
 
-    For each core pair, runs H1a/H1b (dual hit-rate) and H2a/H2b (balance)
-    tests, applies BH FDR correction on the primary family, evaluates
-    the degradation guard, and writes structured JSON outputs.
+    These are SECONDARY analyses -- not part of primary decision rule.
+    Each sub-analysis is wrapped in try/except so failures don't block
+    the main pipeline.
+    """
+    sensitivity: dict[str, object] = {}
+
+    try:
+        from dualdocking.analysis.power_analysis import detectable_effect as _det_effect
+        from dualdocking.analysis.power_analysis import sensitivity_table as _sens_table
+
+        sensitivity["power_analysis"] = {
+            "detectable_cliffs_delta_m5": _det_effect(n_seeds=5, n_simulations=500, n_bootstrap=499),
+            "sensitivity_table": _sens_table(seed_range=[3, 5, 10, 15], n_simulations=500, n_bootstrap=499),
+        }
+    except Exception as exc:
+        logger.warning("Power analysis failed: {}", exc)
+
+    try:
+        from dualdocking.analysis.wild_bootstrap import wild_cluster_bootstrap
+
+        wild_results: dict[str, dict[str, object]] = {}
+        for pair_id in pairs:
+            pair_wild: dict[str, object] = {}
+            for test_id, mode_b, mode_a in [("H1a", "double", "single_a"), ("H1b", "double", "single_b")]:
+                group_a_dfs = list(data.get(pair_id, {}).get(mode_a, {}).values())
+                group_b_dfs = list(data.get(pair_id, {}).get(mode_b, {}).values())
+                if not group_a_dfs or not group_b_dfs:
+                    continue
+                vals_a = np.array([metric_hr_both_fn(df) for df in group_a_dfs])
+                vals_b = np.array([metric_hr_both_fn(df) for df in group_b_dfs])
+                wb = wild_cluster_bootstrap(vals_b, vals_a, n_boot=9999, alternative="less")
+                pair_wild[test_id] = {
+                    "p_value": wb.p_value,
+                    "observed_diff": wb.observed_diff,
+                    "ci_lower": wb.ci_lower,
+                    "ci_upper": wb.ci_upper,
+                    "alternative": wb.alternative,
+                }
+            if pair_wild:
+                wild_results[pair_id] = pair_wild
+        sensitivity["wild_bootstrap"] = wild_results
+    except Exception as exc:
+        logger.warning("Wild bootstrap failed: {}", exc)
+
+    try:
+        from dualdocking.analysis.rliable_metrics import compute_iqm, compute_iqm_ci, probability_of_improvement
+
+        rliable_out: dict[str, object] = {}
+        for mode in modes:
+            hr_both_vals = [
+                float(df["is_hit_both"].mean())
+                for pair_id in pairs
+                for df in data.get(pair_id, {}).get(mode, {}).values()
+                if not df.empty
+            ]
+            if hr_both_vals:
+                arr = np.array(hr_both_vals)
+                iqm = compute_iqm(arr)
+                lo, hi = compute_iqm_ci(arr, n_boot=5000)
+                rliable_out[mode] = {"iqm": iqm, "iqm_ci_lower": lo, "iqm_ci_upper": hi}
+
+        for baseline in ("single_a", "single_b"):
+            trt_vals = [
+                float(df["is_hit_both"].mean())
+                for pair_id in pairs
+                for df in data.get(pair_id, {}).get("double", {}).values()
+                if not df.empty
+            ]
+            ctrl_vals = [
+                float(df["is_hit_both"].mean())
+                for pair_id in pairs
+                for df in data.get(pair_id, {}).get(baseline, {}).values()
+                if not df.empty
+            ]
+            if trt_vals and ctrl_vals:
+                poi = probability_of_improvement(np.array(trt_vals), np.array(ctrl_vals))
+                rliable_out[f"poi_double_vs_{baseline}"] = poi
+
+        sensitivity["rliable"] = rliable_out
+    except Exception as exc:
+        logger.warning("Rliable metrics failed: {}", exc)
+
+    try:
+        from dualdocking.analysis.mixed_effects import fit_mixed_model
+
+        me_rows = []
+        for pair_id in pairs:
+            for mode in modes:
+                for seed_id, df in data.get(pair_id, {}).get(mode, {}).items():
+                    if not df.empty:
+                        me_rows.append(
+                            {
+                                "pair": pair_id,
+                                "mode": mode,
+                                "seed": seed_id,
+                                "hr_both": float(df["is_hit_both"].mean()),
+                            }
+                        )
+        if me_rows:
+            me_df = pd.DataFrame(me_rows)
+            me_result = fit_mixed_model(me_df, outcome="hr_both", fixed="mode", group="pair")
+            sensitivity["mixed_effects"] = {
+                "converged": me_result.converged,
+                "coefficients": me_result.coefficients,
+                "p_values": me_result.p_values,
+                "random_effects_var": me_result.random_effects_var,
+                "n_groups": me_result.n_groups,
+                "n_obs": me_result.n_obs,
+            }
+    except Exception as exc:
+        logger.warning("Mixed-effects model failed: {}", exc)
+
+    return sensitivity
+
+
+def _compute_summary_metrics(
+    pairs: dict[str, dict],
+    modes: list[str],
+    seeds: list[int],
+    data: dict[str, dict[str, dict[int, pd.DataFrame]]],
+    metrics_cfg: dict,
+    exp_cfg: dict,
+) -> dict[str, dict[str, dict[str, float]]]:
+    """Compute per-pair per-mode summary metrics (hit rates, balance, diversity, filters).
 
     Args:
-        results_root: Root directory containing per-pair results.
-        pairs_config: Path to pairs.yaml.
-        experiment_config: Path to experiment.yaml.
-        metrics_config: Path to metrics.yaml.
-        output_metrics: Output path for metrics JSON.
-        output_stats: Output path for stats JSON.
-        allow_incomplete: Allow missing pair-mode-seed combinations.
+        pairs: Pair configuration dict.
+        modes: List of generation modes.
+        seeds: List of seed values.
+        data: Nested dict of pair_id -> mode -> seed -> DataFrame.
+        metrics_cfg: Metrics configuration.
+        exp_cfg: Experiment configuration.
+
+    Returns:
+        Nested dict mapping pair_id -> mode -> metric_name -> value.
     """
-    from dualdocking.analysis.fairness import validate_fairness, validate_reward_quality
-    from dualdocking.analysis.statistical import (
-        BootstrapResult,
-        cliffs_delta,
-        cohens_d,
-        fdr_correction,
-        hierarchical_bootstrap_test,
-    )
-    from dualdocking.config import load_experiment, load_metrics, load_pairs
-    from dualdocking.data.io_utils import stem_exists
+    from dualdocking.analysis.diversity import compute_all_diversity_metrics
     from dualdocking.scoring.objectives import parse_objectives_config
 
-    all_pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
-    # Exclude blocked pairs from analysis (they have no results).
-    pairs = {pid: cfg for pid, cfg in all_pairs.items() if cfg.get("set") != "blocked"}
-    exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
-    metrics_cfg = load_metrics(PROJECT_ROOT / metrics_config)
-
-    modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
-    seeds = exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
-
-    results_root_path = PROJECT_ROOT / results_root
-    qg_cfg = exp_cfg.get("quality_gate", {})
-    data: dict[str, dict[str, dict[int, pd.DataFrame]]] = {}
-
-    # Fairness gate + quality gate + load data
-    for pair_id in pairs:
-        thresholds = metrics_cfg.get("thresholds", {}).get(pair_id, {})
-        thr_a = thresholds.get("target_a", 0.0)
-        thr_b = thresholds.get("target_b", 0.0)
-
-        data[pair_id] = {}
-        for mode in modes:
-            data[pair_id][mode] = {}
-            for seed in seeds:
-                run_dir = results_root_path / pair_id / mode / f"seed_{seed}"
-                scored_stem = run_dir / "scored_joined"
-                if not stem_exists(scored_stem):
-                    logger.warning("Missing scored_joined: {}", scored_stem)
-                    continue
-
-                fairness = validate_fairness(run_dir)
-                if not fairness["budget_consistent"]:
-                    logger.error("Fairness check failed for {}: {}", run_dir, fairness["issues"])
-                    sys.exit(1)
-
-                reward_quality = validate_reward_quality(
-                    run_dir,
-                    max_invalid_fraction=qg_cfg.get("max_invalid_fraction", 0.10),
-                    max_timeout_fraction=qg_cfg.get("max_timeout_fraction", 0.05),
-                )
-                if not reward_quality["run_valid"]:
-                    logger.warning("Quality gate failed for {}: {}", run_dir, reward_quality["issues"])
-                    continue
-
-                df = _load_scored(scored_stem, thr_a, thr_b)
-                data[pair_id][mode][seed] = df
-
-    # Summary metrics
     metrics_out: dict[str, dict[str, dict[str, float]]] = {}
     for pair_id in pairs:
         thresholds = metrics_cfg.get("thresholds", {}).get(pair_id, {})
@@ -301,7 +357,220 @@ def main(
                     mode_metrics[f"{col}_mean"] = float(np.mean(obj_values))
                     mode_metrics[f"{col}_sem"] = _sem(obj_values)
 
+            # Filtered hit rates (backward compat: only if filter columns present)
+            for df in seed_dfs.values():
+                if "passes_all_filters" in df.columns:
+                    n_pass = int(df["passes_all_filters"].sum())
+                    filter_pass_rate = n_pass / len(df) if len(df) > 0 else 0.0
+                    df_filt = df[df["passes_all_filters"]]
+                    mode_metrics["filter_pass_rate"] = filter_pass_rate
+                    mode_metrics["hr_a_filtered"] = float(df_filt["is_hit_a"].mean()) if len(df_filt) > 0 else float("nan")
+                    mode_metrics["hr_b_filtered"] = float(df_filt["is_hit_b"].mean()) if len(df_filt) > 0 else float("nan")
+                    mode_metrics["hr_both_filtered"] = float(df_filt["is_hit_both"].mean()) if len(df_filt) > 0 else float("nan")
+                    break  # use first seed with filter data for summary
+
+            # Chemical diversity metrics
+            all_smiles: list[str] = []
+            for df in seed_dfs.values():
+                smi_col = "smiles_canonical" if "smiles_canonical" in df.columns else "smiles"
+                if smi_col in df.columns:
+                    all_smiles.extend(df[smi_col].dropna().astype(str).tolist())
+            if all_smiles:
+                div_result = compute_all_diversity_metrics(all_smiles)
+                for k, v in div_result.to_dict().items():
+                    mode_metrics[f"diversity_{k}"] = v
+
             metrics_out[pair_id][mode] = mode_metrics
+
+    return metrics_out
+
+
+def _compute_gnina_cross_validation(
+    pairs: dict[str, dict],
+    modes: list[str],
+    data: dict[str, dict[str, dict[int, pd.DataFrame]]],
+) -> dict[str, dict[str, object]]:
+    """Compute GNINA cross-validation metrics if gnina columns are present.
+
+    For each pair/mode, computes Spearman correlations between GNINA CNN
+    affinity and Boltz-2 affinity, and between GNINA Vina scores and
+    UniDock scores.
+
+    Args:
+        pairs: Pair configuration dict.
+        modes: List of generation modes.
+        data: Nested dict of pair_id -> mode -> seed -> DataFrame.
+
+    Returns:
+        Dict mapping pair_id -> mode -> metrics dict. Empty if no GNINA data.
+    """
+    from scipy.stats import spearmanr
+
+    _false = False  # named constant avoids FBT003 lint
+
+    gnina_xval: dict[str, dict[str, object]] = {}
+    for pair_id in pairs:
+        pair_gnina: dict[str, object] = {}
+        for mode in modes:
+            seed_dfs = data.get(pair_id, {}).get(mode, {})
+            if not seed_dfs:
+                continue
+
+            gnina_affs_a: list[float] = []
+            gnina_affs_b: list[float] = []
+            boltz_affs_a: list[float] = []
+            boltz_affs_b: list[float] = []
+            for df in seed_dfs.values():
+                if "gnina_cnn_affinity_a" not in df.columns:
+                    continue
+                valid_mask = df["gnina_valid_a"].fillna(value=_false) & df["gnina_valid_b"].fillna(value=_false)
+                valid_df = df[valid_mask]
+                if len(valid_df) == 0:
+                    continue
+                gnina_affs_a.extend(valid_df["gnina_cnn_affinity_a"].tolist())
+                gnina_affs_b.extend(valid_df["gnina_cnn_affinity_b"].tolist())
+                boltz_affs_a.extend(valid_df["affinity_a"].tolist())
+                boltz_affs_b.extend(valid_df["affinity_b"].tolist())
+
+            if len(gnina_affs_a) < 5:
+                continue
+
+            gnina_a = np.array(gnina_affs_a)
+            gnina_b = np.array(gnina_affs_b)
+            boltz_a = np.array(boltz_affs_a)
+            boltz_b = np.array(boltz_affs_b)
+
+            rho_a_boltz, _ = spearmanr(gnina_a, boltz_a)
+            rho_b_boltz, _ = spearmanr(gnina_b, boltz_b)
+
+            mode_gnina: dict[str, float] = {
+                "n_valid": len(gnina_affs_a),
+                "mean_cnn_affinity_a": float(np.nanmean(gnina_a)),
+                "mean_cnn_affinity_b": float(np.nanmean(gnina_b)),
+                "spearman_gnina_boltz_a": float(rho_a_boltz),
+                "spearman_gnina_boltz_b": float(rho_b_boltz),
+            }
+
+            for df in seed_dfs.values():
+                if "gnina_vina_score_a" in df.columns and "score_a" in df.columns:
+                    valid_mask = df["gnina_valid_a"].fillna(value=_false)
+                    vdf = df[valid_mask]
+                    if len(vdf) >= 5:
+                        rho_vina_a, _ = spearmanr(
+                            vdf["gnina_vina_score_a"].to_numpy(),
+                            vdf["score_a"].to_numpy(),
+                        )
+                        mode_gnina["spearman_gnina_vina_unidock_a"] = float(rho_vina_a)
+                if "gnina_vina_score_b" in df.columns and "score_b" in df.columns:
+                    valid_mask = df["gnina_valid_b"].fillna(value=_false)
+                    vdf = df[valid_mask]
+                    if len(vdf) >= 5:
+                        rho_vina_b, _ = spearmanr(
+                            vdf["gnina_vina_score_b"].to_numpy(),
+                            vdf["score_b"].to_numpy(),
+                        )
+                        mode_gnina["spearman_gnina_vina_unidock_b"] = float(rho_vina_b)
+                break  # use first seed with GNINA data
+
+            pair_gnina[mode] = mode_gnina
+
+        if pair_gnina:
+            gnina_xval[pair_id] = pair_gnina
+
+    return gnina_xval
+
+
+@click.command()
+@click.option("--results-root", default="output/results", help="Root directory with results")
+@click.option("--pairs-config", default="configs/pairs.yaml")
+@click.option("--experiment-config", default="configs/experiment.yaml")
+@click.option("--metrics-config", default="configs/metrics.yaml")
+@click.option("--output-metrics", default="report/metrics.json")
+@click.option("--output-stats", default="report/stats.json")
+@click.option("--allow-incomplete/--no-allow-incomplete", default=True, help="Allow missing pair-mode-seed combos")
+def main(
+    results_root: str,
+    pairs_config: str,
+    experiment_config: str,
+    metrics_config: str,
+    output_metrics: str,
+    output_stats: str,
+    allow_incomplete: bool,
+) -> None:
+    """Compute per-pair metrics and run hierarchical bootstrap comparisons.
+
+    For each core pair, runs H1a/H1b (dual hit-rate) and H2a/H2b (balance)
+    tests, applies BH FDR correction on the primary family, evaluates
+    the degradation guard, and writes structured JSON outputs.
+
+    Args:
+        results_root: Root directory containing per-pair results.
+        pairs_config: Path to pairs.yaml.
+        experiment_config: Path to experiment.yaml.
+        metrics_config: Path to metrics.yaml.
+        output_metrics: Output path for metrics JSON.
+        output_stats: Output path for stats JSON.
+        allow_incomplete: Allow missing pair-mode-seed combinations.
+    """
+    from dualdocking.analysis.fairness import validate_fairness, validate_reward_quality
+    from dualdocking.analysis.statistical import (
+        BootstrapResult,
+        cliffs_delta,
+        cohens_d,
+        fdr_correction,
+        hierarchical_bootstrap_test,
+    )
+    from dualdocking.config import load_experiment, load_metrics, load_pairs
+    from dualdocking.data.io_utils import stem_exists
+
+    all_pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
+    # Exclude blocked pairs from analysis (they have no results).
+    pairs = {pid: cfg for pid, cfg in all_pairs.items() if cfg.get("set") != "blocked"}
+    exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
+    metrics_cfg = load_metrics(PROJECT_ROOT / metrics_config)
+
+    modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
+    seeds = exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
+
+    results_root_path = PROJECT_ROOT / results_root
+    qg_cfg = exp_cfg.get("quality_gate", {})
+    data: dict[str, dict[str, dict[int, pd.DataFrame]]] = {}
+
+    # Fairness gate + quality gate + load data
+    for pair_id in pairs:
+        thresholds = metrics_cfg.get("thresholds", {}).get(pair_id, {})
+        thr_a = thresholds.get("target_a", 0.0)
+        thr_b = thresholds.get("target_b", 0.0)
+
+        data[pair_id] = {}
+        for mode in modes:
+            data[pair_id][mode] = {}
+            for seed in seeds:
+                run_dir = results_root_path / pair_id / mode / f"seed_{seed}"
+                scored_stem = run_dir / "scored_joined"
+                if not stem_exists(scored_stem):
+                    logger.warning("Missing scored_joined: {}", scored_stem)
+                    continue
+
+                fairness = validate_fairness(run_dir)
+                if not fairness["budget_consistent"]:
+                    logger.error("Fairness check failed for {}: {}", run_dir, fairness["issues"])
+                    sys.exit(1)
+
+                reward_quality = validate_reward_quality(
+                    run_dir,
+                    max_invalid_fraction=qg_cfg.get("max_invalid_fraction", 0.10),
+                    max_timeout_fraction=qg_cfg.get("max_timeout_fraction", 0.05),
+                )
+                if not reward_quality["run_valid"]:
+                    logger.warning("Quality gate failed for {}: {}", run_dir, reward_quality["issues"])
+                    continue
+
+                df = _load_scored(scored_stem, thr_a, thr_b)
+                data[pair_id][mode][seed] = df
+
+    # Summary metrics
+    metrics_out = _compute_summary_metrics(pairs, modes, seeds, data, metrics_cfg, exp_cfg)
 
     # Completeness check
     missing_list: list[str] = []
@@ -440,6 +709,9 @@ def main(
         "missing_rate": round(missing_rate, 4),
         "missing_runs": missing_list,
     }
+
+    stats_out["_sensitivity_analyses"] = _compute_sensitivity_analyses(pairs, modes, data, _metric_hr_both)
+    stats_out["_gnina_cross_validation"] = _compute_gnina_cross_validation(pairs, modes, data)
 
     out_metrics_path = PROJECT_ROOT / output_metrics
     out_stats_path = PROJECT_ROOT / output_stats

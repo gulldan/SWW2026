@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
 
 import scripts.s2_calibrate.dock_calibration as mod
@@ -12,7 +11,7 @@ class _FakeRunner:
     def __init__(self):
         self.commands: list[list[str]] = []
 
-    def exec(self, args: list[str], timeout: int | None = None):  # noqa: ARG002
+    def exec(self, args: list[str], timeout: int | None = None):
         self.commands.append(args)
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 

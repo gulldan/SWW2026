@@ -16,7 +16,7 @@ def test_run_uses_inprocess_project_runner(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(mod, "PROJECT_ROOT", Path("/repo"))
     captured: dict[str, object] = {}
 
-    def _fake_run_project_command(cmd, **kwargs):  # noqa: ANN001, ANN003
+    def _fake_run_project_command(cmd, **kwargs):
         captured["cmd"] = cmd
         captured["kwargs"] = kwargs
         return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -35,7 +35,7 @@ def test_run_converts_inprocess_runtime_error_to_click_exception(monkeypatch: py
     """In-process dispatch failure should surface as ClickException."""
     monkeypatch.setattr(mod, "PROJECT_ROOT", Path("/repo"))
 
-    def _boom(*_args, **_kwargs):  # noqa: ANN001, ANN002, ANN003
+    def _boom(*_args, **_kwargs):
         raise RuntimeError("dispatch failed")
 
     monkeypatch.setattr(mod, "run_project_command", _boom)

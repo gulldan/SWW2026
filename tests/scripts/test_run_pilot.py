@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
+
 from scripts.pipeline.run_pilot import _verify_pilot_artifacts
 
 PROJECT_ROOT_MARKER = "PROJECT_ROOT"

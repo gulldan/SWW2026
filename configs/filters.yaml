@@ -1,0 +1,19 @@
+filters:
+  lipinski:
+    enabled: true
+    mw_max: 500.0
+    logp_max: 5.0
+    hbd_max: 5
+    hba_max: 10
+  qed:
+    enabled: true
+    threshold_min: 0.5
+  pains:
+    enabled: true
+  sa_score:
+    enabled: true
+    threshold_max: 5.0
+  veber:
+    enabled: true
+    rotatable_bonds_max: 10
+    tpsa_max: 140.0

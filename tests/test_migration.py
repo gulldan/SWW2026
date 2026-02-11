@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-import pytest
 from click.testing import CliRunner
 
 from scripts.migrate_csv_to_parquet import _find_csvs, _migrate_one, _should_exclude, main

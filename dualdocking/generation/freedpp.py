@@ -63,8 +63,9 @@ class GenerationConfig:
         seed: Random seed for reproducibility.
         output_dir: Directory for output files and workspace.
         reward_mode: Reward strategy -- ``"single_a"`` (dock against A only),
-            ``"single_b"`` (dock against B only), or ``"double"``
-            (dock against both A and B).
+            ``"single_b"`` (dock against B only), ``"double"``
+            (dock against both, worst-case), ``"linear_equal"`` (z_a + z_b),
+            ``"biased_a"`` (z_a + 0.3*z_b), or ``"selective_a"`` (z_a - z_b).
         second_target_id: Target identifier for receptor B. Required when
             *reward_mode* is ``"single_b"`` or ``"double"``.
         epochs: Number of FREED++ training epochs.
@@ -88,7 +89,7 @@ class GenerationConfig:
     n_molecules: int = 1000
     seed: int = 42
     output_dir: Path = field(default_factory=lambda: Path("output/results/smoke"))
-    reward_mode: str = "single_a"  # "single_a" | "single_b" | "double"
+    reward_mode: str = "single_a"  # "single_a" | "single_b" | "double" | "linear_equal" | "biased_a" | "selective_a"
     second_target_id: str | None = None
 
     # FREED++-specific
@@ -552,8 +553,9 @@ def _run_freedpp(
         ]
     )
 
-    # Dual-target: mount second receptor and config (only needed for double mode)
-    if config.reward_mode == "double" and pdbqt_b is not None:
+    # Dual-target: mount second receptor and config (needed for all dual modes)
+    _dual_modes = {"double", "linear_equal", "biased_a", "selective_a"}
+    if config.reward_mode in _dual_modes and pdbqt_b is not None:
         dual_cfg = {
             "receptor_b": f"/workspace/{pdbqt_b.name}",
             "center_b": center_b,
@@ -766,7 +768,7 @@ def generate(config: GenerationConfig) -> list[str]:
             *second_target_id* is not set.
         FileNotFoundError: If normalization.yaml is missing.
     """
-    needs_second = config.reward_mode in {"single_b", "double"}
+    needs_second = config.reward_mode in {"single_b", "double", "linear_equal", "biased_a", "selective_a"}
     if needs_second and not config.second_target_id:
         raise ValueError(f"{config.reward_mode} mode requires second_target_id")
     n_steps = 8 if not needs_second else 9

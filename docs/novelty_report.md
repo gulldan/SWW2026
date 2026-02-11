@@ -73,6 +73,27 @@
 - SynFormer: [hf.co/papers/2410.03494](https://hf.co/papers/2410.03494)
 - 3DMolFormer: [hf.co/papers/2502.05107](https://hf.co/papers/2502.05107)
 
+### A2. GFlowNet and Alternative Multi-Objective Approaches
+
+| Work | Approach | Targets | Key Difference from DualDocking |
+|------|----------|---------|-------------------------------|
+| **MOGFN-PC** (Jain et al., 2023) | GFlowNet with Pareto conditioning | Molecular properties (QED, LogP, SA) | No docking reward, property-only objectives |
+| **HN-GFN** (Zhu et al., 2023) | Hypernetwork GFlowNets, multi-objective Bayesian optimization | Molecular properties via surrogate models | No dual-target docking, single-target affinity at most |
+| **DrugEx v2** (Liu et al., 2021) | RNN + Pareto-based multi-objective RL | A1AR/A2AAR + hERG avoidance | Predictor-based (not docking), no systematic weight-space |
+| **DrugEx v3** (Liu et al., 2023) | Graph Transformer + RL, scaffold-constrained | A2A receptor properties | Single-target, no dual-target docking, no weight grid |
+| **PMMG** (Liu et al., 2025) | RNN + Pareto MCTS | EGFR + HER2 docking + ADMET | Closest competitor: dual-target docking, but MCTS-based (not RL weight-space exploration); no orthogonal evaluation |
+| **AIxFuse** (Chen et al., 2024) | Self-play RL + pharmacophore fusion + active learning | GSK3B/JNK3 and RORgt/DHODH dual-docking | Structure-aware dual-target with docking, but pharmacophore-based (not fragment RL); no weight-space spectrum, no independent scorer |
+| **POLYGON** (Munson et al., 2024) | VAE + generative RL | MEK1/mTOR and 10 protein pairs | Network-based polypharmacology with experimental validation; predictor-based reward (not docking), no weight-space exploration |
+
+**References:**
+- Jain M, Raparthy SC, Hernandez-Garcia A, et al. Multi-objective GFlowNets. *Proc ICML*. 2023;202:14631-14653. [arXiv](https://arxiv.org/abs/2210.12765)
+- Zhu Y, Wu J, Hu C, et al. Sample-efficient multi-objective molecular optimization with GFlowNets. *Proc NeurIPS*. 2023. [GitHub](https://github.com/violet-sto/HN-GFN)
+- Liu X, Ye K, van Vlijmen HWT, Emmerich MTM, IJzerman AP, van Westen GJP. DrugEx v2: de novo design of drug molecules by Pareto-based multi-objective reinforcement learning in polypharmacology. *J Cheminformatics*. 2021;13:85. [DOI](https://doi.org/10.1186/s13321-021-00561-9) PMID: 34772471
+- Liu X, Ye K, van Vlijmen HWT, IJzerman AP, van Westen GJP. DrugEx v3: scaffold-constrained drug design with graph transformer-based reinforcement learning. *J Cheminformatics*. 2023;15:24. [DOI](https://doi.org/10.1186/s13321-023-00694-z) PMID: 36803659
+- Liu Y, Zhu Y, Wang J, et al. A multi-objective molecular generation method based on Pareto algorithm and Monte Carlo tree search. *Adv Sci*. 2025;12(20):e2410640. [DOI](https://doi.org/10.1002/advs.202410640) PMID: 40183315
+- Chen S, Xie J, Ye R, Xu DD, Yang Y. Structure-aware dual-target drug design through collaborative learning of pharmacophore combination and molecular simulation. *Chem Sci*. 2024;15(27):10366-10380. [DOI](https://doi.org/10.1039/d4sc00094c) PMID: 38994407
+- Munson BP, Chen M, Bogosian A, et al. De novo generation of multi-target compounds using deep generative chemistry. *Nat Commun*. 2024;15:3636. [DOI](https://doi.org/10.1038/s41467-024-47120-y) PMID: 38710699
+
 ### B. Dual-Target Drug Design (Computational)
 
 | Work | Approach | Key Difference |
@@ -197,7 +218,7 @@
 
 | Aspect | Literature | DualDocking |
 |--------|-----------|-------------|
-| Weight configurations | 1-2 (single vs dual) | **8 configurations** (selective_A, single_A, biased_A, balanced_AB, dual_linear, dual_min, single_B, selective_B) |
+| Weight configurations | 1-2 (single vs dual) | **6 configurations** (single_a, single_b, double, linear_equal, biased_a, selective_a) |
 | Reward type | Properties (QED, SA, logP) | **Docking score to 2 protein targets** |
 | Selectivity | Not explored | **Included (w=-1)** |
 | Pair design | Single pair or none | **5 core + 3 auxiliary pairs** with factorial design |
@@ -239,7 +260,7 @@
 None of the 65+ PubMed articles or 21 HuggingFace papers uses an RL generator with docking reward for systematic scanning of the weight space of two protein targets.
 
 - Closest: CPRL (Pareto RL for properties), Isigkeit et al. (CLM for dual-ligands), REINVENT 4 ([GitHub](https://github.com/MolecularAI/REINVENT4), multi-objective but no systematic weight grid)
-- Implementation: `dual_reward_patch.py` with 3 modes (single_a, single_b, double), z-score normalization, worst-case scalarization. 53 dedicated tests.
+- Implementation: `dual_reward_patch.py` with 6 modes (single_a, single_b, double, linear_equal, biased_a, selective_a), z-score normalization, multiple scalarizations. 53 dedicated tests.
 
 ### Claim 2: "Boltz-2 as independent post-scoring (not circular evaluation)"
 
@@ -257,7 +278,7 @@ Boltz-2 is already used in drug discovery pipelines (Ock et al. 2026, SynFlowNet
 
 Unique conceptual contribution. Literature clearly separates selectivity and polypharmacology as separate tasks. Unifying them in a single parametric scale is **not found in any of the analyzed works**.
 
-- Implementation: 8 weight configurations in `experiment.yaml`, from w2=-1.0 (selective) to w2=+1.0 (dual)
+- Implementation: 6 reward modes in `experiment.yaml`, from selective_a (z_a - z_b) through single_a/single_b to double (worst-case)
 - Pre-registered success criteria in `goal.md`
 
 ### Combination of All Three
@@ -277,8 +298,10 @@ As confirmed by HuggingFace search: **"NO single work combines all three claims.
 | "Isigkeit et al. already did dual-target generation" | Their approach: ligand-based CLM fine-tuning (no structural information, no docking). Ours: structure-based RL with docking reward + weight-space exploration. Fundamentally different approaches — complementary, not competing. | [DOI](https://doi.org/10.1038/s41467-024-52060-8) |
 | "Why weight-space when you can do Pareto?" | Pareto front is a **result**; weight-space is an **input parameter**. We show HOW different weights influence the Pareto front shape. These are complementary concepts, not competing ones. | objectives.py: both Pareto + scalarizations |
 | "Only 5 core pairs is too few" | Pre-registered factorial design (3 axes x 2 levels). Cameron/Gelbach/Miller (2008) showed that wild cluster bootstrap helps with 5 clusters. Our primary evidence = effect size + cross-pair consistency, not single-pair significance. | Cameron et al. (2008) |
-| "Computational cost is prohibitive" | 100 epochs x 5 seeds x 3 modes x 5 pairs. NIM Boltz-2 = ~5 sec/mol. Feasible on 4 GPUs in ~2 weeks. | Performance findings in MEMORY.md |
+| "Computational cost is prohibitive" | 100 epochs x 5 seeds x 6 modes x 5 pairs. NIM Boltz-2 = ~5 sec/mol. Feasible on 4 GPUs in ~2 weeks. | Performance findings in MEMORY.md |
 | "Docking as RL reward is too noisy" | (1) Z-score normalization + clamping (_MAX_Z_ABS=10.0) controls noise; (2) Score validation (_SCORE_MIN=-20, _SCORE_MAX=10) rejects corrupt GPU scores; (3) Boltz-2 post-scoring catches docking artifacts. | dual_reward_patch.py |
+| "GFlowNets already solve multi-objective generation" | GFlowNets (MOGFN-PC, HN-GFN) optimize molecular properties (QED, LogP, SA), not binding affinity to specific protein targets. DualDocking is unique in combining docking-based RL reward with systematic weight-space exploration across dual targets. No GFlowNet work uses structure-based docking as objective for two targets simultaneously. | MOGFN-PC uses QED/LogP/SA; HN-GFN single-target surrogate; SynFlowNet+Boltz-2 (ICLR 2025) is single-target only |
+| "PMMG/AIxFuse/POLYGON already do dual-target generation" | PMMG (Liu et al., 2025) uses MCTS for EGFR/HER2 but lacks weight-space exploration and orthogonal evaluation. AIxFuse (Chen et al., 2024) uses pharmacophore fusion for GSK3B/JNK3 but has no selectivity spectrum. POLYGON (Munson et al., 2024) uses predictor-based reward (not docking) and no weight-space. None combines all three of our claims. | PMMG: no Boltz-2; AIxFuse: no weight grid; POLYGON: no docking reward |
 | "No experimental validation" | Acknowledged as limitation. Computational study with orthogonal evaluation. Isigkeit et al. (2024) showed 7/12 CLM designs confirmed — a CLM result, not RL+docking. Our pipeline generates 3D complexes (Boltz-2 CIF files) suitable for MD validation (GROMACS, Step 7 of pipeline). | Pipeline architecture |
 
 ---
@@ -306,16 +329,26 @@ As confirmed by HuggingFace search: **"NO single work combines all three claims.
 14. SynFlowNet + Boltz-2. ICLR 2025
 15. Cameron AC, Gelbach JB, Miller DL. Bootstrap-based improvements for inference with clustered errors. *Rev Econ Stat*. 2008;90(3):414-427
 
+### GFlowNet and Alternative Multi-Objective Approaches (Should-Cite)
+
+16. Jain M, Raparthy SC, Hernandez-Garcia A, et al. Multi-objective GFlowNets. *Proc ICML*. 2023;202:14631-14653. [arXiv](https://arxiv.org/abs/2210.12765)
+17. Zhu Y, Wu J, Hu C, et al. Sample-efficient multi-objective molecular optimization with GFlowNets. *Proc NeurIPS*. 2023. [GitHub](https://github.com/violet-sto/HN-GFN)
+18. Liu X, Ye K, van Vlijmen HWT, Emmerich MTM, IJzerman AP, van Westen GJP. DrugEx v2: de novo design of drug molecules by Pareto-based multi-objective reinforcement learning in polypharmacology. *J Cheminformatics*. 2021;13:85. [DOI](https://doi.org/10.1186/s13321-021-00561-9) PMID: 34772471
+19. Liu X, Ye K, van Vlijmen HWT, IJzerman AP, van Westen GJP. DrugEx v3: scaffold-constrained drug design with graph transformer-based reinforcement learning. *J Cheminformatics*. 2023;15:24. [DOI](https://doi.org/10.1186/s13321-023-00694-z) PMID: 36803659
+20. Liu Y, Zhu Y, Wang J, et al. PMMG: A multi-objective molecular generation method based on Pareto algorithm and Monte Carlo tree search. *Adv Sci*. 2025;12(20):e2410640. [DOI](https://doi.org/10.1002/advs.202410640) PMID: 40183315
+21. Chen S, Xie J, Ye R, Xu DD, Yang Y. AIxFuse: Structure-aware dual-target drug design through collaborative learning of pharmacophore combination and molecular simulation. *Chem Sci*. 2024;15(27):10366-10380. [DOI](https://doi.org/10.1039/d4sc00094c) PMID: 38994407
+22. Munson BP, Chen M, Bogosian A, et al. POLYGON: De novo generation of multi-target compounds using deep generative chemistry. *Nat Commun*. 2024;15:3636. [DOI](https://doi.org/10.1038/s41467-024-47120-y) PMID: 38710699
+
 ### Boltz-2 Benchmarks
 
-16. Leng J, et al. Covalent docking limits and affinity prediction with Boltz-2. *Phys Chem Chem Phys*. 2026. [DOI](https://doi.org/10.1039/d5cp04981d)
-17. Liu Y, et al. Comparative study AF3 vs Boltz-2 vs Vina for coronavirus Mpro. *J Chem Inf Model*. 2025;66(1):731-743. [DOI](https://doi.org/10.1021/acs.jcim.5c02481)
-18. Manap S, et al. Structure-guided GR inhibitor discovery using Boltz-2. *Int J Biol Macromol*. 2025;337(Pt 2):149471. [DOI](https://doi.org/10.1016/j.ijbiomac.2025.149471)
+23. Leng J, et al. Covalent docking limits and affinity prediction with Boltz-2. *Phys Chem Chem Phys*. 2026. [DOI](https://doi.org/10.1039/d5cp04981d)
+24. Liu Y, et al. Comparative study AF3 vs Boltz-2 vs Vina for coronavirus Mpro. *J Chem Inf Model*. 2025;66(1):731-743. [DOI](https://doi.org/10.1021/acs.jcim.5c02481)
+25. Manap S, et al. Structure-guided GR inhibitor discovery using Boltz-2. *Int J Biol Macromol*. 2025;337(Pt 2):149471. [DOI](https://doi.org/10.1016/j.ijbiomac.2025.149471)
 
 ### Docking and Scoring
 
-19. Su M, et al. Comparative assessment of scoring functions: the CASF-2016 update. *J Chem Inf Model*. 2019;59(2):895-913 (Vina Pearson r=0.604, Spearman rho=0.528)
-20. Xu Y, et al. Rentosertib in solid tumors. *Nature Medicine*. 2025;31(8):2602-2610. NCT05938920
+26. Su M, et al. Comparative assessment of scoring functions: the CASF-2016 update. *J Chem Inf Model*. 2019;59(2):895-913 (Vina Pearson r=0.604, Spearman rho=0.528)
+27. Xu Y, et al. Rentosertib in solid tumors. *Nature Medicine*. 2025;31(8):2602-2610. NCT05938920
 
 ### Clinical Validation (from ClinicalTrials.gov)
 
@@ -349,7 +382,7 @@ As confirmed by HuggingFace search: **"NO single work combines all three claims.
 | Configuration (`configs/`) | Complete | Schema validation | Pre-registered design |
 | Reporting (`report/templates/`) | Production | Via pipeline | LaTeX + plots |
 
-**Pre-registered configurations**: `pairs.yaml` (9 pairs, factorial design), `metrics.yaml` (thresholds T=0.0), `experiment.yaml` (1000 molecules, 5 seeds, 3 modes)
+**Pre-registered configurations**: `pairs.yaml` (9 pairs, factorial design), `metrics.yaml` (thresholds T=0.0), `experiment.yaml` (1000 molecules, 5 seeds, 6 modes)
 
 ---
 

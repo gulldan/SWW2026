@@ -60,11 +60,11 @@ def _make_fake_docking_vina():
             return self._scores.pop(0)
 
         @staticmethod
-        def parse_output(stdout, error_val):
+        def parse_output(stdout: str, error_val: float) -> float:
             return error_val
 
         @staticmethod
-        def docking(**kwargs):
+        def docking(**kwargs: float) -> float:
             return kwargs.get("error_val", 99.9)
 
     return FakeDockingVina
@@ -94,7 +94,7 @@ def _setup_env(monkeypatch, tmp_path, *, reward_mode="single_a"):
     monkeypatch.setenv("REWARD_METADATA_PATH", str(tmp_path / "reward_metadata.json"))
     monkeypatch.setenv("INVALID_Z_PENALTY", "4.0")
 
-    if reward_mode == "double":
+    if reward_mode in {"double", "linear_equal", "biased_a", "selective_a"}:
         dual_cfg_path = tmp_path / "dual_config.json"
         dual_cfg_path.write_text(
             json.dumps(
@@ -124,7 +124,7 @@ def _fresh_import(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def _patch_module(tmp_path, monkeypatch):
     """Import dual_reward_patch with MagicMock DockingVina (for unit tests)."""
     from unittest.mock import MagicMock
@@ -142,7 +142,7 @@ def _patch_module(tmp_path, monkeypatch):
     sys.modules.pop("dual_reward_patch", None)
 
 
-@pytest.fixture()
+@pytest.fixture
 def _integration_single_a(tmp_path, monkeypatch):
     """Import in single_a mode with FakeDockingVina for integration tests."""
     FakeVina = _make_fake_docking_vina()
@@ -157,7 +157,7 @@ def _integration_single_a(tmp_path, monkeypatch):
     sys.modules.pop("dual_reward_patch", None)
 
 
-@pytest.fixture()
+@pytest.fixture
 def _integration_double(tmp_path, monkeypatch):
     """Import in double mode with FakeDockingVina for integration tests."""
     FakeVina = _make_fake_docking_vina()
@@ -172,7 +172,7 @@ def _integration_double(tmp_path, monkeypatch):
     sys.modules.pop("dual_reward_patch", None)
 
 
-@pytest.fixture()
+@pytest.fixture
 def _integration_single_b(tmp_path, monkeypatch):
     """Import in single_b mode with FakeDockingVina for integration tests."""
     FakeVina = _make_fake_docking_vina()
@@ -729,3 +729,113 @@ class TestParseResultValidation:
         p = self.tmp_path / "no_result.pdbqt"
         p.write_text("ATOM      1  C1  UNL     1       0.000   0.000   0.000\n")
         assert self.mod._parse_result_from_pdbqt(p) is None
+
+
+# ---------------------------------------------------------------------------
+# Integration: _dual_call in new weight modes (linear_equal, biased_a, selective_a)
+# ---------------------------------------------------------------------------
+
+
+def _make_new_mode_fixture(mode_name):
+    """Factory: create a fixture for a new dual-target weight mode."""
+
+    @pytest.fixture
+    def _fixture(tmp_path, monkeypatch):
+        FakeVina = _make_fake_docking_vina()
+        _install_ffreed_mock(monkeypatch, FakeVina)
+        _setup_env(monkeypatch, tmp_path, reward_mode=mode_name)
+        mod = _fresh_import(monkeypatch)
+        instance = FakeVina()
+        yield mod, instance
+
+        if PATCH_DIR in sys.path:
+            sys.path.remove(PATCH_DIR)
+        sys.modules.pop("dual_reward_patch", None)
+
+    return _fixture
+
+
+_integration_linear_equal = _make_new_mode_fixture("linear_equal")
+_integration_biased_a = _make_new_mode_fixture("biased_a")
+_integration_selective_a = _make_new_mode_fixture("selective_a")
+
+
+class TestDualCallLinearEqual:
+    """Exercise _dual_call in linear_equal mode: z_a + z_b."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, _integration_linear_equal):
+        self.mod, self.vina = _integration_linear_equal
+
+    def test_reward_value(self):
+        # score_a=-6.5 → z_a=(−6.5−(−7.5))/1.0=1.0
+        # score_b=-5.0 → z_b=(−5.0−(−6.0))/0.5=2.0
+        # linear_equal: z_a + z_b = 3.0
+        self.vina._scores = [-6.5, -5.0]
+        reward = self.vina()
+        assert reward == pytest.approx(3.0)
+
+    def test_both_mean_returns_zero(self):
+        # z_a=0, z_b=0 → 0+0=0
+        self.vina._scores = [-7.5, -6.0]
+        reward = self.vina()
+        assert reward == pytest.approx(0.0)
+
+    def test_stats_tracked(self):
+        self.vina._scores = [-6.5, -5.0]
+        self.vina()
+        assert self.mod._call_stats["total"] == 1
+        assert self.mod._call_stats["invalid_a"] == 0
+        assert self.mod._call_stats["invalid_b"] == 0
+
+
+class TestDualCallBiasedA:
+    """Exercise _dual_call in biased_a mode: z_a + 0.3*z_b."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, _integration_biased_a):
+        self.mod, self.vina = _integration_biased_a
+
+    def test_reward_value(self):
+        # z_a=1.0, z_b=2.0 → 1.0 + 0.3*2.0 = 1.6
+        self.vina._scores = [-6.5, -5.0]
+        reward = self.vina()
+        assert reward == pytest.approx(1.6)
+
+    def test_both_mean_returns_zero(self):
+        self.vina._scores = [-7.5, -6.0]
+        reward = self.vina()
+        assert reward == pytest.approx(0.0)
+
+    def test_stats_tracked(self):
+        self.vina._scores = [-6.5, -5.0]
+        self.vina()
+        assert self.mod._call_stats["total"] == 1
+        assert self.mod._call_stats["invalid_a"] == 0
+        assert self.mod._call_stats["invalid_b"] == 0
+
+
+class TestDualCallSelectiveA:
+    """Exercise _dual_call in selective_a mode: z_a - z_b."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, _integration_selective_a):
+        self.mod, self.vina = _integration_selective_a
+
+    def test_reward_value(self):
+        # z_a=1.0, z_b=2.0 → 1.0 - 2.0 = -1.0
+        self.vina._scores = [-6.5, -5.0]
+        reward = self.vina()
+        assert reward == pytest.approx(-1.0)
+
+    def test_both_mean_returns_zero(self):
+        self.vina._scores = [-7.5, -6.0]
+        reward = self.vina()
+        assert reward == pytest.approx(0.0)
+
+    def test_stats_tracked(self):
+        self.vina._scores = [-6.5, -5.0]
+        self.vina()
+        assert self.mod._call_stats["total"] == 1
+        assert self.mod._call_stats["invalid_a"] == 0
+        assert self.mod._call_stats["invalid_b"] == 0

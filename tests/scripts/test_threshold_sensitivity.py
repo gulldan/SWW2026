@@ -7,9 +7,10 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-import scripts.s5_analyze.threshold_sensitivity as mod
 import yaml
 from click.testing import CliRunner
+
+import scripts.s5_analyze.threshold_sensitivity as mod
 from scripts.s5_analyze.threshold_sensitivity import main
 
 

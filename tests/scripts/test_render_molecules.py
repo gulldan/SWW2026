@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 from click.testing import CliRunner
+
 from scripts.s6_report.render_molecules import _is_hit, _load_target_names, _load_thresholds, _render_grid, main
 
 

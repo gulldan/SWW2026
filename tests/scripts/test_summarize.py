@@ -5,6 +5,7 @@ import json
 import pandas as pd
 import yaml
 from click.testing import CliRunner
+
 from scripts.s5_analyze.summarize import _build_report, _score_distribution_block, _top_molecules_block, main
 
 

@@ -400,15 +400,16 @@ def _apply_dual_patch() -> None:
 
     # Load mean_b/std_b as closure variables for both single_b and double
     mean_b = std_b = 0.0  # sentinels; only used when mode needs B
-    if reward_mode in {"single_b", "double"}:
+    if reward_mode in {"single_b", "double", "linear_equal", "biased_a", "selective_a"}:
         if target_id_b not in targets:
             raise KeyError(f"Target B '{target_id_b}' не найден в normalization.yaml")
         mean_b = float(targets[target_id_b]["mean"])
         std_b = float(targets[target_id_b]["std"])
 
-    # dual_cfg only needed for double mode (config swap to score B)
+    # dual_cfg needed for modes that score both targets (config swap to score B)
+    _dual_modes = {"double", "linear_equal", "biased_a", "selective_a"}
     dual_cfg = None
-    if reward_mode == "double":
+    if reward_mode in _dual_modes:
         if not dual_receptor_b:
             raise RuntimeError("DUAL_RECEPTOR_B обязателен для double режима")
         config_path = Path(os.environ.get("DUAL_CONFIG", "/workspace/dual_config.json"))
@@ -604,6 +605,13 @@ def _apply_dual_patch() -> None:
         else:
             _warn_large_z("b", z_b)
 
+        if reward_mode == "linear_equal":
+            return z_a + z_b
+        if reward_mode == "biased_a":
+            return z_a + 0.3 * z_b
+        if reward_mode == "selective_a":
+            return z_a - z_b
+
         return max(z_a, z_b)
 
     DockingVina.__call__ = _dual_call
@@ -638,8 +646,8 @@ def _apply_dual_patch() -> None:
                     config["box_center"],
                     config["box_size"],
                 )
-                # Pre-compute for secondary receptor (double mode)
-                if reward_mode == "double" and dual_cfg:
+                # Pre-compute for secondary receptor (dual modes)
+                if reward_mode in _dual_modes and dual_cfg:
                     _precompute_gpu_batch_for_receptor(
                         unseen,
                         config,

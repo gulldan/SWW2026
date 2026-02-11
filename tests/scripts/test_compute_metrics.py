@@ -14,6 +14,16 @@ import scripts.s5_analyze.compute_metrics as mod
 from scripts.s5_analyze.compute_metrics import main
 
 
+@pytest.fixture(autouse=True)
+def _mock_expensive_analyses():
+    """Stub out sensitivity analyses that are too slow for unit tests."""
+    with (
+        patch.object(mod, "_compute_sensitivity_analyses", return_value={}),
+        patch.object(mod, "_compute_gnina_cross_validation", return_value={}),
+    ):
+        yield
+
+
 def _pairs_cfg():
     return {
         "pairs": {
@@ -121,6 +131,8 @@ class TestDefaultFullSetup:
             patch.object(mod, "PROJECT_ROOT", tmp_path),
             patch.object(fairness_mod, "validate_fairness", return_value={"budget_consistent": True, "issues": []}),
             patch.object(fairness_mod, "validate_reward_quality", return_value={"run_valid": True, "issues": []}),
+            patch.object(mod, "_compute_sensitivity_analyses", return_value={}),
+            patch.object(mod, "_compute_gnina_cross_validation", return_value={}),
         ):
             result = _invoke()
 
@@ -566,10 +578,10 @@ def test_all_nan_affinities(tmp_path, monkeypatch):
     result = _invoke()
     assert result.exit_code == 0, result.output
 
-    metrics = json.loads((tmp_path / "report" / "metrics.json").read_text())
+    _metrics = json.loads((tmp_path / "report" / "metrics.json").read_text())
     # All affinities NaN -> valid filter removes all rows -> no hr values -> mode skipped
     # OR NaN affinities produce 0 valid rows -> continue
-    # Either way it should not crash.
+    # Either way it should not crash. Metrics loaded just to verify file exists and is valid JSON.
 
 
 def test_degradation_boundary_exactly_minus_047():
