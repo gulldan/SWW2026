@@ -51,4 +51,5 @@ docker/freedpp/dualdocking-freedpp.tar.zst
 *.key
 output/data/
 docker/boltz2/boltz2_1.5.0.tar
+docker/boltz2/cache/
 output/cache/boltz_nim

@@ -9,11 +9,12 @@ log file under ``report/``.
 from __future__ import annotations
 
 import os
-import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
 import click
+
+from dualdocking.command_runner import run_project_command
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -67,12 +68,11 @@ def _run_cmd(cmd: list[str], log_path: Path) -> None:
         RuntimeError: If the subprocess exits with a non-zero return code.
     """
     _log_to_file(log_path, f"[{_ts()}] RUN: {' '.join(cmd)}")
-    result = subprocess.run(  # noqa: S603
+    result = run_project_command(
         cmd,
-        cwd=str(PROJECT_ROOT),
+        project_root=PROJECT_ROOT,
         capture_output=True,
-        text=True,
-        check=False,
+        allow_inprocess=True,
     )
     if result.returncode != 0:
         combined = (result.stdout or "") + (result.stderr or "")

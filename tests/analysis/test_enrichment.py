@@ -18,6 +18,7 @@ from dualdocking.analysis.enrichment import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _perfect_separation(n_pos: int = 50, n_neg: int = 200) -> tuple[np.ndarray, np.ndarray]:
     """Actives get scores (-10..-8), decoys get (-4..-2). Perfect separation."""
     rng = np.random.RandomState(42)
@@ -228,9 +229,15 @@ class TestEnrichmentResult:
 
     def test_creation(self) -> None:
         r = EnrichmentResult(
-            target_id="CDK2", n_actives=100, n_decoys=1000,
-            auroc=0.85, bedroc_alpha20=0.55, ef_1pct=15.0, ef_5pct=8.0,
-            passed=True, status="pass",
+            target_id="CDK2",
+            n_actives=100,
+            n_decoys=1000,
+            auroc=0.85,
+            bedroc_alpha20=0.55,
+            ef_1pct=15.0,
+            ef_5pct=8.0,
+            passed=True,
+            status="pass",
         )
         assert r.target_id == "CDK2"
         assert r.passed is True
@@ -238,26 +245,45 @@ class TestEnrichmentResult:
 
     def test_error_result(self) -> None:
         r = EnrichmentResult(
-            target_id="CDK5", n_actives=0, n_decoys=0,
-            auroc=0.0, bedroc_alpha20=0.0, ef_1pct=0.0, ef_5pct=0.0,
-            passed=False, status="error", error="Docking failed",
+            target_id="CDK5",
+            n_actives=0,
+            n_decoys=0,
+            auroc=0.0,
+            bedroc_alpha20=0.0,
+            ef_1pct=0.0,
+            ef_5pct=0.0,
+            passed=False,
+            status="error",
+            error="Docking failed",
         )
         assert r.status == "error"
         assert r.error == "Docking failed"
 
     def test_skipped_blocked(self) -> None:
         r = EnrichmentResult(
-            target_id="COX1", n_actives=0, n_decoys=0,
-            auroc=0.0, bedroc_alpha20=0.0, ef_1pct=0.0, ef_5pct=0.0,
-            passed=False, status="skipped:blocked",
+            target_id="COX1",
+            n_actives=0,
+            n_decoys=0,
+            auroc=0.0,
+            bedroc_alpha20=0.0,
+            ef_1pct=0.0,
+            ef_5pct=0.0,
+            passed=False,
+            status="skipped:blocked",
         )
         assert r.status == "skipped:blocked"
 
     def test_frozen(self) -> None:
         r = EnrichmentResult(
-            target_id="CDK2", n_actives=100, n_decoys=1000,
-            auroc=0.85, bedroc_alpha20=0.55, ef_1pct=15.0, ef_5pct=8.0,
-            passed=True, status="pass",
+            target_id="CDK2",
+            n_actives=100,
+            n_decoys=1000,
+            auroc=0.85,
+            bedroc_alpha20=0.55,
+            ef_1pct=15.0,
+            ef_5pct=8.0,
+            passed=True,
+            status="pass",
         )
         with pytest.raises(AttributeError):
             r.auroc = 0.9  # type: ignore[misc]

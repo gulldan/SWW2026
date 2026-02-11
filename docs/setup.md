@@ -24,6 +24,8 @@ uv run ruff check dualdocking/ scripts/ docker/
 ```
 
 Boltz-2 is installed from source via `pyproject.toml` (`boltz[cuda]` git dependency).
+It is the default built-in scorer engine, but scoring can be replaced via
+`configs/experiment.yaml` (`scorer.engine`).
 
 ## Docker (FREED++ Generator)
 
@@ -39,6 +41,9 @@ docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 ```
 
 Rebuild the image after any changes in `docker/freedpp/`.
+
+The default built-in generator backend is `freedpp`, configurable via
+`configs/experiment.yaml` (`generator.backend`).
 
 ## Calibration
 

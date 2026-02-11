@@ -104,10 +104,53 @@ Stages and dependencies:
 | `fetch` | Internet | PDB, FASTA, SMILES, Docker image |
 | `calibrate` | fetch outputs | `normalization.yaml`, calibration scores |
 | `generate` | calibrate outputs | `generated.parquet` per run |
-| `score` | generated molecules | `scored_joined.parquet` per run |
+| `score` | generated molecules | `scored_joined.parquet` per run (configured scorer engine; default `boltz2`) |
 | `analyze` | scored results | `all_results.parquet`, `metrics.json`, `stats.json` |
 | `report` | analysis outputs | Figures, LaTeX report |
 | `audit` | analysis outputs | `claim_audit.json` |
+
+### Backend Selection
+
+Pipeline backend choice is controlled by `configs/experiment.yaml`:
+
+```yaml
+generator:
+  backend: freedpp  # default; or package.module[:callable]
+
+scorer:
+  engine: boltz2    # default; or package.module[:factory_or_object]
+  backend: nim      # only for built-in boltz2: cli | nim
+```
+
+Legacy keys `generator.name` and `scorer.name` are still supported for backward compatibility.
+
+### Execution Model
+
+Pipeline orchestrators (`run_full_experiment.py`, `run_post_pipeline.py`,
+`run_stages.py`, `prepare_all.py`, `fetch_all.py`) execute internal project
+scripts through `dualdocking.command_runner.run_project_command`, which
+dispatches known `scripts/*.py` entry points in-process via
+`dualdocking.script_dispatch`.
+
+`subprocess` is still used at external boundaries only:
+- Docker CLI (`docker build`, `docker run`, `docker image inspect`)
+- Boltz CLI (`boltz predict`) when scorer backend is `cli`
+- UniDock/other external docking binaries
+- LaTeX toolchain (`pdflatex`, `bibtex`)
+- System probes (`nvidia-smi`, `git`)
+
+## Programmatic Run (Python API)
+
+For notebook/service integration you can run the same workflows directly
+from Python, without shell CLI wrappers:
+
+```python
+from dualdocking.api import run_full_experiment, run_post_pipeline, run_stages
+
+run_full_experiment(dry_run=True, pairs=["CDK2_ERK2"], seeds=[42], with_post=False)
+run_stages(stages="analyze,report", dry_run=True, skip_preflight=True)
+run_post_pipeline(dry_run=True, latex_mode="off")
+```
 
 ## Pilot Run (SCI-09)
 

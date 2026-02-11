@@ -1,4 +1,4 @@
-"""Score generated molecules against both targets of a pair using Boltz-2.
+"""Score generated molecules against both targets of a pair.
 
 Reads molecules from ``results/<pair>/<mode>/seed_<seed>/generated.parquet``
 (with CSV fallback), scores against both targets, and writes
@@ -6,8 +6,7 @@ Reads molecules from ``results/<pair>/<mode>/seed_<seed>/generated.parquet``
 (plus CSV copies for compatibility).
 
 Supports checkpointing: if ``scores_A.parquet`` (or ``.csv``) already exists,
-target A scoring is skipped.  The Boltz-2 disk cache
-(``cache/{target_id}.json``) is saved incrementally on interruption.
+target A scoring is skipped.
 """
 
 from __future__ import annotations
@@ -15,6 +14,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 import numpy as np
@@ -23,6 +23,9 @@ from loguru import logger
 from tqdm import tqdm
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+if TYPE_CHECKING:
+    from dualdocking.scoring.backends import ScoringBackend
 
 
 def _detect_gpu_count() -> int:
@@ -47,10 +50,12 @@ def _score_one_target(
     scores_path: Path,
     force: bool,
     label: str,
+    scoring_backend: ScoringBackend,
     *,
+    use_cache: bool = True,
     device: str | None = None,
 ) -> tuple[str, np.ndarray]:
-    """Score a list of molecules against a single target via Boltz-2.
+    """Score a list of molecules against a single target via configured scorer.
 
     If ``scores_path`` already exists and *force* is ``False``, loads cached
     scores from disk instead of re-computing.
@@ -61,13 +66,14 @@ def _score_one_target(
         scores_path: Path to write/read the per-target score Parquet (with CSV fallback).
         force: If ``True``, re-score even when checkpoint exists.
         label: Short label for logging (``"A"`` or ``"B"``).
+        scoring_backend: Resolved scoring backend implementation.
+        use_cache: Whether backend-level cache should be used.
         device: CUDA device identifier for parallel scoring.
 
     Returns:
         Tuple of ``(label, scores_array)``.
     """
     from dualdocking.data.io_utils import stem_exists
-    from dualdocking.scoring.boltz2 import score_batch
 
     if not force and stem_exists(scores_path.with_suffix("")):
         logger.info("Чекпоинт: скоры мишени {} уже существуют ({}), пропускаем", target_id, scores_path)
@@ -77,7 +83,7 @@ def _score_one_target(
         return label, saved["score"].to_numpy()
 
     logger.info("Скоринг {} молекул по мишени {} (device={})", len(smiles_list), target_id, device)
-    scores = score_batch(target_id, smiles_list, device=device)
+    scores = np.asarray(scoring_backend.score_batch(target_id, smiles_list, use_cache=use_cache, device=device), dtype=float)
 
     from dualdocking.data.io_utils import write_df
 
@@ -120,7 +126,7 @@ def main(
 ) -> None:
     """Score molecules against both targets and compute combined objectives.
 
-    Loads generated SMILES, runs Boltz-2 affinity prediction for each target,
+    Loads generated SMILES, runs configured scorer for each target,
     computes hit flags and combined objective scores, then writes
     ``scored_joined.parquet`` (plus CSV copy) and ``scoring_context.json``.
 
@@ -131,16 +137,22 @@ def main(
         config: Path to pairs.yaml.
         experiment_config: Path to experiment.yaml.
         force: Re-score even if checkpoint CSVs exist.
-        prune_cache: Remove stale Boltz-2 cache files before scoring.
+        prune_cache: Remove stale scorer cache files before scoring.
         parallel_scoring: Parallel scoring mode (``auto``/``on``/``off``).
         molecules: Optional path to molecule file overriding generated output.
     """
     from dualdocking.config import load_experiment, load_pairs
-    from dualdocking.scoring.boltz2 import get_scoring_context_info, prune_stale_cache
+    from dualdocking.scoring.backends import resolve_scoring_backend
     from dualdocking.scoring.objectives import compute_combined, parse_objectives_config
 
+    exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
+    scorer_cfg = exp_cfg.get("scorer", {})
+    scorer_engine, scoring_backend = resolve_scoring_backend(scorer_cfg)
+    logger.info("Scoring engine: {}", scorer_engine)
+
+    use_cache = bool(scorer_cfg.get("cache_enabled", True))
     if prune_cache:
-        n = prune_stale_cache()
+        n = scoring_backend.prune_stale_cache()
         logger.info("Pruned {} stale cache file(s)", n)
 
     pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
@@ -180,9 +192,8 @@ def main(
 
     # Determine whether to use parallel scoring
     n_gpus = _detect_gpu_count()
-    use_parallel = parallel_scoring == "on" or (
-        parallel_scoring == "auto" and n_gpus >= 2 and os.getenv("BOLTZ_CUDA_DEVICE") is None
-    )
+    pinned_device = os.getenv("SCORER_CUDA_DEVICE") or os.getenv("BOLTZ_CUDA_DEVICE")
+    use_parallel = parallel_scoring == "on" or (parallel_scoring == "auto" and n_gpus >= 2 and pinned_device is None)
 
     if use_parallel:
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -199,6 +210,8 @@ def main(
                     scores_path,
                     force,
                     label,
+                    scoring_backend,
+                    use_cache=use_cache,
                     device=gpu_id,
                 )
                 futures[f] = label
@@ -217,6 +230,8 @@ def main(
                 scores_path,
                 force,
                 label,
+                scoring_backend,
+                use_cache=use_cache,
             )
             all_scores[label] = scores
 
@@ -224,7 +239,6 @@ def main(
     scores_b = all_scores["B"]
 
     # Parse objectives from experiment config
-    exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
     objectives = parse_objectives_config(exp_cfg)
 
     # Сохранить объединённую таблицу (schema contract: smiles_canonical, affinity_a, affinity_b, is_hit_both)
@@ -268,7 +282,8 @@ def main(
     import json as _json
     from datetime import UTC, datetime
 
-    scoring_meta = get_scoring_context_info()
+    scoring_meta = scoring_backend.get_scoring_context_info()
+    scoring_meta["scorer_engine"] = scorer_engine
     scoring_meta["timestamp"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     (result_dir / "scoring_context.json").write_text(_json.dumps(scoring_meta, indent=2))
     logger.info("Scoring context -> {}", result_dir / "scoring_context.json")

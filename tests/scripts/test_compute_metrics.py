@@ -15,7 +15,11 @@ from scripts.s5_analyze.compute_metrics import main
 
 
 def _pairs_cfg():
-    return {"pairs": {"pair1": {"target_a": {"id": "A", "organism": "Homo sapiens"}, "target_b": {"id": "B", "organism": "Homo sapiens"}}}}
+    return {
+        "pairs": {
+            "pair1": {"target_a": {"id": "A", "organism": "Homo sapiens"}, "target_b": {"id": "B", "organism": "Homo sapiens"}}
+        }
+    }
 
 
 def _experiment_cfg():
@@ -84,10 +88,14 @@ def _setup_full(tmp_path, seeds=None, missing_seeds=None):
 def _invoke(extra_args=None):
     runner = CliRunner()
     args = [
-        "--results-root", "output/results",
-        "--pairs-config", "configs/pairs.yaml",
-        "--experiment-config", "configs/experiment.yaml",
-        "--metrics-config", "configs/metrics.yaml",
+        "--results-root",
+        "output/results",
+        "--pairs-config",
+        "configs/pairs.yaml",
+        "--experiment-config",
+        "configs/experiment.yaml",
+        "--metrics-config",
+        "configs/metrics.yaml",
     ]
     if extra_args:
         args.extend(extra_args)
@@ -373,12 +381,16 @@ def test_fdr_scope_primary_only(tmp_path, monkeypatch):
     (tmp_path / "configs").mkdir()
     (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(pairs_cfg))
     (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(_experiment_cfg()))
-    (tmp_path / "configs" / "metrics.yaml").write_text(yaml.dump({
-        "thresholds": {
-            "core_pair": {"target_a": 0.0, "target_b": 0.0},
-            "aux_pair": {"target_a": 0.0, "target_b": 0.0},
-        }
-    }))
+    (tmp_path / "configs" / "metrics.yaml").write_text(
+        yaml.dump(
+            {
+                "thresholds": {
+                    "core_pair": {"target_a": 0.0, "target_b": 0.0},
+                    "aux_pair": {"target_a": 0.0, "target_b": 0.0},
+                }
+            }
+        )
+    )
 
     rng = np.random.default_rng(42)
     for pair_id in ("core_pair", "aux_pair"):
@@ -443,12 +455,16 @@ def test_blocked_pairs_excluded(tmp_path, monkeypatch):
     (tmp_path / "configs" / "experiment.yaml").write_text(
         yaml.dump({"modes": ["single_a", "single_b", "double"], "seeds": [1, 2, 3, 4, 5]})
     )
-    (tmp_path / "configs" / "metrics.yaml").write_text(yaml.dump({
-        "thresholds": {
-            "active_pair": {"target_a": 0.0, "target_b": 0.0},
-            "blocked_pair": {"target_a": 0.0, "target_b": 0.0},
-        }
-    }))
+    (tmp_path / "configs" / "metrics.yaml").write_text(
+        yaml.dump(
+            {
+                "thresholds": {
+                    "active_pair": {"target_a": 0.0, "target_b": 0.0},
+                    "blocked_pair": {"target_a": 0.0, "target_b": 0.0},
+                }
+            }
+        )
+    )
 
     rng = np.random.default_rng(42)
     # Only create runs for active_pair (blocked has no results)
@@ -520,21 +536,21 @@ def test_all_nan_affinities(tmp_path, monkeypatch):
 
     (tmp_path / "configs").mkdir(exist_ok=True)
     (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(_pairs_cfg()))
-    (tmp_path / "configs" / "experiment.yaml").write_text(
-        yaml.dump({"modes": ["single_a", "single_b", "double"], "seeds": [1]})
-    )
+    (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump({"modes": ["single_a", "single_b", "double"], "seeds": [1]}))
     (tmp_path / "configs" / "metrics.yaml").write_text(yaml.dump(_metrics_cfg()))
 
     # Write scored CSVs with all-NaN affinities
     for mode in ("single_a", "single_b", "double"):
         run_dir = tmp_path / "output" / "results" / "pair1" / mode / "seed_1"
         run_dir.mkdir(parents=True, exist_ok=True)
-        df = pd.DataFrame({
-            "smiles_canonical": ["C0", "C1", "C2"],
-            "affinity_a": [float("nan")] * 3,
-            "affinity_b": [float("nan")] * 3,
-            "is_hit_both": [False] * 3,
-        })
+        df = pd.DataFrame(
+            {
+                "smiles_canonical": ["C0", "C1", "C2"],
+                "affinity_a": [float("nan")] * 3,
+                "affinity_b": [float("nan")] * 3,
+                "is_hit_both": [False] * 3,
+            }
+        )
         df.to_csv(run_dir / "scored_joined.csv", index=False)
         df.to_parquet(run_dir / "scored_joined.parquet", index=False)
 

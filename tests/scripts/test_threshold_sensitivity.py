@@ -36,9 +36,7 @@ def _metrics_cfg():
     }
 
 
-def _write_run(
-    run_dir: Path, rng: np.random.Generator, *, mean: float = -1.0
-) -> None:
+def _write_run(run_dir: Path, rng: np.random.Generator, *, mean: float = -1.0) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "generated.csv").write_text("smiles\nCCO\n")
     df = pd.DataFrame(
@@ -70,10 +68,14 @@ def _setup(tmp_path, *, double_mean=-1.5, single_mean=-0.5):
 def _invoke(extra_args=None):
     runner = CliRunner()
     args = [
-        "--results-root", "output/results",
-        "--pairs-config", "configs/pairs.yaml",
-        "--experiment-config", "configs/experiment.yaml",
-        "--metrics-config", "configs/metrics.yaml",
+        "--results-root",
+        "output/results",
+        "--pairs-config",
+        "configs/pairs.yaml",
+        "--experiment-config",
+        "configs/experiment.yaml",
+        "--metrics-config",
+        "configs/metrics.yaml",
     ]
     if extra_args:
         args.extend(extra_args)
@@ -127,9 +129,7 @@ class TestDefaultSetup:
         """All 3 pre-registered thresholds appear in output."""
         assert self.result.exit_code == 0, self.result.output
 
-        data = json.loads(
-            (self.tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text()
-        )
+        data = json.loads((self.tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text())
         assert set(data["thresholds_tested"]) == {-1.0, 0.0, 1.0}
         for thr in [-1.0, 0.0, 1.0]:
             assert str(thr) in data["results"]
@@ -138,9 +138,7 @@ class TestDefaultSetup:
         """JSON output includes robustness_summary with pass/fail per threshold."""
         assert self.result.exit_code == 0, self.result.output
 
-        data = json.loads(
-            (self.tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text()
-        )
+        data = json.loads((self.tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text())
         assert "robustness_summary" in data
         for thr_key in ["-1.0", "0.0", "1.0"]:
             s = data["robustness_summary"][thr_key]
@@ -157,9 +155,7 @@ class TestDefaultSetup:
 
     def test_statistical_tests_in_json(self):
         """H1a and H1b tests are present per pair per threshold."""
-        data = json.loads(
-            (self.tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text()
-        )
+        data = json.loads((self.tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text())
         for thr_key in ["-1.0", "0.0", "1.0"]:
             pair_data = data["results"][thr_key]["pair1"]
             assert "H1a" in pair_data["stats"]
@@ -185,19 +181,19 @@ def test_hit_rate_varies_with_threshold(tmp_path, monkeypatch):
     import dualdocking.analysis.fairness as fairness_mod
 
     monkeypatch.setattr(
-        fairness_mod, "validate_fairness",
+        fairness_mod,
+        "validate_fairness",
         lambda _: {"budget_consistent": True, "issues": []},
     )
     monkeypatch.setattr(
-        fairness_mod, "validate_reward_quality",
+        fairness_mod,
+        "validate_reward_quality",
         lambda *_a, **_kw: {"run_valid": True, "issues": []},
     )
 
     _invoke()
 
-    data = json.loads(
-        (tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text()
-    )
+    data = json.loads((tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text())
     hr_strict = data["results"]["-1.0"]["pair1"]["metrics"]["double"]["hr_both_mean"]
     hr_lenient = data["results"]["1.0"]["pair1"]["metrics"]["double"]["hr_both_mean"]
     assert hr_strict <= hr_lenient
@@ -215,7 +211,5 @@ def test_empty_results(tmp_path, monkeypatch):
     result = _invoke()
     assert result.exit_code == 0
 
-    data = json.loads(
-        (tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text()
-    )
+    data = json.loads((tmp_path / "report" / "data" / "threshold_sensitivity.json").read_text())
     assert data["thresholds_tested"] == [-1.0, 0.0, 1.0]

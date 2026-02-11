@@ -8,7 +8,11 @@ from scripts.s5_analyze.aggregate import main
 
 
 def _pairs_cfg():
-    return {"pairs": {"pair1": {"target_a": {"id": "A", "organism": "Homo sapiens"}, "target_b": {"id": "B", "organism": "Homo sapiens"}}}}
+    return {
+        "pairs": {
+            "pair1": {"target_a": {"id": "A", "organism": "Homo sapiens"}, "target_b": {"id": "B", "organism": "Homo sapiens"}}
+        }
+    }
 
 
 def _experiment_cfg():
@@ -16,12 +20,14 @@ def _experiment_cfg():
 
 
 def _make_scored_csv(path, n=3):
-    df = pd.DataFrame({
-        "smiles": ["CCO", "c1ccccc1", "CC(=O)O"][:n],
-        "score_a": [-8.0 + i for i in range(n)],
-        "score_b": [-7.0 + i for i in range(n)],
-        "combined_min": [-7.5 + i for i in range(n)],
-    })
+    df = pd.DataFrame(
+        {
+            "smiles": ["CCO", "c1ccccc1", "CC(=O)O"][:n],
+            "score_a": [-8.0 + i for i in range(n)],
+            "score_b": [-7.0 + i for i in range(n)],
+            "combined_min": [-7.5 + i for i in range(n)],
+        }
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
     df.to_parquet(path.with_suffix(".parquet"), index=False)
@@ -64,7 +70,17 @@ def test_main_aggregates(tmp_path, monkeypatch):
         _write_reward_metadata(run_dir)
 
     runner = CliRunner()
-    result = runner.invoke(main, ["--config", "configs/pairs.yaml", "--experiment-config", "configs/experiment.yaml", "--output", "report/data/all_results.parquet"])
+    result = runner.invoke(
+        main,
+        [
+            "--config",
+            "configs/pairs.yaml",
+            "--experiment-config",
+            "configs/experiment.yaml",
+            "--output",
+            "report/data/all_results.parquet",
+        ],
+    )
     assert result.exit_code == 0, result.output
 
     out = tmp_path / "report" / "data" / "all_results.parquet"

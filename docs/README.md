@@ -2,7 +2,7 @@
 
 Navigation hub for the DualDocking project documentation.
 
-Updated: 2026-02-10
+Updated: 2026-02-11
 
 ---
 
@@ -26,7 +26,7 @@ Updated: 2026-02-10
 
 1. [`setup.md`](setup.md) -- Environment, Docker image, calibration
 2. [`pipeline.md`](pipeline.md) -- Stage 0 fetch through analysis
-3. [`architecture.md`](architecture.md) -- Troubleshooting, Boltz-2 backends, score conventions
+3. [`architecture.md`](architecture.md) -- Troubleshooting, backend architecture, score conventions
 4. [`receptor_qc.md`](receptor_qc.md) -- Per-target structural quality checks
 5. [`nim_benchmark.md`](nim_benchmark.md) -- CLI vs NIM performance comparison
 
@@ -46,9 +46,9 @@ Updated: 2026-02-10
 | 2 | [`preregistration.md`](preregistration.md) | Frozen (v1.1) | Pre-registered hypotheses, study design, decision rules. Amendments tracked in Section 11. |
 | 3 | [`statistical_analysis_plan.md`](statistical_analysis_plan.md) | Frozen (v1.1) | Inference procedures: bootstrap, effect sizes, claim thresholds, code mapping. |
 | 4 | [`selection_criteria.md`](selection_criteria.md) | Reference | Pair selection rationale: factor design (Disease/Structure/Cofactor), core vs auxiliary split, Boltz-2 compatibility. |
-| 5 | [`setup.md`](setup.md) | Canonical | Installation: Python/uv, Docker/FREED++, Boltz-2, calibration, baseline. |
+| 5 | [`setup.md`](setup.md) | Canonical | Installation: Python/uv, Docker/FREED++, scorer setup, calibration, baseline. |
 | 6 | [`pipeline.md`](pipeline.md) | Canonical | Full pipeline: fetch (Stage 0) through run, scoring, and analysis. |
-| 7 | [`architecture.md`](architecture.md) | Reference | Technical internals: score conventions, Boltz-2 CLI/NIM backends, FREED++ Docker, caching, troubleshooting. |
+| 7 | [`architecture.md`](architecture.md) | Reference | Technical internals: pluggable generator/scorer backends, Boltz-2 CLI/NIM, FREED++ Docker, caching, troubleshooting. |
 | 8 | [`receptor_qc.md`](receptor_qc.md) | Reference | Per-target structural QC: resolution, chain, ligand, mutations, coverage. |
 | 9 | [`nim_benchmark.md`](nim_benchmark.md) | Reference | Boltz-2 CLI vs NIM backend: latency, score agreement, TensorRT notes. |
 | 10 | [`tasks.md`](tasks.md) | Living log | Task journal, execution plan, daily progress. |
@@ -127,6 +127,7 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 
 | Topic | Location |
 |-------|----------|
+| Generator/scorer backend selection | `configs/experiment.yaml` (`generator.backend`, `scorer.engine`) |
 | Binding box coordinates, grid sizes | `architecture.md` (Binding Box section) + `configs/pairs.yaml` |
 | Affinity thresholds (T_A, T_B) | `configs/metrics.yaml` (fixed at 0.0 = 1 uM) |
 | Boltz-2 cache format, context hashing | `architecture.md` (Caching section) |

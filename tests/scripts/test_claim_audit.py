@@ -93,8 +93,9 @@ def _make_sensitivity(*, all_pass: bool = True) -> dict:
     }
 
 
-def _setup(tmp_path, monkeypatch, *, n_significant=5, sensitivity_pass=True,
-           flip_reported=None, degradation=None, missing_rate=0.0):
+def _setup(
+    tmp_path, monkeypatch, *, n_significant=5, sensitivity_pass=True, flip_reported=None, degradation=None, missing_rate=0.0
+):
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     # Write pairs.yaml so _load_core_pairs can read it
     configs = tmp_path / "configs"
@@ -102,15 +103,19 @@ def _setup(tmp_path, monkeypatch, *, n_significant=5, sensitivity_pass=True,
     (configs / "pairs.yaml").write_text(yaml.dump(_make_pairs_yaml()))
     report = tmp_path / "report"
     report.mkdir(parents=True, exist_ok=True)
-    (report / "stats.json").write_text(json.dumps(_make_stats(
-        n_significant=n_significant, flip_reported=flip_reported,
-        degradation=degradation, missing_rate=missing_rate,
-    )))
+    (report / "stats.json").write_text(
+        json.dumps(
+            _make_stats(
+                n_significant=n_significant,
+                flip_reported=flip_reported,
+                degradation=degradation,
+                missing_rate=missing_rate,
+            )
+        )
+    )
     (report / "metrics.json").write_text(json.dumps(_make_metrics()))
     (report / "data").mkdir(parents=True, exist_ok=True)
-    (report / "data" / "threshold_sensitivity.json").write_text(
-        json.dumps(_make_sensitivity(all_pass=sensitivity_pass))
-    )
+    (report / "data" / "threshold_sensitivity.json").write_text(json.dumps(_make_sensitivity(all_pass=sensitivity_pass)))
 
 
 def test_full_success(tmp_path, monkeypatch):
@@ -440,6 +445,7 @@ def test_core_pair_with_set_blocked_excluded(tmp_path, monkeypatch):
     (configs / "pairs.yaml").write_text(yaml.dump({"pairs": pairs}))
 
     from scripts.s7_audit.claim_audit import _load_core_pairs
+
     core = _load_core_pairs(configs / "pairs.yaml")
     assert "CDK2_ERK2" not in core
     assert len(core) == 4

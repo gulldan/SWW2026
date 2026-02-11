@@ -20,9 +20,32 @@ Convert: `pIC50 = 6 - log10(IC50_uM)`.
 
 Full notation: see `docs/goal.md` (Section "Nотация").
 
-## Boltz-2 Scorer
+## Scoring Backends
 
-Boltz-2 has no Python API. Interaction is via CLI (`boltz predict`) as subprocess.
+`scripts/s4_score/score.py` resolves scorer implementation via
+`dualdocking.scoring.backends.resolve_scoring_backend`.
+
+- Built-in engine: `boltz2`
+- External engines: `scorer.engine: "package.module"` or `scorer.engine: "package.module:factory_or_object"`
+
+For built-in `boltz2`, `scorer.backend` selects transport (`cli` or `nim`).
+
+### Built-in Boltz-2 Engine
+
+Boltz-2 has no stable Python API. Built-in integration uses CLI (`boltz predict`)
+or NIM REST backend.
+
+Example config:
+
+```yaml
+scorer:
+  engine: boltz2
+  backend: nim  # cli | nim
+  nim:
+    urls:
+      - http://localhost:8000
+      - http://localhost:8001
+```
 
 ### Input YAML
 
@@ -78,7 +101,15 @@ Disk cache segmented by target: `output/cache/boltz_scores/{target}.{ctx[:8]}.js
 - I/O: `fcntl.flock` + atomic write (temp file + `os.replace`)
 - Safe for concurrent single-machine access, NOT for NFS
 
-## FREED++ Generator
+## Generation Backends
+
+`scripts/s3_generate/generate.py` resolves generator implementation via
+`dualdocking.generation.backends.resolve_generation_backend`.
+
+- Built-in backend: `freedpp`
+- External backends: `generator.backend: "package.module"` or `generator.backend: "package.module:callable"`
+
+### Built-in FREED++ Backend
 
 FREED++ (Telepov et al., TMLR 2023) is an RL molecule generator (SAC + fragment assembly).
 Runs in Docker due to dependency conflicts (Python 3.10, PyTorch 1.12, DGL 0.9).
@@ -87,7 +118,8 @@ Runs in Docker due to dependency conflicts (Python 3.10, PyTorch 1.12, DGL 0.9).
 
 ```
 scripts/s3_generate/generate.py
-  -> generation.freedpp.generate(config)
+  -> generation.backends.resolve_generation_backend(...)
+  -> builtin generation.freedpp.generate(config)  # default
       1. _ensure_docker_image()       # build if absent
       2. _prepare_receptor()          # PDB -> PDBQT + binding box
       3. _run_freedpp()               # docker run --gpus all ... python main.py
@@ -122,6 +154,19 @@ Bypass: `DUALDOCKING_ALLOW_NON_HUMAN=true`.
 Each `run_full_experiment.py` invocation creates
 `report/run_manifest_{run_id}.json` tracking parameters,
 task status, timestamps, and config hashes.
+
+## Process Boundaries
+
+Internal pipeline entry points under `scripts/` are invoked in-process through
+`dualdocking.command_runner` + `dualdocking.script_dispatch` when possible.
+This avoids spawning extra Python interpreters between stages.
+
+`subprocess` is retained only where an external executable is required:
+- Docker (`docker`)
+- Boltz CLI (`boltz`) for built-in CLI scoring backend
+- UniDock and related calibration binaries
+- LaTeX (`pdflatex`, `bibtex`)
+- Host probes (`nvidia-smi`, `git`)
 
 ## Offline Principle
 

@@ -22,14 +22,16 @@ from dualdocking.analysis.statistical import (
 def _make_df(values_a: list[float], values_b: list[float]) -> pd.DataFrame:
     """Create a scored DataFrame with affinity columns and hit flags."""
     n = len(values_a)
-    return pd.DataFrame({
-        "smiles_canonical": [f"C{i}" for i in range(n)],
-        "affinity_a": values_a,
-        "affinity_b": values_b,
-        "is_hit_a": [v <= 0.0 for v in values_a],
-        "is_hit_b": [v <= 0.0 for v in values_b],
-        "is_hit_both": [a <= 0.0 and b <= 0.0 for a, b in zip(values_a, values_b)],
-    })
+    return pd.DataFrame(
+        {
+            "smiles_canonical": [f"C{i}" for i in range(n)],
+            "affinity_a": values_a,
+            "affinity_b": values_b,
+            "is_hit_a": [v <= 0.0 for v in values_a],
+            "is_hit_b": [v <= 0.0 for v in values_b],
+            "is_hit_both": [a <= 0.0 and b <= 0.0 for a, b in zip(values_a, values_b)],
+        }
+    )
 
 
 def _metric_hr_both(df: pd.DataFrame) -> float:
@@ -60,8 +62,11 @@ class TestTwoLevelBootstrap:
         ]
 
         result = hierarchical_bootstrap_test(
-            group_a, group_b, _metric_hr_both,
-            n_bootstrap=2000, rng_seed=42,
+            group_a,
+            group_b,
+            _metric_hr_both,
+            n_bootstrap=2000,
+            rng_seed=42,
         )
         assert isinstance(result, BootstrapResult)
         assert result.observed_diff > 0.3
@@ -88,8 +93,11 @@ class TestTwoLevelBootstrap:
         ]
 
         result = hierarchical_bootstrap_test(
-            group_a, group_b, _metric_hr_both,
-            n_bootstrap=2000, rng_seed=42,
+            group_a,
+            group_b,
+            _metric_hr_both,
+            n_bootstrap=2000,
+            rng_seed=42,
         )
         # p-value should be high (no clear advantage)
         assert result.p_value > 0.1
@@ -115,8 +123,11 @@ class TestTwoLevelBootstrap:
         ]
 
         result = hierarchical_bootstrap_test(
-            group_a, group_b, _metric_hr_both,
-            n_bootstrap=2000, rng_seed=42,
+            group_a,
+            group_b,
+            _metric_hr_both,
+            n_bootstrap=2000,
+            rng_seed=42,
         )
         assert result.observed_diff < -0.3
         assert result.p_value > 0.95
@@ -154,8 +165,11 @@ class TestTwoLevelBootstrap:
             group_b.append(_make_df(vals2.tolist(), vals2.tolist()))
 
         result = hierarchical_bootstrap_test(
-            group_a, group_b, _metric_hr_both,
-            n_bootstrap=2000, rng_seed=42,
+            group_a,
+            group_b,
+            _metric_hr_both,
+            n_bootstrap=2000,
+            rng_seed=42,
         )
         ci_width = result.ci_upper - result.ci_lower
         assert ci_width > 0.001, "CI should have non-trivial width from molecule resampling"
@@ -247,8 +261,11 @@ class TestBootstrapEdgeCases:
         group_a = [empty_df]
         group_b = [_make_df([-1.0, -2.0], [-1.0, -2.0])]
         result = hierarchical_bootstrap_test(
-            group_a, group_b, _metric_hr_both,
-            n_bootstrap=100, rng_seed=42,
+            group_a,
+            group_b,
+            _metric_hr_both,
+            n_bootstrap=100,
+            rng_seed=42,
         )
         # Should not crash; observed_diff will be nan because group_a metric is nan
         assert np.isnan(result.observed_diff)
@@ -259,8 +276,11 @@ class TestBootstrapEdgeCases:
         group_a = [one_row, one_row, one_row]
         group_b = [_make_df([1.0], [1.0])]  # is_hit_both = False
         result = hierarchical_bootstrap_test(
-            group_a, group_b, _metric_hr_both,
-            n_bootstrap=200, rng_seed=42,
+            group_a,
+            group_b,
+            _metric_hr_both,
+            n_bootstrap=200,
+            rng_seed=42,
         )
         # group_a: all seeds have hr_both=1.0; group_b: hr_both=0.0
         # observed_diff = mean(0.0) - mean(1.0) = -1.0
@@ -270,25 +290,31 @@ class TestBootstrapEdgeCases:
 
     def test_all_nan_affinities_in_metric(self):
         """When all affinity values are NaN, metric should not crash."""
-        nan_df = pd.DataFrame({
-            "smiles_canonical": ["C0", "C1"],
-            "affinity_a": [float("nan"), float("nan")],
-            "affinity_b": [float("nan"), float("nan")],
-            "is_hit_a": [False, False],
-            "is_hit_b": [False, False],
-            "is_hit_both": [False, False],
-        })
+        nan_df = pd.DataFrame(
+            {
+                "smiles_canonical": ["C0", "C1"],
+                "affinity_a": [float("nan"), float("nan")],
+                "affinity_b": [float("nan"), float("nan")],
+                "is_hit_a": [False, False],
+                "is_hit_b": [False, False],
+                "is_hit_both": [False, False],
+            }
+        )
         group_a = [nan_df]
         group_b = [_make_df([-1.0, -2.0], [-1.0, -2.0])]
         result = hierarchical_bootstrap_test(
-            group_a, group_b, _metric_hr_both,
-            n_bootstrap=100, rng_seed=42,
+            group_a,
+            group_b,
+            _metric_hr_both,
+            n_bootstrap=100,
+            rng_seed=42,
         )
         # NaN affinities produce is_hit_both=False -> hr_both=0.0 (not NaN)
         assert np.isfinite(result.observed_diff)
 
     def test_metric_fn_exception_propagates(self):
         """If metric_fn raises, the exception should propagate (no silent swallow)."""
+
         def _bad_metric(df: pd.DataFrame) -> float:
             raise ValueError("intentional test error")
 
@@ -296,8 +322,11 @@ class TestBootstrapEdgeCases:
         group_b = [_make_df([1.0], [1.0])]
         with pytest.raises(ValueError, match="intentional test error"):
             hierarchical_bootstrap_test(
-                group_a, group_b, _bad_metric,
-                n_bootstrap=10, rng_seed=42,
+                group_a,
+                group_b,
+                _bad_metric,
+                n_bootstrap=10,
+                rng_seed=42,
             )
 
     def test_single_seed_per_group(self):
@@ -305,8 +334,11 @@ class TestBootstrapEdgeCases:
         group_a = [_make_df([-1.0, -2.0, 1.0], [-1.0, -2.0, 1.0])]
         group_b = [_make_df([-1.0, -2.0, -3.0], [-1.0, -2.0, -3.0])]
         result = hierarchical_bootstrap_test(
-            group_a, group_b, _metric_hr_both,
-            n_bootstrap=200, rng_seed=42,
+            group_a,
+            group_b,
+            _metric_hr_both,
+            n_bootstrap=200,
+            rng_seed=42,
         )
         assert np.isfinite(result.observed_diff)
         assert np.isfinite(result.p_value)

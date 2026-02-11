@@ -20,7 +20,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -29,6 +28,7 @@ from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
 
+from dualdocking.command_runner import run_project_command
 from dualdocking.scoring.binding_box import extract_binding_box
 
 # ---------------------------------------------------------------------------
@@ -203,13 +203,11 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
     missing_files = [p for p in FREED_DATA_FILES if not p.exists()]
     if missing_files:
         logger.info("Отсутствуют FREED data files, скачиваю: {}", ", ".join(str(p) for p in missing_files))
-        fetch_script = PROJECT_ROOT / "scripts" / "fetch_freed_data.py"
-        result = subprocess.run(  # noqa: S603
-            [sys.executable, str(fetch_script)],
+        result = run_project_command(
+            ["python", "scripts/s0_fetch/fetch_freed_fragments.py"],
+            project_root=PROJECT_ROOT,
             capture_output=True,
-            text=True,
-            check=False,
-            cwd=str(PROJECT_ROOT),
+            allow_inprocess=True,
         )
         if result.returncode != 0:
             tail = ((result.stdout or "") + (result.stderr or ""))[-2000:]

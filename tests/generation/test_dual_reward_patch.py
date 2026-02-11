@@ -659,9 +659,7 @@ class TestRunValidInMetadata:
         """All fractions below default thresholds → run_valid=True."""
         monkeypatch.setenv("QG_MAX_INVALID_FRACTION", "0.10")
         monkeypatch.setenv("QG_MAX_TIMEOUT_FRACTION", "0.05")
-        self.mod._call_stats.update(
-            {"total": 100, "invalid_a": 5, "invalid_b": 3, "timeout_a": 2, "timeout_b": 1}
-        )
+        self.mod._call_stats.update({"total": 100, "invalid_a": 5, "invalid_b": 3, "timeout_a": 2, "timeout_b": 1})
         self.mod._write_reward_metadata()
         data = json.loads(self.mod._METADATA_PATH.read_text())
         assert data["run_valid"] is True
@@ -670,9 +668,7 @@ class TestRunValidInMetadata:
         """Invalid fraction exceeds threshold → run_valid=False."""
         monkeypatch.setenv("QG_MAX_INVALID_FRACTION", "0.10")
         monkeypatch.setenv("QG_MAX_TIMEOUT_FRACTION", "0.05")
-        self.mod._call_stats.update(
-            {"total": 100, "invalid_a": 15, "invalid_b": 3, "timeout_a": 2, "timeout_b": 1}
-        )
+        self.mod._call_stats.update({"total": 100, "invalid_a": 15, "invalid_b": 3, "timeout_a": 2, "timeout_b": 1})
         self.mod._write_reward_metadata()
         data = json.loads(self.mod._METADATA_PATH.read_text())
         assert data["run_valid"] is False

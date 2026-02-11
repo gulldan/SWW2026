@@ -19,6 +19,7 @@ from dualdocking.reporting.run_manifest import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_configs(tmp_path: Path) -> Path:
     """Create minimal config files and return the config directory."""
     cfg = tmp_path / "configs"
@@ -37,6 +38,7 @@ TASKS = [("CDK2_ERK2", "single_a", 42), ("CDK2_ERK2", "double", 137)]
 # manifest_path
 # ---------------------------------------------------------------------------
 
+
 def test_manifest_path():
     p = manifest_path(Path("/results"), "run01")
     assert p == Path("/results/run_manifest_run01.json")
@@ -45,6 +47,7 @@ def test_manifest_path():
 # ---------------------------------------------------------------------------
 # init_manifest
 # ---------------------------------------------------------------------------
+
 
 def test_init_creates_valid_json(tmp_path: Path):
     cfg = _make_configs(tmp_path)
@@ -115,6 +118,7 @@ def test_init_task_structure(tmp_path: Path):
 # ---------------------------------------------------------------------------
 # update_task
 # ---------------------------------------------------------------------------
+
 
 def test_update_task_generate_running(tmp_path: Path):
     cfg = _make_configs(tmp_path)
@@ -207,6 +211,7 @@ def test_update_on_missing_manifest_is_noop(tmp_path: Path):
 # skip_task
 # ---------------------------------------------------------------------------
 
+
 def test_skip_task(tmp_path: Path):
     cfg = _make_configs(tmp_path)
     mf = tmp_path / "manifest.json"
@@ -239,6 +244,7 @@ def test_skip_all_tasks(tmp_path: Path):
 # ---------------------------------------------------------------------------
 # finalize_manifest
 # ---------------------------------------------------------------------------
+
 
 def test_finalize_sets_completed(tmp_path: Path):
     cfg = _make_configs(tmp_path)
@@ -274,6 +280,7 @@ def test_finalize_missing_manifest_is_noop(tmp_path: Path):
 # load_manifest
 # ---------------------------------------------------------------------------
 
+
 def test_load_roundtrip(tmp_path: Path):
     cfg = _make_configs(tmp_path)
     mf = tmp_path / "manifest.json"
@@ -304,6 +311,7 @@ def test_load_empty_file_returns_empty(tmp_path: Path):
 # ---------------------------------------------------------------------------
 # Full lifecycle integration
 # ---------------------------------------------------------------------------
+
 
 def test_full_lifecycle_two_tasks(tmp_path: Path):
     """Simulate a complete run with two tasks: one succeeds, one fails."""
@@ -360,6 +368,7 @@ def test_resume_lifecycle(tmp_path: Path):
 # ---------------------------------------------------------------------------
 # Atomicity: file is never partially written
 # ---------------------------------------------------------------------------
+
 
 def test_atomic_write_creates_parent_dirs(tmp_path: Path):
     cfg = _make_configs(tmp_path)

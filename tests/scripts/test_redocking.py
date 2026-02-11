@@ -160,23 +160,44 @@ class TestWriteCsv:
 
         results = [
             RedockResult(
-                target_id="ERK2", pdb_id="4QTA", ligand_resname="38Z",
-                ligand_smiles="CCC", n_crystal_atoms=20, n_docked_atoms=20,
-                docking_score=-8.5, rmsd=1.2, centroid_dist=0.8,
-                passed=True, status=STATUS_PASS,
+                target_id="ERK2",
+                pdb_id="4QTA",
+                ligand_resname="38Z",
+                ligand_smiles="CCC",
+                n_crystal_atoms=20,
+                n_docked_atoms=20,
+                docking_score=-8.5,
+                rmsd=1.2,
+                centroid_dist=0.8,
+                passed=True,
+                status=STATUS_PASS,
             ),
             RedockResult(
-                target_id="CDK2", pdb_id="1HCL", ligand_resname="?",
-                ligand_smiles="", n_crystal_atoms=0, n_docked_atoms=0,
-                docking_score=None, rmsd=None, centroid_dist=None,
-                passed=False, status=STATUS_SKIPPED_APO,
+                target_id="CDK2",
+                pdb_id="1HCL",
+                ligand_resname="?",
+                ligand_smiles="",
+                n_crystal_atoms=0,
+                n_docked_atoms=0,
+                docking_score=None,
+                rmsd=None,
+                centroid_dist=None,
+                passed=False,
+                status=STATUS_SKIPPED_APO,
                 error="No co-crystal ligand in PDB (apo structure)",
             ),
             RedockResult(
-                target_id="HER2", pdb_id="3PP0", ligand_resname="03Q",
-                ligand_smiles="CCC", n_crystal_atoms=25, n_docked_atoms=25,
-                docking_score=-6.0, rmsd=2.5, centroid_dist=1.9,
-                passed=False, status=STATUS_FAIL,
+                target_id="HER2",
+                pdb_id="3PP0",
+                ligand_resname="03Q",
+                ligand_smiles="CCC",
+                n_crystal_atoms=25,
+                n_docked_atoms=25,
+                docking_score=-6.0,
+                rmsd=2.5,
+                centroid_dist=1.9,
+                passed=False,
+                status=STATUS_FAIL,
             ),
         ]
 
@@ -217,10 +238,17 @@ class TestRedockResultStatus:
         )
 
         r = RedockResult(
-            target_id="ERK2", pdb_id="4QTA", ligand_resname="38Z",
-            ligand_smiles="CCC", n_crystal_atoms=20, n_docked_atoms=20,
-            docking_score=-8.5, rmsd=1.2, centroid_dist=0.8,
-            passed=True, status=STATUS_PASS,
+            target_id="ERK2",
+            pdb_id="4QTA",
+            ligand_resname="38Z",
+            ligand_smiles="CCC",
+            n_crystal_atoms=20,
+            n_docked_atoms=20,
+            docking_score=-8.5,
+            rmsd=1.2,
+            centroid_dist=0.8,
+            passed=True,
+            status=STATUS_PASS,
         )
         d = _result_to_dict(r)
         assert d["status"] == "pass"

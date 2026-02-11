@@ -28,18 +28,18 @@ def _create_run_artifacts(
             # generated.csv
             n = 20
             smiles = [f"C{'C' * i}O" for i in range(n)]
-            pd.DataFrame({"smiles": smiles}).to_csv(
-                run_dir / "generated.csv", index=False
-            )
+            pd.DataFrame({"smiles": smiles}).to_csv(run_dir / "generated.csv", index=False)
 
             # scored_joined.csv
             if skip_scored and skip_scored == f"{mode}/seed_{seed}":
                 continue
-            pd.DataFrame({
-                "smiles_canonical": smiles,
-                "affinity_a": rng.normal(-1.0, 0.5, n),
-                "affinity_b": rng.normal(-0.5, 0.5, n),
-            }).to_csv(run_dir / "scored_joined.csv", index=False)
+            pd.DataFrame(
+                {
+                    "smiles_canonical": smiles,
+                    "affinity_a": rng.normal(-1.0, 0.5, n),
+                    "affinity_b": rng.normal(-0.5, 0.5, n),
+                }
+            ).to_csv(run_dir / "scored_joined.csv", index=False)
 
     # Stage 2 artifacts
     report = root / "report"

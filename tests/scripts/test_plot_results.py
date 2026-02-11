@@ -11,24 +11,29 @@ def _make_df(n=5):
     rng = np.random.default_rng(42)
     rows = []
     for m in ("single_a", "single_b", "double"):
-        rows.append(pd.DataFrame({
-            "smiles": [f"C{'C' * i}" for i in range(n)],
-            "score_a": rng.uniform(-10, -3, n),
-            "score_b": rng.uniform(-10, -3, n),
-            "combined_min": rng.uniform(-10, -3, n),
-            "combined_harmonic": rng.uniform(-10, -3, n),
-            "combined_geometric": rng.uniform(-10, -3, n),
-            "combined_weighted_sum_0.5": rng.uniform(-10, -3, n),
-            "combined_weighted_product_0.5": rng.uniform(-10, -3, n),
-            "combined_tchebycheff_0.5": rng.uniform(0, 3, n),
-            "pair": ["pair1"] * n,
-            "mode": [m] * n,
-        }))
+        rows.append(
+            pd.DataFrame(
+                {
+                    "smiles": [f"C{'C' * i}" for i in range(n)],
+                    "score_a": rng.uniform(-10, -3, n),
+                    "score_b": rng.uniform(-10, -3, n),
+                    "combined_min": rng.uniform(-10, -3, n),
+                    "combined_harmonic": rng.uniform(-10, -3, n),
+                    "combined_geometric": rng.uniform(-10, -3, n),
+                    "combined_weighted_sum_0.5": rng.uniform(-10, -3, n),
+                    "combined_weighted_product_0.5": rng.uniform(-10, -3, n),
+                    "combined_tchebycheff_0.5": rng.uniform(0, 3, n),
+                    "pair": ["pair1"] * n,
+                    "mode": [m] * n,
+                }
+            )
+        )
     return pd.concat(rows, ignore_index=True)
 
 
 def test_plot_score_comparison(tmp_path):
     import matplotlib
+
     matplotlib.use("Agg")
 
     df = _make_df()
@@ -49,6 +54,7 @@ def test_plot_score_comparison(tmp_path):
 
 def test_main_cli(tmp_path, monkeypatch):
     import matplotlib
+
     matplotlib.use("Agg")
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
@@ -60,6 +66,7 @@ def test_main_cli(tmp_path, monkeypatch):
 
     # experiment config with objectives
     import yaml
+
     exp = {
         "modes": ["single_a", "single_b", "double"],
         "objectives": {
@@ -77,10 +84,15 @@ def test_main_cli(tmp_path, monkeypatch):
     (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(exp))
 
     runner = CliRunner()
-    result = runner.invoke(main, [
-        "--input", "report/data/all_results.parquet",
-        "--output-dir", "report/figures",
-    ])
+    result = runner.invoke(
+        main,
+        [
+            "--input",
+            "report/data/all_results.parquet",
+            "--output-dir",
+            "report/figures",
+        ],
+    )
     assert result.exit_code == 0, result.output
 
     fig_dir = tmp_path / "report" / "figures"
@@ -93,18 +105,21 @@ def test_main_cli(tmp_path, monkeypatch):
 def test_missing_column_skipped(tmp_path):
     """Legacy DataFrame missing a column → no crash."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     rng = np.random.default_rng(42)
     n = 5
-    df = pd.DataFrame({
-        "smiles": [f"C{i}" for i in range(n)],
-        "score_a": rng.uniform(-10, -3, n),
-        "score_b": rng.uniform(-10, -3, n),
-        "combined_min": rng.uniform(-10, -3, n),
-        "pair": ["pair1"] * n,
-        "mode": ["double"] * n,
-    })
+    df = pd.DataFrame(
+        {
+            "smiles": [f"C{i}" for i in range(n)],
+            "score_a": rng.uniform(-10, -3, n),
+            "score_b": rng.uniform(-10, -3, n),
+            "combined_min": rng.uniform(-10, -3, n),
+            "pair": ["pair1"] * n,
+            "mode": ["double"] * n,
+        }
+    )
     obj_cols = [
         ("combined_min", "combined_min"),
         ("combined_nonexistent", "combined_nonexistent"),

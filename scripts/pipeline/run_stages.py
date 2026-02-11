@@ -13,12 +13,13 @@ Usage::
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 
 import click
 from loguru import logger
+
+from dualdocking.command_runner import run_project_command
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -158,10 +159,10 @@ def _run_cmd(cmd: list[str]) -> None:
         RuntimeError: If the subprocess exits with a non-zero return code.
     """
     logger.info("Running: {}", " ".join(cmd))
-    result = subprocess.run(  # noqa: S603
+    result = run_project_command(
         cmd,
-        cwd=str(PROJECT_ROOT),
-        check=False,
+        project_root=PROJECT_ROOT,
+        allow_inprocess=True,
     )
     if result.returncode != 0:
         raise RuntimeError(f"Command failed (rc={result.returncode}): {' '.join(cmd)}")

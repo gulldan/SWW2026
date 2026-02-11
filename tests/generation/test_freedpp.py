@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -14,6 +15,7 @@ from dualdocking.generation.freedpp import (
     GenerationConfig,
     _build_freedpp_args,
     _cache_key,
+    _ensure_docker_image,
     _parse_output_smiles,
     _resolve_pdb_path,
     _run_freedpp,
@@ -221,9 +223,7 @@ class TestRunFreedppBranching:
         assert "REWARD_MODE=single_a" in cmd_str
 
     def test_run_freedpp_single_b_uses_receptor_b(self):
-        cfg = GenerationConfig(
-            target_id="CDK2", reward_mode="single_b", second_target_id="ERK2"
-        )
+        cfg = GenerationConfig(target_id="CDK2", reward_mode="single_b", second_target_id="ERK2")
         cmd = self._run(cfg, pdbqt_b=self.pdbqt_b, center_b="4.0,5.0,6.0", size_b="25.0,25.0,25.0")
         cmd_str = " ".join(cmd)
         assert "receptor_b.pdbqt" in cmd_str
@@ -232,9 +232,7 @@ class TestRunFreedppBranching:
         assert "DUAL_RECEPTOR_B" not in cmd_str
 
     def test_run_freedpp_double_has_dual_config(self):
-        cfg = GenerationConfig(
-            target_id="CDK2", reward_mode="double", second_target_id="ERK2"
-        )
+        cfg = GenerationConfig(target_id="CDK2", reward_mode="double", second_target_id="ERK2")
         cmd = self._run(cfg, pdbqt_b=self.pdbqt_b, center_b="4.0,5.0,6.0", size_b="25.0,25.0,25.0")
         cmd_str = " ".join(cmd)
         assert "DUAL_RECEPTOR_B" in cmd_str
@@ -248,8 +246,42 @@ class TestRunFreedppBranching:
         assert "receptor_b" in data
 
     def test_run_freedpp_single_b_fails_without_receptor_b(self):
-        cfg = GenerationConfig(
-            target_id="CDK2", reward_mode="single_b", second_target_id="ERK2"
-        )
+        cfg = GenerationConfig(target_id="CDK2", reward_mode="single_b", second_target_id="ERK2")
         with pytest.raises(ValueError, match="single_b requires receptor B"):
             self._run(cfg, pdbqt_b=None)
+
+
+def test_ensure_docker_image_uses_stage0_fetch_script(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Missing FREED data should trigger fetch via scripts/s0_fetch/fetch_freed_fragments.py."""
+    import dualdocking.generation.freedpp as mod
+
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(mod, "DOCKER_BIN", "docker")
+    monkeypatch.setattr(mod, "FREED_DATA_FILES", (tmp_path / "missing_a.json", tmp_path / "missing_b.csv"))
+
+    dockerfile = tmp_path / "docker" / "freedpp" / "Dockerfile"
+    dockerfile.parent.mkdir(parents=True, exist_ok=True)
+    dockerfile.write_text("FROM scratch\n")
+
+    docker_calls: list[list[str]] = []
+    fetch_calls: list[list[str]] = []
+
+    def _fake_subprocess_run(cmd, **kwargs):  # noqa: ANN001, ANN003, ARG001
+        docker_calls.append(cmd)
+        if cmd[:3] == ["docker", "image", "inspect"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="No such image")
+        if cmd[:2] == ["docker", "build"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    def _fake_run_project_command(cmd, **kwargs):  # noqa: ANN001, ANN003, ARG001
+        fetch_calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(mod.subprocess, "run", _fake_subprocess_run)
+    monkeypatch.setattr(mod, "run_project_command", _fake_run_project_command)
+
+    _ensure_docker_image("dualdocking/freedpp:test")
+
+    assert fetch_calls, "Expected fetch script call for missing FREED data files"
+    assert fetch_calls[0] == ["python", "scripts/s0_fetch/fetch_freed_fragments.py"]

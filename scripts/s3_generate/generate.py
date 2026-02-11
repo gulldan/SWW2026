@@ -162,10 +162,10 @@ def main(
     config: str,
     experiment_config: str,
 ) -> None:
-    """Generate molecules using FREED++ for a given target pair and mode.
+    """Generate molecules for a given target pair and mode.
 
     Loads pair configuration, validates calibration, runs the FREED++
-    generator, and writes ``generated.csv`` plus ``metadata.json`` with
+    (or configured alternative) generator, and writes ``generated.csv`` plus ``metadata.json`` with
     provenance information (git commit, docker digest, hardware, diversity).
 
     Args:
@@ -179,7 +179,7 @@ def main(
         experiment_config: Path to experiment.yaml config file.
     """
     from dualdocking.config import load_experiment, load_pairs
-    from dualdocking.generation.freedpp import GenerationConfig, generate
+    from dualdocking.generation.backends import GenerationRequest, resolve_generation_backend
 
     pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
     if pair not in pairs:
@@ -191,7 +191,7 @@ def main(
 
     # Загрузить параметры FREED++ из experiment.yaml
     exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
-    freedpp_cfg = exp_cfg.get("generator", {}).get("freedpp", {})
+    generator_cfg = exp_cfg.get("generator", {})
 
     # Проверка калибровки нормализации для таргетов
     norm_path = PROJECT_ROOT / "configs" / "normalization.yaml"
@@ -204,45 +204,37 @@ def main(
             tid = pair_cfg[role]["id"]
             entry = norm_targets.get(tid, {})
             if not entry:
-                logger.error("Таргет '{}' отсутствует в normalization.yaml. Запустите calibrate_normalization.py", tid)
+                logger.error("Таргет '{}' отсутствует в normalization.yaml. Запустите compute_normalization.py", tid)
                 sys.exit(1)
             if not entry.get("stable_mean") or not entry.get("stable_std"):
                 logger.error(
                     "Таргет '{}' не калиброван (stable=false, n_samples={}). "
-                    "Запустите: dock_calibration.py + calibrate_normalization.py",
+                    "Запустите: dock_calibration.py + compute_normalization.py",
                     tid,
                     entry.get("n_samples", 0),
                 )
                 sys.exit(1)
 
-    second_target_id = None
-    if mode in {"single_b", "double"}:
-        second_target_id = pair_cfg["target_b"]["id"]
-
     qg_cfg = exp_cfg.get("quality_gate", {})
 
-    gen_config = GenerationConfig(
-        target_id=pair_cfg["target_a"]["id"],
-        n_molecules=n_molecules or exp_cfg.get("budget", {}).get("n_molecules", 1000),
+    backend_name, backend_generate = resolve_generation_backend(generator_cfg)
+    logger.info("Generator backend: {}", backend_name)
+
+    request = GenerationRequest(
+        pair_id=pair,
+        pair_config=pair_cfg,
+        mode=mode,
         seed=seed,
         output_dir=output_dir,
-        reward_mode=mode,
-        second_target_id=second_target_id,
-        epochs=epochs or freedpp_cfg.get("epochs", 200),
-        num_sub_proc=freedpp_cfg.get("num_sub_proc", 12),
-        starting_smile=freedpp_cfg.get("starting_smile", "c1([*:1])c([*:2])ccc([*:3])c1"),
-        use_cache=freedpp_cfg.get("use_model_cache", True),
-        docker_image=freedpp_cfg.get("docker_image", "dualdocking/freedpp:latest"),
-        training_timeout=freedpp_cfg.get("training_timeout", 86400),
-        box_padding=freedpp_cfg.get("box_padding", 10.0),
-        vina_program=freedpp_cfg.get("vina_program", "unidock_gpu"),
-        steps_per_epoch=steps_per_epoch or freedpp_cfg.get("steps_per_epoch", 256),
-        qg_max_invalid_fraction=qg_cfg.get("max_invalid_fraction", 0.10),
-        qg_max_timeout_fraction=qg_cfg.get("max_timeout_fraction", 0.05),
+        n_molecules=n_molecules or exp_cfg.get("budget", {}).get("n_molecules", 1000),
+        epochs_override=epochs,
+        steps_per_epoch_override=steps_per_epoch,
+        generator_config=generator_cfg,
+        quality_gate=qg_cfg,
     )
 
     start = time.time()
-    smiles = generate(gen_config)
+    smiles = backend_generate(request)
     duration = time.time() - start
 
     from dualdocking.analysis.diversity import compute_all_diversity_metrics
@@ -257,13 +249,20 @@ def main(
     if diversity.get("uniqueness", 0.0) < 0.90:
         logger.warning("Низкая уникальность: {:.3f}", diversity.get("uniqueness", 0.0))
 
-    docker_digest = _docker_image_digest(gen_config.docker_image)
+    freedpp_cfg = generator_cfg.get("freedpp", {}) if isinstance(generator_cfg, dict) else {}
+    docker_image = (
+        freedpp_cfg.get("docker_image", "dualdocking/freedpp:latest")
+        if backend_name == "freedpp" and isinstance(freedpp_cfg, dict)
+        else "unknown"
+    )
+    docker_digest = _docker_image_digest(str(docker_image)) if docker_image != "unknown" else "unknown"
     docking_program, docking_version = _normalization_meta()
 
     metadata = {
         "pair_id": pair,
         "mode": mode,
         "seed": seed,
+        "generator_backend": backend_name,
         "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "git_commit": _git_commit(),
         "master_config_version": _master_config_version(),

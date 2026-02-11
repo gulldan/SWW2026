@@ -61,7 +61,19 @@ class TestFindCsvs:
         assert csv in found
 
     def test_ignores_train_csvs(self, tmp_path):
-        csv = tmp_path / "output" / "results" / "pair1" / "double" / "seed_42" / "freedpp_workspace" / "output" / "run" / "mols" / "train_000.csv"
+        csv = (
+            tmp_path
+            / "output"
+            / "results"
+            / "pair1"
+            / "double"
+            / "seed_42"
+            / "freedpp_workspace"
+            / "output"
+            / "run"
+            / "mols"
+            / "train_000.csv"
+        )
         _make_csv(csv)
         found = _find_csvs(tmp_path)
         assert csv not in found

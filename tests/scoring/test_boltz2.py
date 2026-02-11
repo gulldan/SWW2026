@@ -35,6 +35,8 @@ def _reset_scorer_state(monkeypatch):
     monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
     monkeypatch.setattr(mod, "_ACCELERATOR", None)
     monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "cli")
+    monkeypatch.setattr(mod, "_NIM_ACTIVE_URLS", None)
+    monkeypatch.setattr(mod, "_NIM_ACTIVE_URLS_KEY", None)
     mod._sequence_cache.clear()
     yield
     mod._sequence_cache.clear()
@@ -531,6 +533,12 @@ class TestNimHealthCheck:
         monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://127.0.0.1:1"])
         assert _nim_health_check() is False
 
+    def test_health_any_url_ready(self, nim_server, monkeypatch):
+        alive_url = mod._BOLTZ_NIM_URLS[0]
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://127.0.0.1:1")
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://127.0.0.1:1", alive_url])
+        assert _nim_health_check() is True
+
 
 class TestNimPredictAffinity:
     def test_success_averages_two_models(self, nim_server):
@@ -601,6 +609,13 @@ class TestNimScoreBatchInternal:
         scores = _score_batch_internal_nim("tgt", ["CCO", "not_a_smiles!!!"], "MKTAY", None)
         assert not math.isnan(scores[0])
         assert math.isnan(scores[1])
+
+    def test_batch_filters_unavailable_url(self, nim_server, monkeypatch):
+        alive_url = mod._BOLTZ_NIM_URLS[0]
+        monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://127.0.0.1:1", alive_url])
+        _NimHandler.response_body = {"affinities": {"B": {"affinity_pred_value": [-5.0]}}}
+        scores = _score_batch_internal_nim("tgt", ["CCO"], "MKTAY", None)
+        assert not math.isnan(scores[0])
 
 
 class TestNimScoringContext:

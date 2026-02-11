@@ -50,8 +50,8 @@ Source: `configs/pairs.yaml`, `docs/selection_criteria.md`
 | Seeds | [42, 137, 256, 512, 1024] | `configs/experiment.yaml: seeds` |
 | Runs per (pair, mode) | 5 | `configs/experiment.yaml: n_runs` |
 | RL epochs | 200 | `configs/experiment.yaml: generator.freedpp.epochs` |
-| Generator | FREED++ (UniDock GPU) | `configs/experiment.yaml: generator.name` |
-| Scorer | Boltz-2 affinity | `configs/experiment.yaml: scorer.name` |
+| Generator | FREED++ (UniDock GPU) | `configs/experiment.yaml: generator.backend` (legacy alias: `generator.name`) |
+| Scorer | Boltz-2 affinity | `configs/experiment.yaml: scorer.engine` (legacy alias: `scorer.name`) |
 
 Total experimental matrix: 8 active pairs x 3 modes x 5 seeds = **120 runs**.
 

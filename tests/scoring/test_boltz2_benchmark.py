@@ -35,12 +35,12 @@ import dualdocking.scoring.boltz2 as mod
 
 # 6 drug-like molecules of varying complexity
 _BENCH_SMILES = [
-    "CC(=O)Oc1ccccc1C(=O)O",         # aspirin
-    "CC(C)Cc1ccc(cc1)C(C)C(=O)O",     # ibuprofen
+    "CC(=O)Oc1ccccc1C(=O)O",  # aspirin
+    "CC(C)Cc1ccc(cc1)C(C)C(=O)O",  # ibuprofen
     "c1ccc2c(c1)c(=O)c3ccccc3[nH]2",  # acridone
-    "CCOc1ccc2nc(S)n(C)c2c1",          # omeprazole fragment
-    "CC(=O)Nc1ccc(O)cc1",              # acetaminophen
-    "c1ccc(cc1)C(=O)Nc2ccccc2",        # benzanilide
+    "CCOc1ccc2nc(S)n(C)c2c1",  # omeprazole fragment
+    "CC(=O)Nc1ccc(O)cc1",  # acetaminophen
+    "c1ccc(cc1)C(=O)Nc2ccccc2",  # benzanilide
 ]
 _TARGET = "CDK2"
 
@@ -48,6 +48,7 @@ _TARGET = "CDK2"
 def _gpu_available() -> bool:
     try:
         import torch
+
         return torch.cuda.is_available()
     except ImportError:
         return False
@@ -58,7 +59,8 @@ def _nim_available() -> bool:
 
 
 def _set_backend(
-    backend: str, monkeypatch: pytest.MonkeyPatch,
+    backend: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Configure module for the given backend."""
     monkeypatch.setattr(mod, "_BOLTZ_BACKEND", backend)
@@ -69,7 +71,8 @@ def _set_backend(
 
 
 def _run_batch(
-    backend: str, monkeypatch: pytest.MonkeyPatch,
+    backend: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[float, list[float]]:
     """Score batch with given backend, return (elapsed_sec, scores)."""
     _set_backend(backend, monkeypatch)
@@ -80,7 +83,8 @@ def _run_batch(
 
 
 def _run_single(
-    backend: str, monkeypatch: pytest.MonkeyPatch,
+    backend: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[float, list[float]]:
     """Score molecules one by one with given backend."""
     _set_backend(backend, monkeypatch)

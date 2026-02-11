@@ -33,11 +33,13 @@ def _write_scored(run_dir: Path, rng: np.random.Generator, n: int = 20) -> list[
     """Write scored_joined.csv with Boltz-2 affinities. Return SMILES list."""
     run_dir.mkdir(parents=True, exist_ok=True)
     smiles = [f"C{'C' * i}O" for i in range(n)]
-    df = pd.DataFrame({
-        "smiles_canonical": smiles,
-        "affinity_a": rng.normal(-1.0, 0.5, n),
-        "affinity_b": rng.normal(-0.5, 0.5, n),
-    })
+    df = pd.DataFrame(
+        {
+            "smiles_canonical": smiles,
+            "affinity_a": rng.normal(-1.0, 0.5, n),
+            "affinity_b": rng.normal(-0.5, 0.5, n),
+        }
+    )
     df.to_csv(run_dir / "scored_joined.csv", index=False)
     df.to_parquet(run_dir / "scored_joined.parquet", index=False)
     return smiles
@@ -84,9 +86,12 @@ def _setup(tmp_path, *, include_docking_b=False):
 def _invoke(extra_args=None):
     runner = CliRunner()
     args = [
-        "--results-root", "output/results",
-        "--pairs-config", "configs/pairs.yaml",
-        "--experiment-config", "configs/experiment.yaml",
+        "--results-root",
+        "output/results",
+        "--pairs-config",
+        "configs/pairs.yaml",
+        "--experiment-config",
+        "configs/experiment.yaml",
     ]
     if extra_args:
         args.extend(extra_args)
@@ -133,18 +138,26 @@ class TestDefaultSetup:
         """CSV has all expected columns."""
         df = pd.read_parquet(self.tmp_path / "report" / "data" / "proxy_final_corr.parquet")
         expected_cols = {
-            "pair", "mode", "target", "n",
-            "spearman_rho", "spearman_ci_lo", "spearman_ci_hi",
-            "pearson_r", "pearson_ci_lo", "pearson_ci_hi",
-            "n_boltz", "n_docking", "n_joined", "join_rate",
+            "pair",
+            "mode",
+            "target",
+            "n",
+            "spearman_rho",
+            "spearman_ci_lo",
+            "spearman_ci_hi",
+            "pearson_r",
+            "pearson_ci_lo",
+            "pearson_ci_hi",
+            "n_boltz",
+            "n_docking",
+            "n_joined",
+            "join_rate",
         }
         assert expected_cols <= set(df.columns)
 
     def test_json_structure(self):
         """JSON has pairs, summary, and suitability decision."""
-        data = json.loads(
-            (self.tmp_path / "report" / "data" / "proxy_final_corr.json").read_text()
-        )
+        data = json.loads((self.tmp_path / "report" / "data" / "proxy_final_corr.json").read_text())
         assert "pairs" in data
         assert "pair1" in data["pairs"]
         assert "summary" in data
@@ -177,9 +190,7 @@ def test_double_mode_with_docking_b(tmp_path, monkeypatch):
     _setup(tmp_path, include_docking_b=True)
     _invoke()
 
-    data = json.loads(
-        (tmp_path / "report" / "data" / "proxy_final_corr.json").read_text()
-    )
+    data = json.loads((tmp_path / "report" / "data" / "proxy_final_corr.json").read_text())
     double_data = data["pairs"]["pair1"]["double"]
     assert "target_a" in double_data["targets"]
     assert "target_b" in double_data["targets"]
@@ -195,7 +206,5 @@ def test_empty_results(tmp_path, monkeypatch):
     result = _invoke()
     assert result.exit_code == 0
 
-    data = json.loads(
-        (tmp_path / "report" / "data" / "proxy_final_corr.json").read_text()
-    )
+    data = json.loads((tmp_path / "report" / "data" / "proxy_final_corr.json").read_text())
     assert data["summary"]["n_pair_mode_target_combos"] == 0

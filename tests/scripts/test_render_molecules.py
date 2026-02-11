@@ -35,19 +35,21 @@ def _metrics_yaml(path: Path) -> Path:
 
 def _make_df(n: int = 3, pair: str = "pair1", mode: str = "single_a") -> pd.DataFrame:
     smiles = ["CCO", "c1ccccc1", "CC(=O)O", "CCCC", "C=CC"][:n]
-    return pd.DataFrame({
-        "smiles": smiles,
-        "score_a": [-8.0 + i for i in range(n)],
-        "score_b": [-7.0 + i for i in range(n)],
-        "combined_min": [-7.5 + i for i in range(n)],
-        "combined_harmonic": [-7.3 + i for i in range(n)],
-        "combined_geometric": [-7.4 + i for i in range(n)],
-        "combined_weighted_sum_0.5": [-7.2 + i for i in range(n)],
-        "combined_weighted_product_0.5": [-7.1 + i for i in range(n)],
-        "combined_tchebycheff_0.5": [0.5 + i for i in range(n)],
-        "pair": [pair] * n,
-        "mode": [mode] * n,
-    })
+    return pd.DataFrame(
+        {
+            "smiles": smiles,
+            "score_a": [-8.0 + i for i in range(n)],
+            "score_b": [-7.0 + i for i in range(n)],
+            "combined_min": [-7.5 + i for i in range(n)],
+            "combined_harmonic": [-7.3 + i for i in range(n)],
+            "combined_geometric": [-7.4 + i for i in range(n)],
+            "combined_weighted_sum_0.5": [-7.2 + i for i in range(n)],
+            "combined_weighted_product_0.5": [-7.1 + i for i in range(n)],
+            "combined_tchebycheff_0.5": [0.5 + i for i in range(n)],
+            "pair": [pair] * n,
+            "mode": [mode] * n,
+        }
+    )
 
 
 # --- unit tests ---
@@ -94,11 +96,13 @@ def test_main_cli(tmp_path, monkeypatch):
     (tmp_path / "report" / "figures").mkdir(parents=True)
     (tmp_path / "configs").mkdir()
 
-    df = pd.concat([
-        _make_df(3, mode="single_a"),
-        _make_df(3, mode="single_b"),
-        _make_df(3, mode="double"),
-    ])
+    df = pd.concat(
+        [
+            _make_df(3, mode="single_a"),
+            _make_df(3, mode="single_b"),
+            _make_df(3, mode="double"),
+        ]
+    )
     df.to_parquet(tmp_path / "report" / "data" / "all_results.parquet")
     _pairs_yaml(tmp_path / "configs")
     _metrics_yaml(tmp_path / "configs")
@@ -112,16 +116,25 @@ def test_main_cli(tmp_path, monkeypatch):
     (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(exp))
 
     import scripts.s6_report.render_molecules as mod
+
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
 
     runner = CliRunner()
-    result = runner.invoke(main, [
-        "--input", "report/data/all_results.parquet",
-        "--output-dir", "report/figures",
-        "--config", "configs/pairs.yaml",
-        "--thresholds", "configs/metrics.yaml",
-        "--top-n", "2",
-    ])
+    result = runner.invoke(
+        main,
+        [
+            "--input",
+            "report/data/all_results.parquet",
+            "--output-dir",
+            "report/figures",
+            "--config",
+            "configs/pairs.yaml",
+            "--thresholds",
+            "configs/metrics.yaml",
+            "--top-n",
+            "2",
+        ],
+    )
     assert result.exit_code == 0, result.output
 
     figs = list((tmp_path / "report" / "figures").glob("*.png"))
@@ -130,14 +143,16 @@ def test_main_cli(tmp_path, monkeypatch):
 
 def test_primary_col_fallback(tmp_path):
     """Primary col missing from data → falls back to combined_min."""
-    df = pd.DataFrame({
-        "smiles": ["CCO", "c1ccccc1"],
-        "score_a": [-8.0, -7.0],
-        "score_b": [-7.0, -6.0],
-        "combined_min": [-7.5, -6.5],
-        "pair": ["pair1", "pair1"],
-        "mode": ["double", "double"],
-    })
+    df = pd.DataFrame(
+        {
+            "smiles": ["CCO", "c1ccccc1"],
+            "score_a": [-8.0, -7.0],
+            "score_b": [-7.0, -6.0],
+            "combined_min": [-7.5, -6.5],
+            "pair": ["pair1", "pair1"],
+            "mode": ["double", "double"],
+        }
+    )
     out = tmp_path / "grid.png"
     # primary_col doesn't exist in df → should fall back to combined_min
     _render_grid(df, out, "Test", "A", "B", -7.0, -6.5, primary_col="combined_nonexistent")

@@ -38,10 +38,12 @@ SWW2026/
 |   |-- config.py               YAML config loading & validation (pairs, metrics, experiment)
 |   |-- scoring/                Scoring & docking objectives
 |   |   |-- objectives.py       Multi-objective scalarizations (min, harmonic, Tchebycheff, Pareto, ...)
+|   |   |-- backends.py         Scoring backend registry (builtin boltz2 + external engines)
 |   |   |-- boltz2.py           Boltz-2 affinity scorer with disk cache + NIM backend
 |   |   |-- cache_io.py         Process-safe JSON cache (fcntl.flock + atomic temp-and-replace)
 |   |   +-- binding_box.py      PDB binding-site extraction from co-crystallized ligands
 |   |-- generation/             FREED++ molecule generation
+|   |   |-- backends.py         Generation backend registry (builtin freedpp + external backends)
 |   |   +-- freedpp.py          Docker subprocess wrapper (GenerationConfig, generate())
 |   |-- analysis/               Post-hoc statistical analysis
 |   |   |-- statistical.py      Hierarchical bootstrap, FDR correction, Cliff's delta
@@ -60,8 +62,8 @@ SWW2026/
 |   |-- s0_fetch/               Data download (PDB, FASTA, FREED fragments, ZINC, ChEMBL)
 |   |-- s1_prepare/             Target preparation (PDB -> PDBQT, binding box, MSA)
 |   |-- s2_calibrate/           Calibration and validation (dock calibration, normalization, redocking)
-|   |-- s3_generate/            Molecule generation (FREED++)
-|   |-- s4_score/               Affinity scoring (Boltz-2)
+|   |-- s3_generate/            Molecule generation (configured backend; default FREED++)
+|   |-- s4_score/               Affinity scoring (configured engine; default Boltz-2)
 |   |-- s5_analyze/             Statistical analysis (aggregate, metrics, correlation)
 |   |-- s6_report/              Visualization and manuscript (plots, molecules, LaTeX)
 |   |-- s7_audit/               Post-hoc verification (claim traceability)
@@ -75,7 +77,7 @@ SWW2026/
 |-- report/                     LaTeX manuscript (chapters/, figures/, templates/)
 +-- output/                     Runtime data (gitignored)
     |-- data/                   Target structures, calibration sets, baseline
-    |-- cache/                  Boltz-2 score cache + MSA cache
+    |-- cache/                  Score cache + MSA cache (backend-dependent)
     +-- results/                Experiment outputs
 ```
 
@@ -139,8 +141,8 @@ All commands are installed as console scripts via `uv sync`:
 | Command | Description |
 |---------|-------------|
 | `dd-prepare` | Prepare target structures (download PDB, extract binding boxes, generate PDBQT) |
-| `dd-generate` | Run FREED++ molecule generation for a specific pair/mode |
-| `dd-score` | Score generated molecules with Boltz-2 affinity predictor |
+| `dd-generate` | Run molecule generation for a specific pair/mode (configured backend) |
+| `dd-score` | Score generated molecules with the configured scoring engine (default Boltz-2) |
 | `dd-aggregate` | Aggregate results across seeds and modes into summary tables |
 | `dd-metrics` | Compute evaluation metrics (hit-rates, Cliff's delta, bootstrap CI) |
 | `dd-summarize` | Generate text summaries of experiment results |
@@ -149,6 +151,42 @@ All commands are installed as console scripts via `uv sync`:
 | `dd-smoke` | Boltz-2 smoke test (health check and single-molecule scoring) |
 
 Run any command with `--help` for usage details, e.g. `uv run dd-generate --help`.
+
+## Python API (non-CLI)
+
+You can run workflows directly from Python (not only from shell CLI):
+
+```python
+from dualdocking.api import run_full_experiment, run_post_pipeline, run_stages
+
+# Full pipeline dry-run for one pair/seed
+run_full_experiment(dry_run=True, pairs=["CDK2_ERK2"], seeds=[42], with_post=False)
+
+# Run selected stages
+run_stages(stages="analyze,report", dry_run=True, skip_preflight=True)
+
+# Post-processing only
+run_post_pipeline(dry_run=True, latex_mode="off")
+```
+
+## Backend Configuration
+
+Generator and scorer are configurable in `configs/experiment.yaml`.
+
+```yaml
+generator:
+  # Legacy key also supported: name: "FREED++"
+  backend: freedpp  # built-in alias; or package.module[:callable]
+
+scorer:
+  # Legacy key also supported: name: "Boltz-2"
+  engine: boltz2    # built-in alias; or package.module[:factory_or_object]
+  backend: nim      # boltz2 transport: cli | nim
+```
+
+Default behavior remains unchanged:
+- Generator: built-in `freedpp`
+- Scorer: built-in `boltz2` (`cli` or `nim` based on config)
 
 ---
 
@@ -204,7 +242,7 @@ Read in the order shown for fastest onboarding.
 | 1 | [Goal](docs/goal.md) | Operational spec (read-only) | Hypothesis, notation, endpoints, success criteria -- single source of truth |
 | 2 | [Setup](docs/setup.md) | Canonical | Installation, Docker build, calibration, baseline preparation |
 | 3 | [Pipeline](docs/pipeline.md) | Canonical | Full experiment pipeline: Stage 0 through report generation |
-| 4 | [Architecture](docs/architecture.md) | Reference | Boltz-2, FREED++, caching, score conventions, troubleshooting |
+| 4 | [Architecture](docs/architecture.md) | Reference | Backend architecture (generator/scorer), Boltz-2, FREED++, caching, score conventions, troubleshooting |
 | 5 | [Selection Criteria](docs/selection_criteria.md) | Reference | Target pair rationale, factorial design, core/auxiliary split |
 | 6 | [Pre-registration](docs/preregistration.md) | Frozen (v1.1) | Frozen hypotheses and decision rules |
 | 7 | [Statistical Analysis Plan](docs/statistical_analysis_plan.md) | Frozen (v1.1) | Inference procedures, claim rules, code mapping |

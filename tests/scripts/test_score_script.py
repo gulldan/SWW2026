@@ -44,9 +44,14 @@ def test_all_objective_columns_generated():
     for obj in objectives:
         joined[obj.column_name] = compute_combined(scores_a, scores_b, obj.kind, lower_is_better=True, **obj.params)
 
-    expected_cols = {"combined_min", "combined_harmonic", "combined_geometric",
-                     "combined_weighted_sum_0.5", "combined_weighted_product_0.5",
-                     "combined_tchebycheff_0.5"}
+    expected_cols = {
+        "combined_min",
+        "combined_harmonic",
+        "combined_geometric",
+        "combined_weighted_sum_0.5",
+        "combined_weighted_product_0.5",
+        "combined_tchebycheff_0.5",
+    }
     assert expected_cols.issubset(set(joined.columns))
 
 

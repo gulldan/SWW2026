@@ -20,6 +20,7 @@ from dualdocking.scoring.cache_io import load_cache, save_cache
 # Basic roundtrip
 # ---------------------------------------------------------------------------
 
+
 def test_roundtrip(tmp_path: Path):
     path = tmp_path / "tgt.json"
     data = {"abc123": 1.5, "def456": -2.3}
@@ -42,6 +43,7 @@ def test_load_empty_file(tmp_path: Path):
 # NaN filtering
 # ---------------------------------------------------------------------------
 
+
 def test_save_filters_nan(tmp_path: Path):
     path = tmp_path / "tgt.json"
     save_cache(path, {"good": -5.2, "bad": float("nan"), "also_good": 1.0})
@@ -62,6 +64,7 @@ def test_load_filters_nan(tmp_path: Path):
 # ---------------------------------------------------------------------------
 # Corrupted file recovery
 # ---------------------------------------------------------------------------
+
 
 def test_load_corrupted_json(tmp_path: Path):
     path = tmp_path / "bad.json"
@@ -107,6 +110,7 @@ def test_save_merges_over_non_dict_json(tmp_path: Path):
 # Merge behaviour (read-merge-write)
 # ---------------------------------------------------------------------------
 
+
 def test_save_merges_with_disk(tmp_path: Path):
     """save_cache must merge new data with existing disk contents."""
     path = tmp_path / "tgt.json"
@@ -129,6 +133,7 @@ def test_merge_does_not_lose_entries(tmp_path: Path):
 # Atomic write — temp file cleaned up
 # ---------------------------------------------------------------------------
 
+
 def test_no_leftover_temp_files(tmp_path: Path):
     path = tmp_path / "tgt.json"
     save_cache(path, {"k": 1.0})
@@ -140,6 +145,7 @@ def test_no_leftover_temp_files(tmp_path: Path):
 # Lock file creation
 # ---------------------------------------------------------------------------
 
+
 def test_lock_file_created(tmp_path: Path):
     path = tmp_path / "tgt.json"
     save_cache(path, {"k": 1.0})
@@ -149,6 +155,7 @@ def test_lock_file_created(tmp_path: Path):
 # ---------------------------------------------------------------------------
 # Lock timeout — fail-closed: load returns {}, save skips write
 # ---------------------------------------------------------------------------
+
 
 def test_load_timeout_returns_empty_and_warns(tmp_path: Path):
     """load_cache must return {} and log a warning when lock times out."""
@@ -211,6 +218,7 @@ def test_save_timeout_skips_write_and_warns(tmp_path: Path):
 # Deterministic output (sort_keys=True)
 # ---------------------------------------------------------------------------
 
+
 def test_deterministic_json_sorted_keys(tmp_path: Path):
     """JSON output must be byte-identical regardless of dict insertion order."""
     path1 = tmp_path / "a.json"
@@ -232,6 +240,7 @@ def test_deterministic_json_keys_are_sorted(tmp_path: Path):
 # Concurrency stress test (multiprocessing)
 # ---------------------------------------------------------------------------
 
+
 def _worker(args: tuple[str, int, int]) -> None:
     """Worker for concurrency test: writes keys start..start+count to cache."""
     cache_path_str, start, count = args
@@ -246,10 +255,7 @@ def test_concurrent_writes_no_corruption(tmp_path: Path):
     workers = 4
     keys_per_worker = 50
 
-    args_list = [
-        (str(path), w * keys_per_worker, keys_per_worker)
-        for w in range(workers)
-    ]
+    args_list = [(str(path), w * keys_per_worker, keys_per_worker) for w in range(workers)]
 
     with multiprocessing.Pool(workers) as pool:
         pool.map(_worker, args_list)
@@ -290,9 +296,11 @@ def test_concurrent_writes_no_leftover_temps(tmp_path: Path):
 # Integration: scorer_boltz2 wrappers still work
 # ---------------------------------------------------------------------------
 
+
 def test_scorer_wrappers_use_cache_io(tmp_path: Path, monkeypatch):
     """_load_cache/_save_cache in scorer_boltz2 must delegate to cache_io."""
     import dualdocking.scoring.boltz2 as mod
+
     monkeypatch.setattr(mod, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(mod, "_CONTEXT_HASH", None)
 

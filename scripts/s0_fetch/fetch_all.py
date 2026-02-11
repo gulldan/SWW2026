@@ -29,11 +29,20 @@ from pathlib import Path
 import click
 from loguru import logger
 
+from dualdocking.command_runner import run_project_command
+
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 DOCKER_BIN: str = shutil.which("docker") or "docker"
 
 
-def _run(cmd: list[str], *, dry_run: bool, timeout: int | None = None, label: str = "") -> bool:
+def _run(
+    cmd: list[str],
+    *,
+    dry_run: bool,
+    timeout: int | None = None,
+    label: str = "",
+    allow_inprocess: bool = False,
+) -> bool:
     """Run a shell command, logging output and status.
 
     Args:
@@ -41,6 +50,7 @@ def _run(cmd: list[str], *, dry_run: bool, timeout: int | None = None, label: st
         dry_run: If True, log the command without executing.
         timeout: Maximum seconds to wait before killing the process.
         label: Optional prefix for log messages.
+        allow_inprocess: Try in-process execution for internal Python scripts.
 
     Returns:
         True if the command succeeded (or was skipped via dry_run).
@@ -49,6 +59,25 @@ def _run(cmd: list[str], *, dry_run: bool, timeout: int | None = None, label: st
     logger.info("{}RUN: {}", tag, " ".join(cmd))
     if dry_run:
         return True
+
+    if allow_inprocess:
+        try:
+            result = run_project_command(
+                cmd,
+                project_root=PROJECT_ROOT,
+                timeout=timeout,
+                capture_output=True,
+                allow_inprocess=True,
+            )
+        except RuntimeError as exc:
+            logger.error("{}FAILED (in-process): {}\n{}", tag, " ".join(cmd), str(exc)[-3000:])
+            return False
+        if result.returncode != 0:
+            tail = ((result.stdout or "") + (result.stderr or ""))[-3000:]
+            logger.error("{}FAILED (rc={}): {}\n{}", tag, result.returncode, " ".join(cmd), tail)
+            return False
+        return True
+
     try:
         result = subprocess.run(  # noqa: S603
             cmd,
@@ -115,7 +144,7 @@ def step_fetch_freed_data(dry_run: bool, force: bool = False) -> bool:
     cmd = [sys.executable, str(PROJECT_ROOT / "scripts" / "s0_fetch" / "fetch_freed_fragments.py")]
     if force:
         cmd.append("--force")
-    return _run(cmd, dry_run=dry_run, timeout=120, label="freed-data")
+    return _run(cmd, dry_run=dry_run, timeout=120, label="freed-data", allow_inprocess=True)
 
 
 # ── Step 3: Docker image build ───────────────────────────────────────────
@@ -159,7 +188,7 @@ def step_docker_build(dry_run: bool, image: str = "dualdocking/freedpp:latest", 
         str(PROJECT_ROOT / "docker" / "freedpp" / "Dockerfile"),
         "-t",
         image,
-        str(PROJECT_ROOT / "docker" / "freedpp"),
+        str(PROJECT_ROOT),
     ]
     return _run(cmd, dry_run=dry_run, timeout=3600, label="docker-build")
 
@@ -177,7 +206,7 @@ def step_fetch_calibration(dry_run: bool) -> bool:
         True on success.
     """
     cmd = [sys.executable, str(PROJECT_ROOT / "scripts" / "s0_fetch" / "fetch_calibration_smiles.py")]
-    return _run(cmd, dry_run=dry_run, timeout=300, label="calibration")
+    return _run(cmd, dry_run=dry_run, timeout=300, label="calibration", allow_inprocess=True)
 
 
 # ── Step 5: Baseline ZINC ────────────────────────────────────────────────
@@ -196,7 +225,7 @@ def step_fetch_baseline(dry_run: bool, url: str | None = None) -> bool:
     cmd = [sys.executable, str(PROJECT_ROOT / "scripts" / "s0_fetch" / "fetch_zinc_baseline.py")]
     if url:
         cmd.extend(["--url", url])
-    return _run(cmd, dry_run=dry_run, timeout=1800, label="baseline")
+    return _run(cmd, dry_run=dry_run, timeout=1800, label="baseline", allow_inprocess=True)
 
 
 # ── Step 6: Prepare targets (PDB + FASTA + MSA + PDBQT) ─────────────────
@@ -211,8 +240,8 @@ def step_prepare_targets(dry_run: bool) -> bool:
     Returns:
         True on success.
     """
-    cmd = ["uv", "run", "python", str(PROJECT_ROOT / "scripts" / "s1_prepare" / "prepare_targets.py"), "--prepare-all"]
-    return _run(cmd, dry_run=dry_run, timeout=7200, label="targets")
+    cmd = [sys.executable, str(PROJECT_ROOT / "scripts" / "s1_prepare" / "prepare_targets.py"), "--prepare-all"]
+    return _run(cmd, dry_run=dry_run, timeout=7200, label="targets", allow_inprocess=True)
 
 
 # ── Verification ─────────────────────────────────────────────────────────

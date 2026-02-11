@@ -7,18 +7,19 @@ SMILES file.
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 
 import click
 from loguru import logger
 
+from dualdocking.command_runner import run_project_command
+
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 
 
 def _run(cmd: list[str], dry_run: bool) -> None:
-    """Run a subprocess command, raising on failure.
+    """Run an internal project command with in-process optimization.
 
     Args:
         cmd: Command and arguments to execute.
@@ -30,7 +31,16 @@ def _run(cmd: list[str], dry_run: bool) -> None:
     logger.info("RUN {}", " ".join(cmd))
     if dry_run:
         return
-    result = subprocess.run(cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True, check=False)  # noqa: S603
+    try:
+        result = run_project_command(
+            cmd,
+            project_root=PROJECT_ROOT,
+            capture_output=True,
+            allow_inprocess=True,
+        )
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
+
     if result.returncode != 0:
         tail = ((result.stdout or "") + (result.stderr or ""))[-4000:]
         raise click.ClickException(f"Command failed (rc={result.returncode}): {' '.join(cmd)}\n{tail}")

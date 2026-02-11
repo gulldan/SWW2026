@@ -132,6 +132,11 @@ _NIM_PREDICT_ENDPOINT = "/biology/mit/boltz2/predict"
 _NIM_HEALTH_ENDPOINT = "/v1/health/ready"
 _NIM_TIMEOUT = 300  # seconds per molecule via NIM
 _NIM_CONCURRENCY = int(os.getenv("NIM_CONCURRENCY", "1"))
+_NIM_HEALTH_TIMEOUT = float(os.getenv("NIM_HEALTH_TIMEOUT", "2.0"))
+
+# Cached active NIM pool (configured URLs are probed once per process/config change).
+_NIM_ACTIVE_URLS: list[str] | None = None
+_NIM_ACTIVE_URLS_KEY: tuple[str, ...] | None = None
 
 # NIM prediction params — mirrors _BOLTZ_CLI_ARGS_BASE values.
 # step_scale=1.5: boltz2 model default (CLI uses 1.5; NIM defaults to 1.638 if unset).
@@ -144,6 +149,62 @@ _NIM_PREDICT_PARAMS: dict[str, int | float | str] = {
     "step_scale": 1.5,
     "output_format": "mmcif",
 }
+
+
+def _configured_nim_urls() -> list[str]:
+    """Return configured NIM URLs with preserved order and deduplication."""
+    urls = _BOLTZ_NIM_URLS or [_BOLTZ_NIM_URL]
+    cleaned = [u.strip().rstrip("/") for u in urls if u and u.strip()]
+    deduped = list(dict.fromkeys(cleaned))
+    if not deduped:
+        msg = "No NIM URLs configured. Set BOLTZ_NIM_URL or BOLTZ_NIM_URLS."
+        raise RuntimeError(msg)
+    return deduped
+
+
+def _nim_url_ready(url: str) -> bool:
+    """Check whether a specific NIM URL is ready."""
+    health_url = f"{url}{_NIM_HEALTH_ENDPOINT}"
+    try:
+        req = urllib.request.Request(health_url)  # noqa: S310
+        with urllib.request.urlopen(req, timeout=_NIM_HEALTH_TIMEOUT) as resp:  # noqa: S310
+            body = resp.read().lower()
+        if b"false" in body:
+            return False
+        return b"true" in body or b"ready" in body or len(body) == 0
+    except Exception:
+        return False
+
+
+def _resolve_nim_urls(*, refresh: bool = False) -> list[str]:
+    """Resolve active NIM URLs, filtering out unreachable instances.
+
+    If no URL passes health probing, fall back to configured URLs so the
+    caller still attempts scoring and produces explicit request errors.
+    """
+    global _NIM_ACTIVE_URLS, _NIM_ACTIVE_URLS_KEY
+
+    configured = tuple(_configured_nim_urls())
+    if not refresh and _NIM_ACTIVE_URLS is not None and configured == _NIM_ACTIVE_URLS_KEY:
+        return _NIM_ACTIVE_URLS
+
+    healthy = [url for url in configured if _nim_url_ready(url)]
+    if healthy:
+        dropped = [url for url in configured if url not in healthy]
+        if dropped:
+            logger.warning("NIM URL(s) not ready, excluded from pool: {}", ", ".join(dropped))
+        _NIM_ACTIVE_URLS = healthy
+        _NIM_ACTIVE_URLS_KEY = configured
+        return healthy
+
+    logger.warning(
+        "No healthy NIM URL detected via {}. Falling back to configured URLs: {}",
+        _NIM_HEALTH_ENDPOINT,
+        ", ".join(configured),
+    )
+    _NIM_ACTIVE_URLS = list(configured)
+    _NIM_ACTIVE_URLS_KEY = configured
+    return _NIM_ACTIVE_URLS
 
 
 def _resolve_accelerator() -> str:
@@ -808,15 +869,9 @@ def _nim_health_check() -> bool:
     """Check whether the NIM Boltz-2 server is healthy and ready.
 
     Returns:
-        ``True`` if the first NIM URL responds with a ready status.
+        ``True`` if at least one configured NIM URL responds as ready.
     """
-    url = f"{_BOLTZ_NIM_URLS[0].rstrip('/')}{_NIM_HEALTH_ENDPOINT}"
-    try:
-        req = urllib.request.Request(url)  # noqa: S310
-        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
-            return b"true" in resp.read().lower()
-    except Exception:
-        return False
+    return any(_nim_url_ready(url) for url in _configured_nim_urls())
 
 
 _NIM_MAX_RETRIES = 2  # total attempts = 1 + retries
@@ -838,7 +893,7 @@ def _nim_predict_affinity(sequence: str, smiles: str) -> float:
     """
     import time
 
-    url = f"{_BOLTZ_NIM_URLS[0].rstrip('/')}{_NIM_PREDICT_ENDPOINT}"
+    nim_urls = _resolve_nim_urls()
 
     payload: dict = {
         "polymers": [{"id": "A", "molecule_type": "protein", "sequence": sequence}],
@@ -850,6 +905,7 @@ def _nim_predict_affinity(sequence: str, smiles: str) -> float:
 
     last_error: Exception | None = None
     for attempt in range(_NIM_MAX_RETRIES + 1):
+        url = f"{nim_urls[attempt % len(nim_urls)]}{_NIM_PREDICT_ENDPOINT}"
         req = urllib.request.Request(  # noqa: S310
             url,
             data=data,
@@ -917,6 +973,8 @@ def _parse_nim_affinity(result: dict[str, Any], smiles: str) -> float:
 async def _nim_predict_batch_async(
     sequence: str,
     smiles_indices: list[tuple[int, str]],
+    *,
+    nim_urls: list[str] | None = None,
 ) -> list[tuple[int, float]]:
     """Score molecules via NIM using async HTTP with round-robin.
 
@@ -928,6 +986,8 @@ async def _nim_predict_batch_async(
         sequence: Protein amino-acid sequence.
         smiles_indices: List of ``(original_index, neutralized_smiles)``
             pairs to score.
+        nim_urls: Optional resolved NIM URL list. When ``None``, URLs are
+            resolved from current module configuration.
 
     Returns:
         List of ``(original_index, score)`` tuples (NaN on failure).
@@ -936,8 +996,9 @@ async def _nim_predict_batch_async(
 
     import aiohttp
 
-    n_urls = len(_BOLTZ_NIM_URLS)
-    urls = [f"{u.rstrip('/')}{_NIM_PREDICT_ENDPOINT}" for u in _BOLTZ_NIM_URLS]
+    base_urls = nim_urls if nim_urls is not None else _resolve_nim_urls()
+    n_urls = len(base_urls)
+    urls = [f"{u}{_NIM_PREDICT_ENDPOINT}" for u in base_urls]
     # Semaphore per NIM instance to avoid overloading a single worker
     semaphores = [asyncio.Semaphore(_NIM_CONCURRENCY) for _ in range(n_urls)]
     timeout = aiohttp.ClientTimeout(total=_NIM_TIMEOUT)
@@ -958,9 +1019,10 @@ async def _nim_predict_batch_async(
 
         last_error: Exception | None = None
         for attempt in range(_NIM_MAX_RETRIES + 1):
-            async with semaphores[url_idx]:
+            current_idx = (url_idx + attempt) % n_urls
+            async with semaphores[current_idx]:
                 try:
-                    async with session.post(urls[url_idx], json=payload) as resp:
+                    async with session.post(urls[current_idx], json=payload) as resp:
                         if resp.status == 200:
                             data = await resp.json()
                             return idx, _parse_nim_affinity(data, smi)
@@ -1045,10 +1107,11 @@ def _score_batch_internal_nim(
     if not valid_pairs:
         return scores
 
+    nim_urls = _resolve_nim_urls()
     logger.debug(
         "NIM async batch: {} molecules, {} NIM URL(s), concurrency={}",
         len(valid_pairs),
-        len(_BOLTZ_NIM_URLS),
+        len(nim_urls),
         _NIM_CONCURRENCY,
     )
 
@@ -1064,9 +1127,9 @@ def _score_batch_internal_nim(
         import concurrent.futures
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            results = pool.submit(asyncio.run, _nim_predict_batch_async(sequence, valid_pairs)).result()  # type: ignore[assignment]
+            results = pool.submit(asyncio.run, _nim_predict_batch_async(sequence, valid_pairs, nim_urls=nim_urls)).result()  # type: ignore[assignment]
     else:
-        results = asyncio.run(_nim_predict_batch_async(sequence, valid_pairs))
+        results = asyncio.run(_nim_predict_batch_async(sequence, valid_pairs, nim_urls=nim_urls))
 
     for idx, score in results:
         scores[idx] = score

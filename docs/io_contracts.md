@@ -89,17 +89,18 @@ z-score normalization parameters for FREED++ reward.
 ## Stage 2 — Generation
 
 **Scripts**: `scripts/s3_generate/generate.py` →
-`dualdocking/generation/freedpp.py`
+`dualdocking/generation/backends.py` (resolver) →
+built-in `dualdocking/generation/freedpp.py` or external generator backend.
 
-Runs FREED++ (Docker) to generate molecules optimized for one or both
-targets using UniDock GPU docking rewards.
+Runs the configured generator backend to produce molecules optimized for one
+or both targets. Default backend is FREED++ (Docker).
 
 ### Inputs
 
 | File | Format | Source |
 |------|--------|--------|
 | `configs/pairs.yaml` | YAML | Config |
-| `configs/experiment.yaml` | YAML | Config (`budget.n_molecules`, `generator.freedpp.*`, `quality_gate.*`) |
+| `configs/experiment.yaml` | YAML | Config (`budget.n_molecules`, `generator.backend`/`generator.name`, `generator.freedpp.*`, `quality_gate.*`) |
 | `configs/normalization.yaml` | YAML | Stage 1 |
 | `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | Stage 0 |
 | `docker/freedpp/data/zinc_crem.json` | JSON | Stage 0 |
@@ -111,7 +112,7 @@ targets using UniDock GPU docking rewards.
 | File | Format | Schema / Contents |
 |------|--------|-------------------|
 | `output/results/{pair}/{mode}/seed_{seed}/generated.parquet` (+`.csv`) | Parquet | **`smiles`** (str) — raw SMILES from FREED++ |
-| `output/results/{pair}/{mode}/seed_{seed}/metadata.json` | JSON | `pair_id`, `mode`, `seed`, `timestamp`, `git_commit`, `docker_image_digest`, `n_molecules_raw`, `n_molecules_unique`, `duplication_rate`, `diversity.*`, `training_time_seconds`, `hardware.*` |
+| `output/results/{pair}/{mode}/seed_{seed}/metadata.json` | JSON | `pair_id`, `mode`, `seed`, `generator_backend`, `timestamp`, `git_commit`, `docker_image_digest`, `n_molecules_raw`, `n_molecules_unique`, `duplication_rate`, `diversity.*`, `training_time_seconds`, `hardware.*` |
 
 **`metadata.json` — `diversity` sub-object**:
 `uniqueness`, `scaffold_diversity`, `internal_diversity`,
@@ -145,9 +146,9 @@ targets using UniDock GPU docking rewards.
 
 **Script**: `scripts/s4_score/score.py`
 
-Scores generated molecules against both targets using Boltz-2 affinity
-prediction. Supports checkpoint recovery, parallel GPU scoring, and
-user-supplied molecule files.
+Scores generated molecules against both targets using the configured scorer
+engine (default built-in Boltz-2). Supports checkpoint recovery, parallel GPU
+scoring, and user-supplied molecule files.
 
 ### Inputs
 
@@ -155,7 +156,7 @@ user-supplied molecule files.
 |------|--------|--------|
 | `output/results/{pair}/{mode}/seed_{seed}/generated.parquet` (or `.csv`) | Parquet | Stage 2 |
 | `configs/pairs.yaml` | YAML | Config (`target_a.id`, `target_b.id`) |
-| `configs/experiment.yaml` | YAML | Config (`objectives.*`) |
+| `configs/experiment.yaml` | YAML | Config (`objectives.*`, `scorer.engine`/`scorer.name`, scorer-specific params) |
 | `configs/metrics.yaml` | YAML | Config (`thresholds.{pair}.target_{a,b}`) |
 | `output/data/targets/{target_id}.fasta` | FASTA | Stage 0 |
 | `output/cache/boltz_msa/{target_id}.csv` | CSV | Stage 0 (CLI backend only) |
@@ -171,7 +172,7 @@ file (`.parquet`/`.csv` with `smiles` column, or `.smi` one-per-line).
 | `…/scores_A.parquet` (+`.csv`) | Parquet | `smiles` (str), `score` (float64) |
 | `…/scores_B.parquet` (+`.csv`) | Parquet | `smiles` (str), `score` (float64) |
 | `…/scored_joined.parquet` (+`.csv`) | Parquet | See schema below |
-| `…/scoring_context.json` | JSON | `cache_context_hash`, `backend`, + backend-specific fields, `timestamp` |
+| `…/scoring_context.json` | JSON | `scorer_engine`, `cache_context_hash`, `backend`, + backend-specific fields, `timestamp` |
 
 ### `scored_joined.parquet` schema
 
@@ -179,8 +180,8 @@ file (`.parquet`/`.csv` with `smiles` column, or `.smi` one-per-line).
 |--------|------|-------------|
 | `smiles` | str | Original SMILES from input |
 | `smiles_canonical` | str | RDKit canonical SMILES (empty string if fails) |
-| `affinity_a` | float64 | Boltz-2 prediction for target A (log₁₀ IC₅₀ µM, lower=better) |
-| `affinity_b` | float64 | Boltz-2 prediction for target B |
+| `affinity_a` | float64 | Scorer prediction for target A (built-in Boltz-2: log₁₀ IC₅₀ µM, lower=better) |
+| `affinity_b` | float64 | Scorer prediction for target B |
 | `score_a` | float64 | Alias for `affinity_a` (legacy) |
 | `score_b` | float64 | Alias for `affinity_b` (legacy) |
 | `is_hit_both` | bool | `affinity_a ≤ thr_a AND affinity_b ≤ thr_b` (inclusive) |
@@ -189,7 +190,7 @@ file (`.parquet`/`.csv` with `smiles` column, or `.smi` one-per-line).
 
 Rows sorted ascending by the primary objective column (default: `combined_min`).
 
-### Boltz-2 Cache
+### Built-in Boltz-2 Cache
 
 | File | Format | Contents |
 |------|--------|----------|
@@ -198,11 +199,14 @@ Rows sorted ascending by the primary objective column (default: `combined_min`).
 
 **Cache key** = SHA-256(`target_id || smiles || ctx_hash || seq_hash || msa_hash`).
 
-### NIM Model Cache (when using NIM backend)
+### NIM Model Cache (built-in Boltz-2 NIM backend)
 
 | File | Format | Contents |
 |------|--------|----------|
 | `output/cache/boltz_nim/` | Directory | NIM model weights, TensorRT engines (Docker-mounted as `/opt/nim/.cache`) |
+
+External scorer engines may use additional cache locations outside this
+contract; such paths must be documented by the backend implementation.
 
 ---
 

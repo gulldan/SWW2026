@@ -362,7 +362,7 @@ def _write_sdf_from_smiles(
     if runner:
         cmd = [
             "python",
-            "/workspace/scripts/rdkit_embed.py",
+            "/workspace/scripts/s1_prepare/rdkit_embed.py",
             "--smiles",
             smiles,
             "--sdf",
