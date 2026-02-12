@@ -116,7 +116,7 @@ class TestExtractLigandInfo:
 
 class TestCollectBlockedTargetIds:
     def test_identifies_blocked(self):
-        from scripts.s2_calibrate.validate_redocking import _collect_blocked_target_ids
+        from dualdocking.config import collect_blocked_target_ids
 
         pairs = {
             "A_B": {
@@ -130,11 +130,11 @@ class TestCollectBlockedTargetIds:
                 "target_b": {"id": "D"},
             },
         }
-        blocked = _collect_blocked_target_ids(pairs)
+        blocked = collect_blocked_target_ids(pairs)
         assert blocked == {"C", "D"}
 
     def test_no_blocked(self):
-        from scripts.s2_calibrate.validate_redocking import _collect_blocked_target_ids
+        from dualdocking.config import collect_blocked_target_ids
 
         pairs = {
             "A_B": {
@@ -143,7 +143,7 @@ class TestCollectBlockedTargetIds:
                 "target_b": {"id": "B"},
             },
         }
-        assert _collect_blocked_target_ids(pairs) == set()
+        assert collect_blocked_target_ids(pairs) == set()
 
 
 class TestWriteCsv:

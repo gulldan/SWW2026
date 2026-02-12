@@ -57,14 +57,17 @@ def mde_paired_ttest(
     df = m - 1
     t_crit = stats.t.ppf(1 - alpha, df) if alternative == "one-sided" else stats.t.ppf(1 - alpha / 2, df)
 
-    # Binary search for the non-centrality parameter
+    # Binary search for the non-centrality parameter.
+    # Use sf (survival function) instead of 1-cdf: scipy computes sf
+    # via cdf(-x, df, -nc), which avoids the numerical overflow that
+    # nct.cdf hits for large positive nc with small df (Boost _nct_cdf).
     lo, hi = 0.0, 20.0
     for _ in range(200):
         mid = (lo + hi) / 2
         if alternative == "one-sided":
-            achieved_power = 1 - stats.nct.cdf(t_crit, df, mid)
+            achieved_power = float(stats.nct.sf(t_crit, df, mid))
         else:
-            achieved_power = 1 - stats.nct.cdf(t_crit, df, mid) + stats.nct.cdf(-t_crit, df, mid)
+            achieved_power = float(stats.nct.sf(t_crit, df, mid) + stats.nct.cdf(-t_crit, df, mid))
         if achieved_power < power:
             lo = mid
         else:
@@ -120,9 +123,9 @@ def power_at_effect(
     ncp = d * np.sqrt(m)
     if alternative == "one-sided":
         t_crit = stats.t.ppf(1 - alpha, df)
-        return float(1 - stats.nct.cdf(t_crit, df, ncp))
+        return float(stats.nct.sf(t_crit, df, ncp))
     t_crit = stats.t.ppf(1 - alpha / 2, df)
-    return float(1 - stats.nct.cdf(t_crit, df, ncp) + stats.nct.cdf(-t_crit, df, ncp))
+    return float(stats.nct.sf(t_crit, df, ncp) + stats.nct.cdf(-t_crit, df, ncp))
 
 
 def power_curve(
