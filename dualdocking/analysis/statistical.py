@@ -58,6 +58,19 @@ def _as_dataframe_list(
     return frames
 
 
+def _safe_nanmean(arr: NDArray[np.float64]) -> float:
+    """``np.nanmean`` that returns NaN for empty/all-NaN arrays without warning.
+
+    Args:
+        arr: 1-D numeric array.
+
+    Returns:
+        Mean of finite elements, or NaN if none exist.
+    """
+    finite = arr[np.isfinite(arr)] if arr.size > 0 else arr
+    return float("nan") if finite.size == 0 else float(np.mean(finite))
+
+
 def _column_mean(arr: NDArray[np.float64], indices: NDArray[np.intp]) -> float:
     """Fast mean of ``arr[indices]`` -- default fast_fn for column_mean mode.
 
@@ -124,7 +137,7 @@ def hierarchical_bootstrap_test(
         # Observed diff
         metrics_a_obs = np.array([_fn(arr, np.arange(len(arr))) for arr in arrays_a], dtype=float)
         metrics_b_obs = np.array([_fn(arr, np.arange(len(arr))) for arr in arrays_b], dtype=float)
-        observed_diff = float(np.nanmean(metrics_b_obs) - np.nanmean(metrics_a_obs))
+        observed_diff = _safe_nanmean(metrics_b_obs) - _safe_nanmean(metrics_a_obs)
 
         n_a = len(arrays_a)
         n_b = len(arrays_b)
@@ -146,7 +159,7 @@ def hierarchical_bootstrap_test(
                 row_idx = rng.integers(0, lens_b[k], size=lens_b[k])
                 boot_b[j] = _fn(arr, row_idx)
 
-            diffs[i] = float(np.nanmean(boot_b) - np.nanmean(boot_a))
+            diffs[i] = _safe_nanmean(boot_b) - _safe_nanmean(boot_a)
 
         p_value = float(np.mean(diffs <= 0))
         ci_lower, ci_upper = np.percentile(diffs, [2.5, 97.5])
@@ -162,7 +175,7 @@ def hierarchical_bootstrap_test(
     # Observed diff: per-seed metrics on original data.
     metrics_a_obs = np.array([metric_fn(df) for df in group_a], dtype=float)
     metrics_b_obs = np.array([metric_fn(df) for df in group_b], dtype=float)
-    observed_diff = float(np.nanmean(metrics_b_obs) - np.nanmean(metrics_a_obs))
+    observed_diff = _safe_nanmean(metrics_b_obs) - _safe_nanmean(metrics_a_obs)
 
     n_a = len(group_a)
     n_b = len(group_b)
@@ -186,7 +199,7 @@ def hierarchical_bootstrap_test(
             row_idx = rng.integers(0, len(df), size=len(df))
             boot_b[j] = metric_fn(df.iloc[row_idx])
 
-        diffs[i] = float(np.nanmean(boot_b) - np.nanmean(boot_a))
+        diffs[i] = _safe_nanmean(boot_b) - _safe_nanmean(boot_a)
 
     # One-sided p-value: fraction of replicates where diff <= 0.
     p_value = float(np.mean(diffs <= 0))

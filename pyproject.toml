@@ -147,6 +147,12 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 addopts = "-v -n auto -m 'not benchmark'"
 pythonpath = ["."]
+filterwarnings = [
+    # scipy Boost _nct_cdf/_nct_sf: numerical divide-by-zero for extreme
+    # non-centrality parameters (small df + large nc). Cannot fix upstream;
+    # results are correct despite the warning.
+    "ignore:divide by zero encountered in _nct_:RuntimeWarning:scipy",
+]
 markers = [
     "integration: marks tests as integration tests",
     "benchmark: marks performance benchmarks (require GPU + optional NIM container)",
