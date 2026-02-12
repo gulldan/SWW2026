@@ -244,7 +244,57 @@ def step_prepare_targets(dry_run: bool) -> bool:
     return _run(cmd, dry_run=dry_run, timeout=7200, label="targets", allow_inprocess=True)
 
 
+# ── Step 7: ChEMBL actives ───────────────────────────────────────────────
+
+
+def step_fetch_chembl_actives(dry_run: bool) -> bool:
+    """Download ChEMBL actives for all targets in pairs.yaml.
+
+    Fetches known-active SMILES per target and computes dual-active
+    overlaps for each pair.  Used by enrichment validation (Stage 1).
+
+    Args:
+        dry_run: If True, only log the command.
+
+    Returns:
+        True on success.
+    """
+    cmd = [sys.executable, str(PROJECT_ROOT / "scripts" / "s0_fetch" / "fetch_chembl_actives.py")]
+    return _run(cmd, dry_run=dry_run, timeout=600, label="chembl", allow_inprocess=True)
+
+
+# ── Step 8: GNINA binary ─────────────────────────────────────────────────
+
+
+def step_fetch_gnina(dry_run: bool) -> bool:
+    """Download GNINA static binary for cross-validation scoring.
+
+    Args:
+        dry_run: If True, only log the command.
+
+    Returns:
+        True on success.
+    """
+    cmd = [sys.executable, str(PROJECT_ROOT / "scripts" / "s0_fetch" / "fetch_gnina.py")]
+    return _run(cmd, dry_run=dry_run, timeout=300, label="gnina", allow_inprocess=True)
+
+
 # ── Verification ─────────────────────────────────────────────────────────
+
+
+def _find_path(relative: str) -> bool:
+    """Check if a file exists under ``output/`` or flat layout.
+
+    Tries ``PROJECT_ROOT / "output" / relative`` first, then
+    ``PROJECT_ROOT / relative`` (server layout without ``output/`` prefix).
+
+    Args:
+        relative: Path relative to the data root (e.g. ``"data/targets/CDK2.fasta"``).
+
+    Returns:
+        True if the file exists under either layout.
+    """
+    return (PROJECT_ROOT / "output" / relative).exists() or (PROJECT_ROOT / relative).exists()
 
 
 def verify_offline_readiness() -> list[str]:
@@ -252,6 +302,7 @@ def verify_offline_readiness() -> list[str]:
 
     Inspects pairs.yaml targets for PDB, FASTA, MSA files; checks FREED
     docker data; calibration SMILES; and the Docker image.
+    Supports both ``output/`` prefix (local dev) and flat (server) layouts.
 
     Returns:
         List of human-readable descriptions of missing items (empty if all present).
@@ -275,19 +326,19 @@ def verify_offline_readiness() -> list[str]:
             role_letter = role[-1].upper()
 
             # PDB
-            pdb_path = PROJECT_ROOT / "output" / "data" / "targets" / pair_id / role_letter / f"{pdb_id.lower()}.pdb"
-            if not pdb_path.exists():
-                missing.append(f"PDB: {pdb_path.relative_to(PROJECT_ROOT)}")
+            pdb_rel = f"data/targets/{pair_id}/{role_letter}/{pdb_id.lower()}.pdb"
+            if not _find_path(pdb_rel):
+                missing.append(f"PDB: {pdb_rel}")
 
             # FASTA
-            fasta_path = PROJECT_ROOT / "output" / "data" / "targets" / f"{tid}.fasta"
-            if not fasta_path.exists():
-                missing.append(f"FASTA: {fasta_path.relative_to(PROJECT_ROOT)}")
+            fasta_rel = f"data/targets/{tid}.fasta"
+            if not _find_path(fasta_rel):
+                missing.append(f"FASTA: {fasta_rel}")
 
             # MSA
-            msa_path = PROJECT_ROOT / "output" / "cache" / "boltz_msa" / f"{tid}.csv"
-            if not msa_path.exists():
-                missing.append(f"MSA: cache/boltz_msa/{tid}.csv")
+            msa_rel = f"cache/boltz_msa/{tid}.csv"
+            if not _find_path(msa_rel):
+                missing.append(f"MSA: {msa_rel}")
 
     # FREED data
     for fname in ("zinc_crem.json", "alert_collections.csv"):
@@ -296,8 +347,11 @@ def verify_offline_readiness() -> list[str]:
             missing.append(f"FREED: docker/freedpp/data/{fname}")
 
     # Calibration
-    cal_dir = PROJECT_ROOT / "output" / "data" / "calibration"
-    smi_files = list(cal_dir.glob("*.smi")) if cal_dir.exists() else []
+    cal_dirs = [PROJECT_ROOT / "output" / "data" / "calibration", PROJECT_ROOT / "data" / "calibration"]
+    smi_files: list[Path] = []
+    for cal_dir in cal_dirs:
+        if cal_dir.exists():
+            smi_files.extend(cal_dir.glob("*.smi"))
     if not smi_files:
         missing.append("Calibration: data/calibration/*.smi (none found)")
 
@@ -312,17 +366,19 @@ def verify_offline_readiness() -> list[str]:
 
 
 @click.command()
-@click.option("--dry-run", is_flag=True, default=False, help="Показать команды без выполнения")
-@click.option("--skip-uv-sync", is_flag=True, default=False, help="Пропустить uv sync")
-@click.option("--skip-freed-data", is_flag=True, default=False, help="Пропустить FREED data files")
-@click.option("--skip-docker-build", is_flag=True, default=False, help="Пропустить сборку Docker-образа")
-@click.option("--skip-calibration", is_flag=True, default=False, help="Пропустить calibration SMILES")
-@click.option("--skip-baseline", is_flag=True, default=False, help="Пропустить baseline ZINC")
-@click.option("--skip-targets", is_flag=True, default=False, help="Пропустить PDB/FASTA/MSA/PDBQT")
-@click.option("--baseline-url", default=None, help="URL для baseline archive")
+@click.option("--dry-run", is_flag=True, default=False, help="Print commands without executing")
+@click.option("--skip-uv-sync", is_flag=True, default=False, help="Skip uv sync")
+@click.option("--skip-freed-data", is_flag=True, default=False, help="Skip FREED data files")
+@click.option("--skip-docker-build", is_flag=True, default=False, help="Skip Docker image build")
+@click.option("--skip-calibration", is_flag=True, default=False, help="Skip calibration SMILES")
+@click.option("--skip-baseline", is_flag=True, default=False, help="Skip baseline ZINC")
+@click.option("--skip-targets", is_flag=True, default=False, help="Skip PDB/FASTA/MSA/PDBQT")
+@click.option("--skip-chembl", is_flag=True, default=False, help="Skip ChEMBL actives fetch")
+@click.option("--skip-gnina", is_flag=True, default=False, help="Skip GNINA binary download")
+@click.option("--baseline-url", default=None, help="URL for baseline archive")
 @click.option("--docker-image", default="dualdocking/freedpp:latest", show_default=True)
-@click.option("--force-docker", is_flag=True, default=False, help="Пересобрать Docker-образ")
-@click.option("--verify-only", is_flag=True, default=False, help="Только проверить готовность, не скачивать")
+@click.option("--force-docker", is_flag=True, default=False, help="Force Docker image rebuild")
+@click.option("--verify-only", is_flag=True, default=False, help="Only check readiness, do not download")
 def main(  # noqa: PLR0913
     dry_run: bool,
     skip_uv_sync: bool,
@@ -331,6 +387,8 @@ def main(  # noqa: PLR0913
     skip_calibration: bool,
     skip_baseline: bool,
     skip_targets: bool,
+    skip_chembl: bool,
+    skip_gnina: bool,
     baseline_url: str | None,
     docker_image: str,
     force_docker: bool,
@@ -338,10 +396,10 @@ def main(  # noqa: PLR0913
 ) -> None:
     """Fetch all artifacts needed for offline experiment execution.
 
-    Runs six sequential steps (uv sync, FREED data, Docker build,
-    calibration SMILES, baseline ZINC, target preparation) with
-    per-step skip flags.  Use ``--verify-only`` to check readiness
-    without downloading anything.
+    Runs eight sequential steps (uv sync, FREED data, Docker build,
+    calibration SMILES, baseline ZINC, target preparation, ChEMBL
+    actives, GNINA binary) with per-step skip flags.  Use
+    ``--verify-only`` to check readiness without downloading anything.
     """
     if verify_only:
         missing = verify_offline_readiness()
@@ -389,6 +447,16 @@ def main(  # noqa: PLR0913
     if not skip_targets:
         ok = step_prepare_targets(dry_run)
         steps.append(("Targets (PDB/FASTA/MSA/PDBQT)", ok))
+
+    # Step 7: ChEMBL actives (for enrichment validation)
+    if not skip_chembl:
+        ok = step_fetch_chembl_actives(dry_run)
+        steps.append(("ChEMBL actives", ok))
+
+    # Step 8: GNINA binary (for cross-validation scoring)
+    if not skip_gnina:
+        ok = step_fetch_gnina(dry_run)
+        steps.append(("GNINA binary", ok))
 
     elapsed = time.monotonic() - t0
 

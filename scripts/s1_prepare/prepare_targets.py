@@ -21,14 +21,16 @@ import time
 from pathlib import Path
 
 import click
-import requests
 from loguru import logger
 from tqdm import tqdm
+
+from dualdocking.data.http_utils import get_with_retry, sha256_file
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 DATA_DIR: Path = PROJECT_ROOT / "output" / "data" / "targets"
 MSA_CACHE_DIR: Path = PROJECT_ROOT / "output" / "cache" / "boltz_msa"
 CHECKPOINT_PATH: Path = PROJECT_ROOT / "output" / "cache" / "prepare_checkpoint.json"
+MANIFEST_PATH: Path = DATA_DIR / "fetch_manifest.json"
 DOCKER_BIN: str = shutil.which("docker") or "docker"
 
 MSA_RETRY_ATTEMPTS: int = 3
@@ -87,8 +89,32 @@ def _mark_step(checkpoint: dict, pair_id: str, role: str, step: str) -> None:
     _save_checkpoint(checkpoint)
 
 
+def _record_manifest(path: Path, *, url: str) -> None:
+    """Record a downloaded file in the fetch manifest with SHA-256.
+
+    Appends to ``MANIFEST_PATH`` (JSON dict keyed by relative path).
+
+    Args:
+        path: Downloaded file path.
+        url: Source URL.
+    """
+    manifest: dict = {}
+    if MANIFEST_PATH.exists():
+        manifest = json.loads(MANIFEST_PATH.read_text())
+
+    rel = str(path.relative_to(PROJECT_ROOT))
+    manifest[rel] = {
+        "sha256": sha256_file(path),
+        "url": url,
+        "size_bytes": path.stat().st_size,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2))
+
+
 def download_pdb(pdb_id: str, output_path: Path) -> Path:
-    """Download a PDB file from RCSB.
+    """Download a PDB file from RCSB with retry.
 
     Args:
         pdb_id: Four-character PDB accession code.
@@ -98,16 +124,16 @@ def download_pdb(pdb_id: str, output_path: Path) -> Path:
         The *output_path* after successful download.
     """
     url = f"https://files.rcsb.org/download/{pdb_id.upper()}.pdb"
-    logger.info("Скачивание {} -> {}", url, output_path)
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
+    logger.info("Downloading PDB {} -> {}", url, output_path)
+    resp = get_with_retry(url, timeout=30)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(resp.text)
+    _record_manifest(output_path, url=url)
     return output_path
 
 
 def fetch_sequence(uniprot_id: str, target_id: str) -> Path:
-    """Download a FASTA sequence from UniProt.
+    """Download a FASTA sequence from UniProt with retry.
 
     Args:
         uniprot_id: UniProt accession (e.g. ``"P24941"``).
@@ -118,17 +144,17 @@ def fetch_sequence(uniprot_id: str, target_id: str) -> Path:
     """
     fasta_path = DATA_DIR / f"{target_id}.fasta"
     if fasta_path.exists():
-        logger.info("FASTA уже существует: {}", fasta_path)
+        logger.info("FASTA already exists: {}", fasta_path)
         return fasta_path
 
     url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.fasta"
-    logger.info("Скачивание FASTA {} -> {}", url, fasta_path)
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
+    logger.info("Downloading FASTA {} -> {}", url, fasta_path)
+    resp = get_with_retry(url, timeout=30)
 
     fasta_path.parent.mkdir(parents=True, exist_ok=True)
     fasta_path.write_text(resp.text)
-    logger.info("FASTA сохранён: {} ({} байт)", fasta_path, len(resp.text))
+    _record_manifest(fasta_path, url=url)
+    logger.info("FASTA saved: {} ({} bytes)", fasta_path, len(resp.text))
     return fasta_path
 
 
@@ -183,7 +209,7 @@ def precompute_msa(target_id: str, sequence: str) -> Path | None:
     """
     msa_csv = MSA_CACHE_DIR / f"{target_id}.csv"
     if msa_csv.exists():
-        logger.info("MSA уже существует: {}", msa_csv)
+        logger.info("MSA already exists: {}", msa_csv)
         return msa_csv
 
     out_dir = MSA_CACHE_DIR / target_id
@@ -208,7 +234,7 @@ def precompute_msa(target_id: str, sequence: str) -> Path | None:
     ]
 
     for attempt in range(1, MSA_RETRY_ATTEMPTS + 1):
-        logger.info("Pre-computing MSA для {} (попытка {}/{})", target_id, attempt, MSA_RETRY_ATTEMPTS)
+        logger.info("Pre-computing MSA for {} (attempt {}/{})", target_id, attempt, MSA_RETRY_ATTEMPTS)
         logger.debug("CMD: {}", " ".join(cmd))
 
         result = subprocess.run(  # noqa: S603
@@ -224,35 +250,35 @@ def precompute_msa(target_id: str, sequence: str) -> Path | None:
         # (e.g. missing cuequivariance_torch), the MSA .csv is already created.
         csv_files = list(out_dir.rglob("msa/*.csv"))
         if csv_files:
-            logger.info("MSA .csv найден после попытки {} (rc={})", attempt, result.returncode)
+            logger.info("MSA .csv found after attempt {} (rc={})", attempt, result.returncode)
             if result.returncode != 0:
-                logger.info("Boltz predict упал после MSA-этапа — это ожидаемо при warmup")
+                logger.info("Boltz predict crashed after MSA stage — expected during warmup")
             break
 
         if result.returncode != 0:
             logger.warning(
-                "Boltz MSA ошибка (попытка {}/{}): rc={}\nstderr: {}",
+                "Boltz MSA error (attempt {}/{}): rc={}\nstderr: {}",
                 attempt,
                 MSA_RETRY_ATTEMPTS,
                 result.returncode,
                 (result.stderr or "")[-1000:],
             )
         if attempt < MSA_RETRY_ATTEMPTS:
-            logger.info("Повтор через {} сек...", MSA_RETRY_BACKOFF * attempt)
+            logger.info("Retrying in {} sec...", MSA_RETRY_BACKOFF * attempt)
             time.sleep(MSA_RETRY_BACKOFF * attempt)
     else:
-        logger.error("Не удалось pre-compute MSA для {} после {} попыток", target_id, MSA_RETRY_ATTEMPTS)
+        logger.error("Failed to pre-compute MSA for {} after {} attempts", target_id, MSA_RETRY_ATTEMPTS)
         return None
 
     csv_files = list(out_dir.rglob("msa/*.csv"))
     if not csv_files:
-        logger.error("MSA .csv файл не найден в {}", out_dir)
+        logger.error("MSA .csv file not found in {}", out_dir)
         return None
 
     # Copy the first found .csv -> cache/boltz_msa/{target_id}.csv
     src_csv = csv_files[0]
     shutil.copy2(src_csv, msa_csv)
-    logger.info("MSA скопирован: {} -> {}", src_csv, msa_csv)
+    logger.info("MSA copied: {} -> {}", src_csv, msa_csv)
     return msa_csv
 
 
@@ -268,7 +294,7 @@ def prepare_receptor_pdbqt(pdb_path: Path, target_id: str) -> Path:
     """
     pdbqt_path = DATA_DIR / f"{target_id}.pdbqt"
     if pdbqt_path.exists():
-        logger.info("PDBQT уже существует: {}", pdbqt_path)
+        logger.info("PDBQT already exists: {}", pdbqt_path)
         return pdbqt_path
 
     # Check Docker image exists
@@ -279,13 +305,13 @@ def prepare_receptor_pdbqt(pdb_path: Path, target_id: str) -> Path:
     )
     if inspect.returncode != 0:
         logger.warning(
-            "Docker-образ {} не найден. Сборка: docker build -f docker/freedpp/Dockerfile -t {} .",
+            "Docker image {} not found. Build: docker build -f docker/freedpp/Dockerfile -t {} .",
             FREEDPP_DOCKER_IMAGE,
             FREEDPP_DOCKER_IMAGE,
         )
         return pdbqt_path
 
-    logger.info("Конвертация PDB → PDBQT: {} → {}", pdb_path, pdbqt_path)
+    logger.info("Converting PDB -> PDBQT: {} -> {}", pdb_path, pdbqt_path)
     subprocess.run(  # noqa: S603
         [
             DOCKER_BIN,
@@ -303,7 +329,7 @@ def prepare_receptor_pdbqt(pdb_path: Path, target_id: str) -> Path:
         check=True,
         timeout=300,
     )
-    logger.info("PDBQT сохранён: {}", pdbqt_path)
+    logger.info("PDBQT saved: {}", pdbqt_path)
     return pdbqt_path
 
 
@@ -335,11 +361,11 @@ def prepare_pair(pair_id: str, pair_cfg: dict, *, prepare_all: bool = False, che
 
         # Step 1: PDB
         if _step_done(checkpoint, pair_id, role, "pdb"):
-            logger.debug("Чекпоинт: PDB {} уже готов", target_id)
+            logger.debug("Checkpoint: PDB {} already done", target_id)
         else:
             pdb_path = out_dir / f"{pdb_id.lower()}.pdb"
             if pdb_path.exists():
-                logger.info("Уже существует: {}", pdb_path)
+                logger.info("Already exists: {}", pdb_path)
             else:
                 download_pdb(pdb_id, pdb_path)
             _mark_step(checkpoint, pair_id, role, "pdb")
@@ -356,7 +382,7 @@ def prepare_pair(pair_id: str, pair_cfg: dict, *, prepare_all: bool = False, che
         if prepare_all:
             # Step 2: FASTA
             if _step_done(checkpoint, pair_id, role, "fasta"):
-                logger.debug("Чекпоинт: FASTA {} уже готов", target_id)
+                logger.debug("Checkpoint: FASTA {} already done", target_id)
             else:
                 fetch_sequence(uniprot_id, target_id)
                 _mark_step(checkpoint, pair_id, role, "fasta")
@@ -365,7 +391,7 @@ def prepare_pair(pair_id: str, pair_cfg: dict, *, prepare_all: bool = False, che
 
             # Step 3: MSA pre-compute
             if _step_done(checkpoint, pair_id, role, "msa"):
-                logger.debug("Чекпоинт: MSA {} уже готов", target_id)
+                logger.debug("Checkpoint: MSA {} already done", target_id)
             else:
                 sequence = _read_sequence(fasta_path)
                 precompute_msa(target_id, sequence)
@@ -373,20 +399,20 @@ def prepare_pair(pair_id: str, pair_cfg: dict, *, prepare_all: bool = False, che
 
             # Step 4: PDB -> PDBQT (for FREED++ / UniDock GPU)
             if _step_done(checkpoint, pair_id, role, "pdbqt"):
-                logger.debug("Чекпоинт: PDBQT {} уже готов", target_id)
+                logger.debug("Checkpoint: PDBQT {} already done", target_id)
             else:
                 prepare_receptor_pdbqt(pdb_path, target_id)
                 _mark_step(checkpoint, pair_id, role, "pdbqt")
 
 
 @click.command()
-@click.option("--config", default="configs/pairs.yaml", help="Путь к конфигу пар")
-@click.option("--pair", default=None, help="Обработать только эту пару")
+@click.option("--config", default="configs/pairs.yaml", help="Path to pairs config")
+@click.option("--pair", default=None, help="Process only this pair")
 @click.option(
     "--prepare-all",
     is_flag=True,
     default=False,
-    help="Полная подготовка: PDB + FASTA + MSA + Boltz checkpoints (нужен интернет)",
+    help="Full preparation: PDB + FASTA + MSA + PDBQT (needs internet)",
 )
 def main(config: str, pair: str | None, prepare_all: bool) -> None:
     """Download and prepare protein target structures.
@@ -409,7 +435,7 @@ def main(config: str, pair: str | None, prepare_all: bool) -> None:
 
     if pair:
         if pair not in pairs:
-            logger.error("Пара '{}' не найдена в конфиге", pair)
+            logger.error("Pair '{}' not found in config", pair)
             sys.exit(1)
         pairs = {pair: pairs[pair]}
 
@@ -426,17 +452,17 @@ def main(config: str, pair: str | None, prepare_all: bool) -> None:
         if _step_done(checkpoint, pair_id, role, step)
     )
 
-    with tqdm(total=total_steps, initial=done_steps, desc="Подготовка мишеней", unit="step") as pbar:
+    with tqdm(total=total_steps, initial=done_steps, desc="Preparing targets", unit="step") as pbar:
         for pair_id, pair_cfg in pairs.items():
-            logger.info("Подготовка пары: {}", pair_id)
+            logger.info("Preparing pair: {}", pair_id)
             steps_before = sum(1 for k, v in checkpoint.items() if v is True)
             prepare_pair(pair_id, pair_cfg, prepare_all=prepare_all, checkpoint=checkpoint)
             steps_after = sum(1 for k, v in checkpoint.items() if v is True)
             pbar.update(steps_after - steps_before)
 
     if prepare_all:
-        logger.info("Полная подготовка завершена. Пайплайн скоринга готов к работе OFFLINE.")
-    logger.info("Готово. Мишени сохранены в data/targets/")
+        logger.info("Full preparation complete. Scoring pipeline ready for OFFLINE operation.")
+    logger.info("Done. Targets saved to data/targets/")
 
 
 if __name__ == "__main__":

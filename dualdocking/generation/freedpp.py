@@ -187,7 +187,7 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
         check=False,
     )
     if result.returncode == 0:
-        logger.debug("Docker-образ {} найден", image)
+        logger.debug("Docker image {} found", image)
         return
 
     stderr = result.stderr or ""
@@ -195,15 +195,15 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
     if "No such image" not in stderr and "not found" not in stderr.lower():
         raise RuntimeError(f"Docker inspect failed (rc={result.returncode}): {stderr.strip()}")
 
-    logger.info("Docker-образ {} не найден, собираю...", image)
+    logger.info("Docker image {} not found, building...", image)
     dockerfile_dir = PROJECT_ROOT / "docker" / "freedpp"
     dockerfile_path = dockerfile_dir / "Dockerfile"
     if not dockerfile_path.exists():
-        raise FileNotFoundError(f"Dockerfile не найден: {dockerfile_path}")
+        raise FileNotFoundError(f"Dockerfile not found: {dockerfile_path}")
 
     missing_files = [p for p in FREED_DATA_FILES if not p.exists()]
     if missing_files:
-        logger.info("Отсутствуют FREED data files, скачиваю: {}", ", ".join(str(p) for p in missing_files))
+        logger.info("Missing FREED data files, downloading: {}", ", ".join(str(p) for p in missing_files))
         result = run_project_command(
             ["python", "scripts/s0_fetch/fetch_freed_fragments.py"],
             project_root=PROJECT_ROOT,
@@ -212,7 +212,7 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
         )
         if result.returncode != 0:
             tail = ((result.stdout or "") + (result.stderr or ""))[-2000:]
-            raise RuntimeError(f"Не удалось скачать FREED data files:\n{tail}")
+            raise RuntimeError(f"Failed to download FREED data files:\n{tail}")
 
     subprocess.run(  # noqa: S603
         [
@@ -226,7 +226,7 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
         ],
         check=True,
     )
-    logger.info("Docker-образ {} собран", image)
+    logger.info("Docker image {} built", image)
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ def _find_cached_model(key: str) -> Path | None:
     """
     model_dir = CACHE_DIR / key
     if model_dir.exists() and any(model_dir.iterdir()):
-        logger.info("Найден кеш модели: {}", model_dir)
+        logger.info("Found cached model: {}", model_dir)
         return model_dir
     return None
 
@@ -315,7 +315,7 @@ def _resolve_pdb_path(target_id: str) -> Path:
                 if pdb_files:
                     return pdb_files[0]
 
-    raise FileNotFoundError(f"PDB файл для target '{target_id}' не найден в {DATA_DIR}")
+    raise FileNotFoundError(f"PDB file for target '{target_id}' not found in {DATA_DIR}")
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ def _prepare_receptor(
     """
     pdbqt_path = out_dir / (pdb_path.stem + ".pdbqt")
     if not pdbqt_path.exists():
-        logger.info("Конвертация PDB → PDBQT: {} → {}", pdb_path, pdbqt_path)
+        logger.info("Converting PDB -> PDBQT: {} -> {}", pdb_path, pdbqt_path)
         out_dir.mkdir(parents=True, exist_ok=True)
         subprocess.run(  # noqa: S603
             [
@@ -367,7 +367,7 @@ def _prepare_receptor(
             timeout=60,
         )
     else:
-        logger.debug("PDBQT уже существует: {}", pdbqt_path)
+        logger.debug("PDBQT already exists: {}", pdbqt_path)
 
     center_str, size_str = extract_binding_box(pdb_path, padding=padding)
     logger.info("Binding box: center={}, size={}", center_str, size_str)
@@ -583,8 +583,8 @@ def _run_freedpp(
     log_ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     log_path = workspace / f"freedpp_{config.reward_mode}_seed_{config.seed}_{run_id}_{log_ts}.log"
 
-    logger.info("Запуск FREED++: {}", " ".join(docker_cmd))
-    logger.info("FREED++ лог -> {}", log_path)
+    logger.info("Starting FREED++: {}", " ".join(docker_cmd))
+    logger.info("FREED++ log -> {}", log_path)
 
     epoch_bar: tqdm[None] | None = None
     log_file = None
@@ -606,7 +606,7 @@ def _run_freedpp(
         )
 
         if "train" in commands:
-            epoch_bar = tqdm(total=config.epochs, desc="FREED++ обучение", unit="epoch")
+            epoch_bar = tqdm(total=config.epochs, desc="FREED++ training", unit="epoch")
 
         train_start = time.monotonic()
         last_epoch_logged = -1
@@ -674,9 +674,9 @@ def _run_freedpp(
 
     if process is None or process.returncode != 0:
         rc = process.returncode if process is not None else -1
-        logger.error("FREED++ завершился с ошибкой (rc={})", rc)
+        logger.error("FREED++ failed (rc={})", rc)
         logger.error("output: {}", stdout_text[-2000:])
-        logger.error("FREED++ лог -> {}", log_path)
+        logger.error("FREED++ log -> {}", log_path)
         raise subprocess.CalledProcessError(rc, docker_cmd, output=stdout_text)
 
     return subprocess.CompletedProcess(docker_cmd, process.returncode, stdout=stdout_text, stderr="")
@@ -774,24 +774,24 @@ def generate(config: GenerationConfig) -> list[str]:
     n_steps = 8 if not needs_second else 9
     pbar = tqdm(
         total=n_steps,
-        desc=f"Генерация [{config.target_id}]",
+        desc=f"Generate [{config.target_id}]",
         unit="step",
         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}] {postfix}",
     )
 
     # 1. Docker image
-    pbar.set_postfix_str("Docker-образ")
+    pbar.set_postfix_str("Docker image")
     _ensure_docker_image(config.docker_image)
     pbar.update(1)
 
     # 2. Cache check
-    pbar.set_postfix_str("Проверка кеша")
+    pbar.set_postfix_str("Cache check")
     key = _cache_key(config)
     cached_model = _find_cached_model(key) if config.use_cache else None
     pbar.update(1)
 
     # 3. Workspace
-    pbar.set_postfix_str("Подготовка workspace")
+    pbar.set_postfix_str("Preparing workspace")
     workspace = config.output_dir / "freedpp_workspace"
     workspace.mkdir(parents=True, exist_ok=True)
     pbar.update(1)
@@ -799,7 +799,7 @@ def generate(config: GenerationConfig) -> list[str]:
     # 3.1. Normalization (needed for reward)
     normalization_src = PROJECT_ROOT / "configs" / "normalization.yaml"
     if not normalization_src.exists():
-        raise FileNotFoundError(f"normalization.yaml не найден: {normalization_src}")
+        raise FileNotFoundError(f"normalization.yaml not found: {normalization_src}")
     normalization_dst = workspace / "normalization.yaml"
     if not normalization_dst.exists():
         shutil.copy2(normalization_src, normalization_dst)
@@ -835,17 +835,17 @@ def generate(config: GenerationConfig) -> list[str]:
         if not model_target.exists():
             shutil.copytree(cached_model, model_target, dirs_exist_ok=True)
         commands = "sample"
-        logger.info("Используется кешированная модель ({}) → только sampling", key)
+        logger.info("Using cached model ({}) -> sample only", key)
     else:
         commands = "train,sample"
         # Clear stale output from a previously interrupted run
         stale_output = workspace / "output" / "run"
         if stale_output.exists():
-            logger.warning("Обнаружен stale output от прерванного запуска: {}", stale_output)
+            logger.warning("Found stale output from interrupted run: {}", stale_output)
             shutil.rmtree(stale_output, ignore_errors=True)
             # Fallback: Docker (root-owned files)
             if stale_output.exists():
-                logger.info("Удаление root-owned файлов через Docker...")
+                logger.info("Removing root-owned files via Docker...")
                 subprocess.run(  # noqa: S603
                     [
                         DOCKER_BIN,
@@ -861,7 +861,7 @@ def generate(config: GenerationConfig) -> list[str]:
                     check=False,
                     timeout=30,
                 )
-            logger.info("Stale output удалён")
+            logger.info("Stale output removed")
 
     # 7. Run FREED++
     pbar.set_postfix_str(f"FREED++ ({commands})")
@@ -879,23 +879,23 @@ def generate(config: GenerationConfig) -> list[str]:
     pbar.update(1)
 
     # 8. Parse output
-    pbar.set_postfix_str("Парсинг SMILES")
+    pbar.set_postfix_str("Parsing SMILES")
     smiles = _parse_output_smiles(workspace)
     pbar.update(1)
 
     # 9. Cache trained model
-    pbar.set_postfix_str("Кеширование модели")
+    pbar.set_postfix_str("Caching model")
     if config.use_cache and commands == "train,sample":
         model_dir = workspace / "output" / "run"
         if model_dir.exists():
             cache_dest = CACHE_DIR / key
             cache_dest.mkdir(parents=True, exist_ok=True)
             shutil.copytree(model_dir, cache_dest, dirs_exist_ok=True)
-            logger.info("Модель сохранена в кеш: {}", cache_dest)
+            logger.info("Model saved to cache: {}", cache_dest)
     pbar.update(1)
 
     # 10. Write output
-    pbar.set_postfix_str("Запись результатов")
+    pbar.set_postfix_str("Writing results")
     config.output_dir.mkdir(parents=True, exist_ok=True)
     import pandas as pd
 
@@ -903,7 +903,7 @@ def generate(config: GenerationConfig) -> list[str]:
 
     _gen_df = pd.DataFrame({"smiles": smiles})
     write_df(_gen_df, config.output_dir / "generated", csv_too=True)
-    logger.info("Сгенерировано {} молекул -> {}", len(smiles), config.output_dir / "generated.parquet")
+    logger.info("Generated {} molecules -> {}", len(smiles), config.output_dir / "generated.parquet")
     pbar.close()
 
     return smiles

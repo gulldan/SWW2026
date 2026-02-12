@@ -7,7 +7,6 @@ the result as a ``.smi`` file with an accompanying SHA-256 sidecar.
 from __future__ import annotations
 
 import bisect
-import hashlib
 import random
 from pathlib import Path
 
@@ -15,21 +14,7 @@ import click
 import pyarrow.parquet as pq
 from loguru import logger
 
-
-def _sha256(path: Path) -> str:
-    """Compute SHA-256 hex digest of a file.
-
-    Args:
-        path: File to hash.
-
-    Returns:
-        Hex-encoded SHA-256 digest.
-    """
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()
+from dualdocking.data.http_utils import sha256_file
 
 
 @click.command()
@@ -108,7 +93,7 @@ def main(input_path: str, output_path: str, n: int, seed: int, column: str) -> N
         raise RuntimeError(f"Only collected {len(sample)} SMILES after filtering empties")
 
     out_path.write_text("\n".join(sample) + "\n")
-    sha = _sha256(out_path)
+    sha = sha256_file(out_path)
     sha_path = out_path.with_suffix(out_path.suffix + ".sha256")
     sha_path.write_text(sha + "\n")
 

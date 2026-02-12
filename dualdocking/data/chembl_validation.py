@@ -9,7 +9,6 @@ Fetches known actives from ChEMBL REST API and computes validation metrics:
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -18,6 +17,8 @@ import requests
 from loguru import logger
 from rdkit import DataStructs
 from rdkit.Chem import AllChem, MolFromSmiles
+
+from dualdocking.data.http_utils import get_with_retry
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -212,6 +213,8 @@ def enrichment_factor(
 def _get_with_retry(url: str) -> requests.Response:
     """HTTP GET with retry and exponential backoff.
 
+    Delegates to :func:`dualdocking.data.http_utils.get_with_retry`.
+
     Args:
         url: Fully-qualified URL to fetch.
 
@@ -221,14 +224,4 @@ def _get_with_retry(url: str) -> requests.Response:
     Raises:
         requests.RequestException: If all retry attempts fail.
     """
-    for attempt in range(1, _RETRY_ATTEMPTS + 1):
-        try:
-            resp = requests.get(url, timeout=60)
-            resp.raise_for_status()
-            return resp
-        except (requests.RequestException, requests.HTTPError) as exc:
-            if attempt == _RETRY_ATTEMPTS:
-                raise
-            logger.warning("ChEMBL API attempt {}/{} failed: {}", attempt, _RETRY_ATTEMPTS, exc)
-            time.sleep(_RETRY_BACKOFF * attempt)
-    raise RuntimeError("Unreachable")  # pragma: no cover
+    return get_with_retry(url, attempts=_RETRY_ATTEMPTS, backoff=_RETRY_BACKOFF)

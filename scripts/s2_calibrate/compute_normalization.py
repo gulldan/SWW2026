@@ -7,7 +7,6 @@ to z-score-normalize docking results.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,24 +18,13 @@ from loguru import logger
 
 from dualdocking.config import load_pairs
 from dualdocking.data.baseline import bootstrap_stability_check
+from dualdocking.data.http_utils import sha256_file
+from dualdocking.scoring.docking import resolve_program
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 
 
-def _sha256(path: Path) -> str:
-    """Compute SHA-256 hex digest of a file.
-
-    Args:
-        path: File to hash.
-
-    Returns:
-        Hex-encoded SHA-256 digest.
-    """
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()
+_sha256 = sha256_file
 
 
 def _boltz_version() -> str:
@@ -53,24 +41,7 @@ def _boltz_version() -> str:
         return "unknown"
 
 
-_PROGRAM_ALIASES: dict[str, str] = {
-    "unidock_gpu": "unidock",
-}
-
-
-def _resolve_program(program: str, override: str | None = None) -> str:
-    """Resolve a docking program name to its binary.
-
-    Args:
-        program: Logical program name (may be aliased).
-        override: Optional explicit binary path.
-
-    Returns:
-        Resolved binary name or path.
-    """
-    if override:
-        return override
-    return _PROGRAM_ALIASES.get(program, program)
+_resolve_program = resolve_program
 
 
 def _docking_version(program: str) -> str:

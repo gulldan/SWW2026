@@ -12,10 +12,10 @@ reported with status "skipped" and excluded from pass/fail counting.
 
 Usage::
 
-    uv run python scripts/validate_redocking.py
-    uv run python scripts/validate_redocking.py --target-id BACE1 --target-id GSK3B
-    uv run python scripts/validate_redocking.py --include-blocked
-    uv run python scripts/validate_redocking.py --dry-run
+    uv run python scripts/s2_calibrate/validate_redocking.py
+    uv run python scripts/s2_calibrate/validate_redocking.py --target-id BACE1 --target-id GSK3B
+    uv run python scripts/s2_calibrate/validate_redocking.py --include-blocked
+    uv run python scripts/s2_calibrate/validate_redocking.py --dry-run
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ from __future__ import annotations
 import csv
 import json
 import re
-import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,15 +30,22 @@ from typing import Any
 
 import click
 import numpy as np
-import requests
 from loguru import logger
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 
+from dualdocking.config import collect_blocked_target_ids
+from dualdocking.data.http_utils import get_with_retry
+from dualdocking.scoring.docking import (
+    DockerRunner,
+    DockingParams,
+    dock_batch_unidock,
+    ensure_ligand_pdbqt,
+    ensure_receptor_pdbqt,
+    parse_vec,
+)
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
-DOCKER_BIN = shutil.which("docker") or "docker"
 
 RMSD_THRESHOLD = 2.0  # Angstrom
 
@@ -71,10 +77,11 @@ class RedockResult:
 
 def fetch_ligand_smiles(resname: str) -> str | None:
     """Fetch canonical SMILES for a PDB ligand from RCSB Chemical Component Dictionary."""
+    import requests
+
     url = f"https://data.rcsb.org/rest/v1/core/chemcomp/{resname.upper()}"
     try:
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
+        resp = get_with_retry(url, timeout=30)
     except requests.RequestException as exc:
         logger.warning("Failed to fetch SMILES for {}: {}", resname, exc)
         return None
@@ -242,14 +249,7 @@ def _write_csv(results: list[RedockResult], path: Path) -> None:
             writer.writerow({k: row.get(k, "") for k in CSV_COLUMNS})
 
 
-def _collect_blocked_target_ids(pairs: dict[str, Any]) -> set[str]:
-    """Return target IDs belonging to blocked pairs."""
-    blocked: set[str] = set()
-    for pair_cfg in pairs.values():
-        if pair_cfg.get("set") == "blocked":
-            for role in ("target_a", "target_b"):
-                blocked.add(pair_cfg[role]["id"])
-    return blocked
+# collect_blocked_target_ids is imported from dualdocking.config
 
 
 def _validate_target(
@@ -261,13 +261,6 @@ def _validate_target(
     rmsd_threshold: float,
 ) -> RedockResult:
     """Run re-docking validation for a single target."""
-    from dock_calibration import (
-        _dock_batch_unidock,
-        _ensure_ligand_pdbqt,
-        _ensure_receptor_pdbqt,
-        _parse_vec,
-    )
-
     from dualdocking.scoring.binding_box import extract_binding_box, extract_ligand_info
 
     pdb_id = target_cfg["pdb_id"]
@@ -333,7 +326,7 @@ def _validate_target(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        _ensure_receptor_pdbqt(runner, pdb_path, receptor_path, timeout=params.timeout_seconds)
+        ensure_receptor_pdbqt(runner, pdb_path, receptor_path, timeout=params.timeout_seconds, project_root=PROJECT_ROOT)
     except Exception as exc:
         return RedockResult(
             target_id=target_id,
@@ -349,13 +342,14 @@ def _validate_target(
             error=f"Receptor prep failed: {exc}",
         )
 
-    ok, err = _ensure_ligand_pdbqt(
+    ok, err = ensure_ligand_pdbqt(
         runner,
         smiles,
         sdf_path,
         ligand_path,
         timeout=params.timeout_seconds,
         seed=42,
+        project_root=PROJECT_ROOT,
         overwrite=True,
     )
     if not ok:
@@ -374,11 +368,11 @@ def _validate_target(
         )
 
     center_str, size_str = extract_binding_box(pdb_path, padding=params.box_padding)
-    center = _parse_vec(center_str)
-    size = _parse_vec(size_str)
+    center = parse_vec(center_str)
+    size = parse_vec(size_str)
 
     try:
-        batch_scores = _dock_batch_unidock(
+        batch_scores = dock_batch_unidock(
             runner,
             "unidock",
             receptor_path,
@@ -390,6 +384,7 @@ def _validate_target(
             batch_id=0,
             seed=42,
             timeout=params.timeout_seconds,
+            project_root=PROJECT_ROOT,
         )
     except Exception as exc:
         return RedockResult(
@@ -471,7 +466,6 @@ def main(
 ) -> None:
     """Validate docking setup by re-docking co-crystallized ligands."""
     import yaml
-    from dock_calibration import DockerRunner, DockingParams
 
     from dualdocking.config import load_pairs
     from dualdocking.scoring.binding_box import extract_ligand_info
@@ -487,7 +481,7 @@ def main(
     )
 
     pairs = load_pairs(PROJECT_ROOT / "configs")["pairs"]
-    blocked_ids = _collect_blocked_target_ids(pairs)
+    blocked_ids = collect_blocked_target_ids(pairs)
 
     targets: dict[str, dict[str, Any]] = {}
     for pair_cfg in pairs.values():

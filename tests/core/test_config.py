@@ -3,7 +3,15 @@
 import pytest
 import yaml
 
-from dualdocking.config import load_experiment, load_metrics, load_pairs, load_yaml
+from dualdocking.config import (
+    collect_all_target_ids,
+    collect_blocked_target_ids,
+    collect_target_pdb_map,
+    load_experiment,
+    load_metrics,
+    load_pairs,
+    load_yaml,
+)
 
 
 def test_load_yaml(tmp_path):
@@ -150,3 +158,51 @@ def test_load_experiment(tmp_path):
     (tmp_path / "experiment.yaml").write_text(yaml.dump(cfg))
     result = load_experiment(tmp_path)
     assert "experiment" in result
+
+
+# ---------------------------------------------------------------------------
+# Config helpers (collect_*)
+# ---------------------------------------------------------------------------
+
+_PAIRS_FIXTURE = {
+    "CDK2_ERK2": {
+        "set": "core",
+        "target_a": {"id": "CDK2", "pdb_id": "1HCK", "organism": "Homo sapiens"},
+        "target_b": {"id": "ERK2", "pdb_id": "4GT3", "organism": "Homo sapiens"},
+    },
+    "COX1_COX2": {
+        "set": "blocked",
+        "target_a": {"id": "COX1", "pdb_id": "3KK6", "organism": "Ovis aries"},
+        "target_b": {"id": "COX2", "pdb_id": "5KIR", "organism": "Mus musculus"},
+    },
+}
+
+
+def test_collect_blocked_target_ids():
+    blocked = collect_blocked_target_ids(_PAIRS_FIXTURE)
+    assert blocked == {"COX1", "COX2"}
+
+
+def test_collect_blocked_empty_when_no_blocked():
+    pairs = {"CDK2_ERK2": _PAIRS_FIXTURE["CDK2_ERK2"]}
+    assert collect_blocked_target_ids(pairs) == set()
+
+
+def test_collect_all_target_ids():
+    ids = collect_all_target_ids(_PAIRS_FIXTURE)
+    assert ids == ["CDK2", "COX1", "COX2", "ERK2"]
+
+
+def test_collect_all_target_ids_deduplicates():
+    pairs = {
+        "p1": {
+            "target_a": {"id": "CDK2", "pdb_id": "1HCK"},
+            "target_b": {"id": "CDK2", "pdb_id": "1HCK"},
+        },
+    }
+    assert collect_all_target_ids(pairs) == ["CDK2"]
+
+
+def test_collect_target_pdb_map():
+    mapping = collect_target_pdb_map(_PAIRS_FIXTURE)
+    assert mapping == {"CDK2": "1HCK", "ERK2": "4GT3", "COX1": "3KK6", "COX2": "5KIR"}

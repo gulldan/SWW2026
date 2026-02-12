@@ -5,22 +5,20 @@ Results are cached in data/chembl/ for use in Stage 2 validation.
 
 Usage::
 
-    uv run python scripts/fetch_chembl_actives.py
-    uv run python scripts/fetch_chembl_actives.py --target-id BACE1 --target-id GSK3B
-    uv run python scripts/fetch_chembl_actives.py --min-pchembl 6.0
+    uv run python scripts/s0_fetch/fetch_chembl_actives.py
+    uv run python scripts/s0_fetch/fetch_chembl_actives.py --target-id BACE1 --target-id GSK3B
+    uv run python scripts/s0_fetch/fetch_chembl_actives.py --min-pchembl 6.0
 """
 
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import click
 from loguru import logger
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
 CHEMBL_DATA_DIR: Path = PROJECT_ROOT / "output" / "data" / "chembl"
 

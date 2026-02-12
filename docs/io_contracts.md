@@ -27,16 +27,21 @@ After completion, no internet access is required.
 
 | File | Format | Contents |
 |------|--------|----------|
-| `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | 3D protein structure from RCSB |
+| `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | 3D protein structure from RCSB (with retry) |
 | `output/data/targets/{pair_id}/{A,B}/meta.yaml` | YAML | Copy of target config (id, pdb_id, uniprot, chain) |
-| `output/data/targets/{target_id}.fasta` | FASTA | Protein amino-acid sequence from UniProt |
+| `output/data/targets/{target_id}.fasta` | FASTA | Protein amino-acid sequence from UniProt (with retry) |
 | `output/data/targets/{target_id}.pdbqt` | PDBQT | Receptor prepared for docking (Meeko via Docker) |
+| `output/data/targets/fetch_manifest.json` | JSON | SHA-256 checksums, URLs, sizes, timestamps for every downloaded PDB/FASTA |
 | `output/cache/boltz_msa/{target_id}.csv` | CSV | Pre-computed MSA from ColabFold |
 | `output/data/calibration/{source}_{n}_seed{seed}.smi` | SMI | Reservoir-sampled calibration SMILES |
 | `output/data/calibration/manifest.json` | JSON | SHA256 checksums, timestamps, source metadata |
 | `docker/freedpp/data/zinc_crem.json` | JSON | CReM fragment library for FREED++ |
 | `docker/freedpp/data/alert_collections.csv` | CSV | Structural alert patterns (PAINS, SureChEMBL, Glaxo) |
 | `output/cache/prepare_checkpoint.json` | JSON | Step completion tracking (`"{pair}/{role}/{step}": true`) |
+| `output/data/chembl/{target_id}_actives.json` | JSON | Known actives from ChEMBL API (array of SMILES) |
+| `output/data/chembl/{pair_id}_dual_actives.json` | JSON | Molecules active on both targets |
+| `output/data/chembl/summary.json` | JSON | Per-pair active counts and dual-active overlaps |
+| `output/bin/gnina` | Binary | GNINA static binary (Linux x86_64) for cross-validation scoring |
 | Docker image `dualdocking/freedpp:latest` | — | CUDA + PyTorch + UniDock GPU + FREED++ |
 
 ### Optional Outputs
@@ -44,8 +49,6 @@ After completion, no internet access is required.
 | File | Format | Contents |
 |------|--------|----------|
 | `output/data/baseline/zinc-druglike-cano.tar.xz` | tar.xz | ZINC20 druglike molecules archive |
-| `output/data/chembl/{target_id}_actives.json` | JSON | Known actives from ChEMBL API (array of SMILES) |
-| `output/data/chembl/{pair_id}_dual_actives.json` | JSON | Molecules active on both targets |
 
 ---
 
@@ -336,6 +339,69 @@ Score columns: `affinity_a`, `affinity_b`, `combined_min`, + configured objectiv
 
 ---
 
+## Stage 5b — GNINA Cross-Validation (planned)
+
+**Script**: `scripts/s6_report/score_gnina.py` (not yet implemented)
+
+Scores generated molecules with GNINA CNN-based scoring as a third
+independent scorer alongside Boltz-2 and UniDock.
+
+### Inputs
+
+| File | Format | Source |
+|------|--------|--------|
+| `output/results/{pair}/{mode}/seed_{seed}/scored_joined.parquet` | Parquet | Stage 3 |
+| `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | Stage 0 |
+| `output/bin/gnina` | Binary | Stage 0 |
+
+### Outputs
+
+| File | Format | Schema |
+|------|--------|--------|
+| `output/results/{pair}/{mode}/seed_{seed}/gnina_scores_A.parquet` | Parquet | `smiles` (str), `gnina_score` (float64), `gnina_affinity` (float64), `cnn_score` (float64) |
+| `output/results/{pair}/{mode}/seed_{seed}/gnina_scores_B.parquet` | Parquet | Same schema |
+
+---
+
+## Stage 5c — MD Validation (planned)
+
+**Script**: `scripts/s6_md/run_md.py` (not yet implemented)
+
+Runs molecular dynamics simulations for top candidate molecules from
+each generation mode.  Validates binding stability over 50 ns.
+
+### Prerequisites
+
+- GROMACS >= 2024 with GPU support (CUDA)
+- AmberTools + acpype (ligand parameterization)
+- gmx_MMPBSA (optional, for MM-GBSA rescoring)
+
+Installation: `conda install -c conda-forge -c bioconda gromacs ambertools acpype`
+or via Docker image.
+
+### Inputs
+
+| File | Format | Source |
+|------|--------|--------|
+| Top-N molecules per mode (from `scored_joined.parquet`) | Parquet | Stage 3 |
+| `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | Stage 0 |
+| Boltz-2 predicted complex structures (`.cif`) | mmCIF | Stage 3 (Boltz-2 output) |
+
+### Outputs
+
+| File | Format | Contents |
+|------|--------|----------|
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/rmsd_ligand.csv` | CSV | Per-frame RMSD of ligand heavy atoms (ns, Å) |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/hbonds.csv` | CSV | Per-frame hydrogen bond count |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/interaction_energy.csv` | CSV | Per-frame protein-ligand interaction energy (kJ/mol) |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/trajectory.xtc` | XTC | Compressed trajectory (GROMACS format) |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/mmpbsa.csv` | CSV | MM-GBSA binding free energy (optional, from gmx_MMPBSA) |
+| `output/md/md_summary.parquet` | Parquet | `pair`, `mode`, `mol_id`, `target`, `mean_rmsd`, `max_rmsd`, `stable` (bool, RMSD < 3 Å), `mean_hbonds`, `mean_energy` |
+
+Stability criterion: ligand RMSD < 3.0 Å over last 25 ns of 50 ns trajectory.
+
+---
+
 ## Stage 6 — Audit
 
 **Script**: `scripts/s7_audit/claim_audit.py`
@@ -404,6 +470,7 @@ Boltz CLI model weights: controlled by `BOLTZ_CACHE` env var
 | `configs/calibration.yaml` | YAML | Fetch, Calibration |
 | `configs/normalization.yaml` | YAML | Generation, Scoring (produced by Stage 1) |
 | `configs/metrics.yaml` | YAML | Scoring, Analysis, Report |
+| `configs/filters.yaml` | YAML | Post-scoring drug-likeness filtering (Lipinski, QED, PAINS, SA, Veber) |
 | `configs/master_config.yaml` | YAML | LaTeX report |
 
 ---
@@ -414,7 +481,7 @@ Boltz CLI model weights: controlled by `BOLTZ_CACHE` env var
 |-------------|--------|
 | `{pair_id}` | e.g. `CDK2_ERK2`, `BACE1_GSK3B`, `AChE_BChE` |
 | `{target_id}` | e.g. `CDK2`, `ERK2`, `BACE1`, `GSK3B` |
-| `{mode}` | `single_a`, `single_b`, `double` |
+| `{mode}` | `single_a`, `single_b`, `double`, `linear_equal`, `biased_a`, `selective_a` |
 | `{seed}` | `42`, `137`, `256`, `512`, `1024` (from experiment.yaml) |
 | `{ctx[:8]}` | First 8 chars of scoring context SHA-256 hash |
 | `{cache_key}` | Full SHA-256 hash of FREED++ config parameters |

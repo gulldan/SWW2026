@@ -8,17 +8,15 @@ Blocks KVA-270 (threshold calibration) and KVA-276 (M2 milestone).
 
 Usage::
 
-    uv run python scripts/enrichment_benchmark.py --dry-run
-    uv run python scripts/enrichment_benchmark.py --target-id BACE1 --target-id CDK2
-    uv run python scripts/enrichment_benchmark.py
+    uv run python scripts/s2_calibrate/enrichment_benchmark.py --dry-run
+    uv run python scripts/s2_calibrate/enrichment_benchmark.py --target-id BACE1 --target-id CDK2
+    uv run python scripts/s2_calibrate/enrichment_benchmark.py
 """
 
 from __future__ import annotations
 
 import json
 import random
-import shutil
-import sys
 from contextlib import nullcontext
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -30,28 +28,23 @@ import numpy as np
 from loguru import logger
 from tqdm import tqdm
 
+from dualdocking.config import (
+    collect_all_target_ids,
+    collect_blocked_target_ids,
+    collect_target_pdb_map,
+)
+from dualdocking.data.http_utils import get_with_retry
+from dualdocking.scoring.docking import (
+    DockerRunner,
+    DockingParams,
+    dock_batch_unidock,
+    ensure_ligand_pdbqt,
+    ensure_receptor_pdbqt,
+    parse_vec,
+    safe_unlink,
+)
+
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
-
-DOCKER_BIN: str = shutil.which("docker") or "docker"
-
-# PDB ID mapping for targets missing local PDB files.
-# These are downloaded from RCSB when not present on disk.
-TARGET_PDB_MAP: dict[str, str] = {
-    "CDK2": "1HCL",
-    "ERK2": "4QTA",
-    "EGFR": "1M17",
-    "HER2": "3PP0",
-    "AChE": "4EY7",
-    "BChE": "4BDS",
-    "BACE1": "6EQM",
-    "GSK3B": "5KPK",
-    "CDK5": "1UNL",
-    "MAOB": "2V5Z",
-    "COX1": "1EQG",
-    "COX2": "3LN1",
-}
 
 CSV_COLUMNS: list[str] = [
     "target_id",
@@ -67,54 +60,11 @@ CSV_COLUMNS: list[str] = [
 ]
 
 
-def _collect_blocked_target_ids(pairs: dict[str, Any]) -> set[str]:
-    """Return target IDs belonging to blocked pairs.
-
-    Args:
-        pairs: Pairs configuration dictionary.
-
-    Returns:
-        Set of target IDs from blocked pairs.
-    """
-    blocked: set[str] = set()
-    for pair_cfg in pairs.values():
-        if pair_cfg.get("set") == "blocked":
-            for role in ("target_a", "target_b"):
-                blocked.add(pair_cfg[role]["id"])
-    return blocked
-
-
-def _collect_all_target_ids(pairs: dict[str, Any]) -> list[str]:
-    """Collect unique target IDs from all pairs.
-
-    Args:
-        pairs: Pairs configuration dictionary.
-
-    Returns:
-        Sorted list of unique target IDs.
-    """
-    ids: list[str] = []
-    for pair_cfg in pairs.values():
-        ids.append(pair_cfg["target_a"]["id"])
-        ids.append(pair_cfg["target_b"]["id"])
-    return sorted(set(ids))
-
-
-def _collect_target_pdb_map(pairs: dict[str, Any]) -> dict[str, str]:
-    """Build a target_id to pdb_id mapping from pairs config.
-
-    Args:
-        pairs: Pairs configuration dictionary.
-
-    Returns:
-        Mapping from target ID to PDB accession code.
-    """
-    mapping: dict[str, str] = {}
-    for pair_cfg in pairs.values():
-        for role in ("target_a", "target_b"):
-            t = pair_cfg[role]
-            mapping[t["id"]] = t["pdb_id"]
-    return mapping
+# collect_blocked_target_ids, collect_all_target_ids, collect_target_pdb_map
+# are imported from dualdocking.config
+_collect_blocked_target_ids = collect_blocked_target_ids
+_collect_all_target_ids = collect_all_target_ids
+_collect_target_pdb_map = collect_target_pdb_map
 
 
 def _download_pdb(pdb_id: str, dest: Path) -> None:
@@ -124,14 +74,11 @@ def _download_pdb(pdb_id: str, dest: Path) -> None:
         pdb_id: Four-character PDB accession code.
         dest: Local destination path.
     """
-    import requests
-
     if dest.exists():
         return
     url = f"https://files.rcsb.org/download/{pdb_id.upper()}.pdb"
     logger.info("Downloading PDB {} from RCSB to {}", pdb_id, dest)
-    resp = requests.get(url, timeout=60)
-    resp.raise_for_status()
+    resp = get_with_retry(url, timeout=60)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(resp.text)
 
@@ -238,11 +185,7 @@ def _dock_smiles_list(
     Returns:
         Tuple of (score_list, total_failures).
     """
-    from dock_calibration import (
-        _dock_batch_unidock,
-        _ensure_ligand_pdbqt,
-        _safe_unlink,
-    )
+    # dock_batch_unidock, ensure_ligand_pdbqt, safe_unlink are top-level imports
 
     ligands_dir = work_dir / "ligands"
     ligands_dir.mkdir(parents=True, exist_ok=True)
@@ -254,13 +197,14 @@ def _dock_smiles_list(
     for idx, smi in enumerate(tqdm(smiles_list, desc="Prep ligands", unit="lig")):
         sdf_path = ligands_dir / f"active_{idx:05d}.sdf"
         lig_path = ligands_dir / f"active_{idx:05d}.pdbqt"
-        ok, err = _ensure_ligand_pdbqt(
+        ok, err = ensure_ligand_pdbqt(
             runner,
             smi,
             sdf_path,
             lig_path,
             timeout=params.timeout_seconds,
             seed=seed + idx,
+            project_root=PROJECT_ROOT,
         )
         if not ok:
             prep_failures += 1
@@ -279,7 +223,7 @@ def _dock_smiles_list(
         for batch_id, start in enumerate(tqdm(range(0, len(ligand_paths), batch_size), desc="Dock", unit="batch")):
             batch = ligand_paths[start : start + batch_size]
             try:
-                batch_scores = _dock_batch_unidock(
+                batch_scores = dock_batch_unidock(
                     runner,
                     binary,
                     receptor_path,
@@ -291,6 +235,7 @@ def _dock_smiles_list(
                     batch_id=batch_id,
                     seed=seed + start,
                     timeout=params.timeout_seconds,
+                    project_root=PROJECT_ROOT,
                 )
             except Exception as exc:
                 dock_failures += len(batch)
@@ -302,15 +247,15 @@ def _dock_smiles_list(
                     dock_failures += 1
                 else:
                     scores.append(score)
-                _safe_unlink(lig, runner)
+                safe_unlink(lig, runner, PROJECT_ROOT)
     else:
-        from dock_calibration import _dock_ligand
+        from dualdocking.scoring.docking import dock_ligand
 
         for idx, lig_path in enumerate(tqdm(ligand_paths, desc="Dock", unit="lig")):
             log_path = output_dir / f"active_{idx:05d}.log"
             out_path = output_dir / f"active_{idx:05d}.pdbqt"
             try:
-                score = _dock_ligand(
+                score = dock_ligand(
                     runner,
                     binary,
                     receptor_path,
@@ -320,6 +265,7 @@ def _dock_smiles_list(
                     params,
                     log_path,
                     out_path,
+                    project_root=PROJECT_ROOT,
                 )
                 scores.append(score)
             except Exception as exc:
@@ -328,7 +274,7 @@ def _dock_smiles_list(
             finally:
                 for p in (log_path, out_path, lig_path):
                     if p.exists():
-                        _safe_unlink(p, runner)
+                        safe_unlink(p, runner, PROJECT_ROOT)
 
     return scores, prep_failures + dock_failures
 
@@ -485,21 +431,19 @@ def _load_or_dock_decoys(  # noqa: PLR0913
     if skip_docking:
         return f"No calibration scores for {tid} and --skip-docking set"
 
-    from dock_calibration import (
-        _ensure_receptor_pdbqt,
+    from scripts.s2_calibrate.dock_calibration import (
         _load_calibration_smiles,
-        _parse_vec,
         _sample_smiles,
     )
 
     logger.info("Docking calibration set for {} (no existing scores)", tid)
     pdb_path = _resolve_pdb_path_or_download(tid, pdb_id, receptors_dir)
     receptor_path = receptors_dir / f"{tid}.pdbqt"
-    _ensure_receptor_pdbqt(runner, pdb_path, receptor_path, timeout=params.timeout_seconds)
+    ensure_receptor_pdbqt(runner, pdb_path, receptor_path, timeout=params.timeout_seconds, project_root=PROJECT_ROOT)
 
     center_str, size_str = extract_binding_box(pdb_path, padding=params.box_padding)
-    center = _parse_vec(center_str)
-    size = _parse_vec(size_str)
+    center = parse_vec(center_str)
+    size = parse_vec(size_str)
 
     cal_path = PROJECT_ROOT / cal_cfg.get("output_path", "output/data/calibration/zinc_druglike_calibration_1000_v2024.smi")
     all_smiles = _load_calibration_smiles(cal_path)
@@ -581,15 +525,13 @@ def _load_or_dock_actives(  # noqa: PLR0913
     if skip_docking:
         return f"No active scores for {tid} and --skip-docking set"
 
-    from dock_calibration import _ensure_receptor_pdbqt, _parse_vec
-
     pdb_path = _resolve_pdb_path_or_download(tid, pdb_id, receptors_dir)
     receptor_path = receptors_dir / f"{tid}.pdbqt"
-    _ensure_receptor_pdbqt(runner, pdb_path, receptor_path, timeout=params.timeout_seconds)
+    ensure_receptor_pdbqt(runner, pdb_path, receptor_path, timeout=params.timeout_seconds, project_root=PROJECT_ROOT)
 
     center_str, size_str = extract_binding_box(pdb_path, padding=params.box_padding)
-    center = _parse_vec(center_str)
-    size = _parse_vec(size_str)
+    center = parse_vec(center_str)
+    size = parse_vec(size_str)
 
     work_dir = PROJECT_ROOT / "output" / "data" / "enrichment" / "work" / tid / "actives"
     scores, _n_fail = _dock_smiles_list(
@@ -749,7 +691,7 @@ def main(  # noqa: PLR0913
         )
         return
 
-    from dock_calibration import DockerRunner, DockingParams
+    # DockerRunner, DockingParams are top-level imports from dualdocking.scoring.docking
 
     params = DockingParams(
         exhaustiveness=int(docking_cfg.get("exhaustiveness", 8)),
@@ -934,7 +876,7 @@ def _process_target(  # noqa: PLR0913
     Returns:
         An ``EnrichmentResult`` instance.
     """
-    pdb_id = target_pdb_map.get(tid, TARGET_PDB_MAP.get(tid, ""))
+    pdb_id = target_pdb_map.get(tid, "")
     err_result = lambda msg: result_cls(  # noqa: E731
         target_id=tid,
         n_actives=0,
@@ -1111,7 +1053,7 @@ def _write_outputs(
     rows = []
     for r in results:
         d = asdict(r)
-        d["pdb_id"] = target_pdb_map.get(r.target_id, TARGET_PDB_MAP.get(r.target_id, ""))
+        d["pdb_id"] = target_pdb_map.get(r.target_id, "")
         rows.append({k: d.get(k, "") for k in CSV_COLUMNS})
     df = pd.DataFrame(rows, columns=CSV_COLUMNS)
     # csv_output has .csv extension — strip to get stem

@@ -92,6 +92,56 @@ def load_metrics(config_dir: str | Path = "configs") -> dict[str, Any]:
     return load_yaml(path)
 
 
+def collect_blocked_target_ids(pairs: dict[str, Any]) -> set[str]:
+    """Return target IDs belonging to blocked pairs.
+
+    Args:
+        pairs: The ``"pairs"`` dict from :func:`load_pairs`.
+
+    Returns:
+        Set of target IDs from blocked pairs.
+    """
+    blocked: set[str] = set()
+    for pair_cfg in pairs.values():
+        if pair_cfg.get("set") == "blocked":
+            for role in ("target_a", "target_b"):
+                blocked.add(pair_cfg[role]["id"])
+    return blocked
+
+
+def collect_all_target_ids(pairs: dict[str, Any]) -> list[str]:
+    """Collect unique target IDs from all pairs.
+
+    Args:
+        pairs: The ``"pairs"`` dict from :func:`load_pairs`.
+
+    Returns:
+        Sorted list of unique target IDs.
+    """
+    ids: list[str] = []
+    for pair_cfg in pairs.values():
+        ids.append(pair_cfg["target_a"]["id"])
+        ids.append(pair_cfg["target_b"]["id"])
+    return sorted(set(ids))
+
+
+def collect_target_pdb_map(pairs: dict[str, Any]) -> dict[str, str]:
+    """Build a target_id → pdb_id mapping from pairs config.
+
+    Args:
+        pairs: The ``"pairs"`` dict from :func:`load_pairs`.
+
+    Returns:
+        Mapping from target ID to PDB accession code.
+    """
+    mapping: dict[str, str] = {}
+    for pair_cfg in pairs.values():
+        for role in ("target_a", "target_b"):
+            t = pair_cfg[role]
+            mapping[t["id"]] = t["pdb_id"]
+    return mapping
+
+
 def load_experiment(config_dir: str | Path = "configs") -> dict[str, Any]:
     """Load experiment.yaml configuration.
 

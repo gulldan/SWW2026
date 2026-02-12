@@ -18,12 +18,16 @@ uv run python scripts/s0_fetch/fetch_all.py
 ```
 
 This downloads PDB structures, FASTA sequences, MSA data, calibration SMILES,
-builds the Docker image, and prepares PDBQT receptors. Supports flags:
+ChEMBL actives, GNINA binary, builds the Docker image, and prepares PDBQT
+receptors. All HTTP downloads use exponential-backoff retry
+(`dualdocking.data.http_utils`). Supports flags:
 
 | Flag | Effect |
 |------|--------|
 | `--baseline-url URL` | Also download ZINC baseline archive |
 | `--skip-docker-build` | Skip Docker image build |
+| `--skip-chembl` | Skip ChEMBL actives fetch (Step 7) |
+| `--skip-gnina` | Skip GNINA binary download (Step 8) |
 | `--verify-only` | Check completeness without downloading |
 | `--dry-run` | Print commands without executing |
 
@@ -40,6 +44,9 @@ builds the Docker image, and prepares PDBQT receptors. Supports flags:
 | FASTA sequences | UniProt | `output/data/targets/` |
 | MSA | ColabFold API | `output/cache/boltz_msa/` |
 | PDBQT receptors | Local Docker | `output/data/targets/` |
+| ChEMBL actives | ChEMBL API | `output/data/chembl/` |
+| GNINA binary | GitHub releases | `output/bin/gnina` |
+| Fetch manifest | — (generated) | `output/data/targets/fetch_manifest.json` |
 
 ## Stage 0.5: Calibration & Validation (offline, GPU)
 
@@ -101,13 +108,15 @@ Stages and dependencies:
 
 | Stage | Requires | Produces |
 |-------|----------|----------|
-| `fetch` | Internet | PDB, FASTA, SMILES, Docker image |
+| `fetch` | Internet | PDB, FASTA, SMILES, Docker image, ChEMBL actives, GNINA binary |
 | `calibrate` | fetch outputs | `normalization.yaml`, calibration scores |
 | `generate` | calibrate outputs | `generated.parquet` per run |
 | `score` | generated molecules | `scored_joined.parquet` per run (configured scorer engine; default `boltz2`) |
 | `analyze` | scored results | `all_results.parquet`, `metrics.json`, `stats.json` |
 | `report` | analysis outputs | Figures, LaTeX report |
 | `audit` | analysis outputs | `claim_audit.json` |
+| `gnina` (planned) | scored results, GNINA binary | GNINA score Parquet per run |
+| `md` (planned) | scored results, PDB structures | MD trajectories, RMSD/stability CSVs |
 
 ### Backend Selection
 
@@ -194,7 +203,7 @@ uv run python scripts/s5_analyze/summarize.py
 
 ```bash
 for pair in CDK2_ERK2 AChE_BChE BACE1_GSK3B AChE_BACE1 GSK3B_CDK5 EGFR_HER2 BACE1_CDK5 AChE_MAOB; do
-  for mode in single_a single_b double; do
+  for mode in single_a single_b double linear_equal biased_a selective_a; do
     uv run python scripts/s3_generate/generate.py --pair $pair --mode $mode
     uv run python scripts/s4_score/score.py --pair $pair --mode $mode
   done
