@@ -11,6 +11,7 @@ for provenance tracking.
 from __future__ import annotations
 
 import os
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
@@ -35,16 +36,41 @@ from dualdocking.reporting.run_manifest import (
 def _detect_gpu_count() -> int:
     """Detect the number of available CUDA GPUs.
 
+    Tries ``torch.cuda.device_count()`` first, falls back to ``nvidia-smi``.
+
     Returns:
         Number of CUDA devices, or 1 if detection fails.
     """
+    # Try torch first
     try:
         import torch
 
         if torch.cuda.is_available():
-            return torch.cuda.device_count()
+            n = torch.cuda.device_count()
+            if n >= 1:
+                logger.debug("GPU count via torch: {}", n)
+                return n
     except Exception:
-        logger.debug("GPU detection failed, assuming 1 GPU")
+        pass
+
+    # Fallback: nvidia-smi
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],  # noqa: S603, S607
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            lines = [ln for ln in result.stdout.strip().splitlines() if ln.strip()]
+            if lines:
+                logger.debug("GPU count via nvidia-smi: {}", len(lines))
+                return len(lines)
+    except Exception:
+        pass
+
+    logger.debug("GPU detection failed, assuming 1 GPU")
     return 1
 
 
