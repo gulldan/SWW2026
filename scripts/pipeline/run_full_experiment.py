@@ -37,24 +37,24 @@ from dualdocking.reporting.run_manifest import (
 def _detect_gpu_count() -> int:
     """Detect the number of available CUDA GPUs.
 
-    Tries ``torch.cuda.device_count()`` first, falls back to ``nvidia-smi``.
+    Checks ``CUDA_VISIBLE_DEVICES`` first, then ``nvidia-smi`` (not affected
+    by env restrictions), then ``torch.cuda.device_count()``.
 
     Returns:
         Number of CUDA devices, or 1 if detection fails.
     """
-    # Try torch first
-    try:
-        import torch
+    # 1. Honour CUDA_VISIBLE_DEVICES if explicitly set
+    cvd = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if cvd is not None:
+        devices = [d.strip() for d in cvd.split(",") if d.strip()]
+        if devices:
+            logger.debug("GPU count via CUDA_VISIBLE_DEVICES: {}", len(devices))
+            return len(devices)
+        # CUDA_VISIBLE_DEVICES="" → no GPUs
+        logger.debug("CUDA_VISIBLE_DEVICES is empty, assuming 1 GPU")
+        return 1
 
-        if torch.cuda.is_available():
-            n = torch.cuda.device_count()
-            if n >= 1:
-                logger.debug("GPU count via torch: {}", n)
-                return n
-    except Exception:
-        pass
-
-    # Fallback: nvidia-smi
+    # 2. nvidia-smi (shows physical GPUs, unaffected by env vars)
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],  # noqa: S603, S607
@@ -68,6 +68,18 @@ def _detect_gpu_count() -> int:
             if lines:
                 logger.debug("GPU count via nvidia-smi: {}", len(lines))
                 return len(lines)
+    except Exception:
+        pass
+
+    # 3. Fallback: torch
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            n = torch.cuda.device_count()
+            if n >= 1:
+                logger.debug("GPU count via torch: {}", n)
+                return n
     except Exception:
         pass
 
@@ -608,12 +620,23 @@ def main(
 
         logger.info("Starting {} tasks (parallel={}, GPUs={})", total, parallel, n_gpus)
 
-        if parallel <= 1:
+        # Cap effective parallelism at GPU count — running more tasks than GPUs
+        # causes contention (FREED++ and Boltz-2 each need a full GPU).
+        effective_parallel = min(parallel, n_gpus)
+        if effective_parallel < parallel:
+            logger.warning(
+                "Capping --parallel {} to {} (available GPUs). "
+                "Cannot run more concurrent tasks than GPUs.",
+                parallel,
+                effective_parallel,
+            )
+
+        if effective_parallel <= 1:
             pbar = tqdm(tasks, desc="Tasks", unit="task", dynamic_ncols=True)
             for pair_id, mode, seed in pbar:
                 pbar.set_postfix_str(f"{pair_id}/{mode}/seed_{seed}", refresh=True)
                 try:
-                    _run_one(pair_id, mode, seed, log_path, resume, mf_path, gpu_id=0 if n_gpus == 1 else None)
+                    _run_one(pair_id, mode, seed, log_path, resume, mf_path, gpu_id=0)
                     n_completed += 1
                 except RuntimeError:
                     n_failed += 1
@@ -622,13 +645,10 @@ def main(
             pbar.close()
         else:
             # GPU pool: each worker acquires a GPU id before running, releases after.
-            gpu_pool: queue.Queue[int | None] = queue.Queue()
-            if n_gpus > 1:
-                for g in range(n_gpus):
-                    gpu_pool.put(g)
-            else:
-                for _ in range(parallel):
-                    gpu_pool.put(None)
+            # Pool has exactly n_gpus items so at most 1 task per GPU at any time.
+            gpu_pool: queue.Queue[int] = queue.Queue()
+            for g in range(n_gpus):
+                gpu_pool.put(g)
 
             def _run_with_gpu_pool(
                 pair_id: str, mode: str, seed: int,
@@ -639,7 +659,7 @@ def main(
                 finally:
                     gpu_pool.put(gid)
 
-            with ThreadPoolExecutor(max_workers=parallel) as executor:
+            with ThreadPoolExecutor(max_workers=effective_parallel) as executor:
                 futures = {}
                 for pair_id, mode, seed in tasks:
                     fut = executor.submit(_run_with_gpu_pool, pair_id, mode, seed)
