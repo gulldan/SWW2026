@@ -1,59 +1,137 @@
-В проекте используются два типа скоров: docking-скоры $d_A, d_B$ (UniDock GPU, kcal/mol)
-служат \textbf{RL reward} для генерации, а Boltz-2 affinity $a_A, a_B$ ($\log_{10}$\,(IC50-like), $\mu$M;
-обучена на смеси Ki/Kd/IC50/EC50)
---- \textbf{ортогональная evaluation surrogate}. Два скорера не смешиваются;
-$a_X$ интерпретируется как ранжирующая метрика, а не калиброванный IC50.
+% ===========================================================================
+%  Chapter 3: Methods
+%  Dual-Target RL Molecular Generation — Workshop Report
+% ===========================================================================
 
-Генерация выполняется в трёх режимах:
-\texttt{single\_a} (reward $= -d_A$), \texttt{single\_b} (reward $= -d_B$),
-\texttt{double} (reward $= -\max(d_A, d_B)$).
-Reward backend --- UniDock GPU (\texttt{unidock\_gpu}), GPU-ускоренный докинг,
-CLI-совместимый с AutoDock Vina.
+\subsection{Scoring Architecture}
+\label{sec:methods:scoring}
 
-Скоринг выполняется скриптом \texttt{scripts/score.py}: Boltz-2 оценивает каждую
-сгенерированную молекулу по двум мишеням пары с записью \texttt{scored\_joined.csv}.
-Далее метрики (hit-rate по $a_A, a_B$) и статистика рассчитываются в
-\texttt{scripts/compute\_metrics.py} с двухуровневым bootstrap и поправкой на множественные сравнения.
+Two independent scoring systems serve complementary roles:
+\begin{itemize}
+\item \textbf{RL reward:} UniDock GPU docking scores
+  $d_A, d_B$ (kcal/mol, lower is better).  UniDock~\citep{yu2023unidock}
+  ports the AutoDock Vina scoring function to GPU, enabling
+  millisecond-per-molecule docking required for RL training.
+\item \textbf{Evaluation surrogate:} Boltz-2 affinity predictions
+  $a_A, a_B$ ($\log_{10}$(IC$_{50}$-like), $\mu$M; trained on a
+  mixture of Ki/Kd/IC$_{50}$/EC$_{50}$ assay
+  types)~\citep{passaro2025boltz2}.
+  Boltz-2 is used exclusively for post-hoc evaluation, never as
+  an RL reward signal.
+\end{itemize}
+The two scorers are never mixed: $a_X$ is interpreted as a
+ranking metric for relative comparisons between generation modes,
+not as a calibrated IC$_{50}$ estimate.
 
-Оркестрация разделена на два этапа:
-\begin{enumerate}
-\item Stage 1: \texttt{scripts/run\_full\_experiment.py} (generate + score).
-\item Stage 2: \texttt{scripts/run\_post\_pipeline.py} (aggregate, metrics, plots, render, summary, LaTeX).
-\end{enumerate}
+\subsection{Generation Modes}
+\label{sec:methods:modes}
 
-\subsection*{Reward function для double-режима}
+FREED++~\citep{telepov2023freedpp} is a fragment-based RL generator
+that assembles molecules by iteratively attaching molecular fragments.
+We extend it with a dual-target monkey-patch
+(\texttt{docker/freedpp/dual\_reward\_patch.py}) that intercepts
+the reward computation and applies per-target $z$-score
+normalization before scalarization.
 
-Ключевой design choice --- как FREED++ комбинирует $d_A$ и $d_B$ в один reward.
+Six reward configurations span the selectivity--polypharmacology
+spectrum:
 
-\textbf{Primary experiment:} $R = -\max(d_A, d_B)$ (worst-case).
-Молекула оценивается по худшему docking-скору; гарантирует активность к обоим таргетам.
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Mode & Reward $R$ & Interpretation \\
+\midrule
+\texttt{single\_a}     & $-z_A$                & Target A only \\
+\texttt{single\_b}     & $-z_B$                & Target B only \\
+\texttt{double}        & $-\max(z_A, z_B)$     & Worst-case (primary) \\
+\texttt{linear\_equal} & $-(z_A + z_B)$        & Equal linear sum \\
+\texttt{biased\_a}     & $-(z_A + 0.3\,z_B)$  & Target A priority \\
+\texttt{selective\_a}  & $-(z_A - z_B)$        & Selectivity for A \\
+\bottomrule
+\end{tabular}
+\end{center}
 
-\textbf{Sensitivity analysis (offline):} $R = -(d_A + d_B)$ (сумма) и другие
-скаляризации (geometric, harmonic, Chebyshev) пересчитываются по уже сгенерированным
-молекулам. Ближайший прецедент суммы: SFG-Drug (MDPI 2025) --- dual MEK1/mTOR.
+\noindent where $z_X = (d_X - \mu_X) / \sigma_X$ is the per-target
+$z$-score computed from calibration docking of 1{,}000 drug-like
+ZINC molecules.  The three primary modes (\texttt{single\_a},
+\texttt{single\_b}, \texttt{double}) are pre-registered;
+the three additional modes (\texttt{linear\_equal},
+\texttt{biased\_a}, \texttt{selective\_a}) are exploratory.
+Invalid docking scores (GPU errors, timeouts) are assigned a
+capped penalty $z = +4.0$ to prevent extreme reward signals.
 
-\subsection*{Категории пар}
+\subsection{Reward Scalarization for Double Mode}
+\label{sec:methods:reward}
 
-Эксперимент включает 9 пар мишеней (8 активных, 1 заблокированная),
-классифицированных по трём осям: \emph{disease context} (AD / Non-AD),
-\emph{structural relation} (Homo / Hetero) и \emph{cofactor presence} (Clean / Present).
-Пары разделены на заранее зафиксированные множества:
+\textbf{Primary experiment:} $R = -\max(z_A, z_B)$ (worst-case).
+The molecule is scored by its worst-performing target, ensuring
+that the agent cannot exploit one easy pocket while ignoring the
+other.  This is a special case of Tchebycheff decomposition with
+equal weights and a zero reference point.
+
+\textbf{Sensitivity analysis (offline):} Alternative scalarizations
+(sum, geometric mean, harmonic mean, Tchebycheff, weighted product)
+are re-computed over molecules already generated by the six RL modes.
+These are secondary endpoints that do not influence generation.
+
+\subsection{Target Pair Design}
+\label{sec:methods:pairs}
+
+The experiment includes 9 target pairs (8 active, 1 blocked),
+classified along three factorial axes: \emph{disease context}
+(AD vs.\ Non-AD), \emph{structural relation} (Homologous vs.\
+Heterologous), and \emph{cofactor presence} (Clean vs.\ Present).
+Pairs are assigned to pre-registered strata:
 
 \begin{itemize}
-\item \textbf{Core set} (5 пар) --- основная проверка гипотезы:
+\item \textbf{Core set} (5~pairs) --- primary hypothesis testing:
   CDK2\_ERK2 (Non-AD, Homo), AChE\_BChE (AD, Homo),
   BACE1\_GSK3B, AChE\_BACE1, GSK3B\_CDK5 (AD, Hetero).
-  Все без кофакторов; Boltz-2 affinity валиден.
-\item \textbf{Auxiliary set} (3 пары) --- robustness и sensitivity:
-  EGFR\_HER2 (второй Homo-контроль), BACE1\_CDK5 (замена tau-киназы),
-  AChE\_MAOB (cofactor-sensitive: FAD removed in receptor prep, Boltz-2 binary only).
-\item \textbf{Blocked}: COX1\_COX2 (non-human PDB: COX1 Ovis aries, COX2 Mus musculus).
+  All cofactor-free; Boltz-2 affinity predictions are applicable.
+\item \textbf{Auxiliary set} (3~pairs) --- robustness and sensitivity:
+  EGFR\_HER2 (second Homo control), BACE1\_CDK5 (tau kinase swap),
+  AChE\_MAOB (cofactor-sensitive: FAD removed in receptor prep,
+  Boltz-2 binary classifier recommended over regression).
+\item \textbf{Blocked}: COX1\_COX2 (non-human PDB: COX1 \emph{Ovis
+  aries}, COX2 \emph{Mus musculus}).
 \end{itemize}
 
-Гомологичные пары (AChE\_BChE, CDK2\_ERK2) служат ``лёгким'' тестом --- высокое сходство
-карманов облегчает dual generation. Гетерогенные AD-пары (BACE1\_GSK3B, GSK3B\_CDK5) ---
-``жёсткий'' тест, проверяющий способность \texttt{double} режима находить dual-active
-молекулы для структурно различных мишеней.
+Homologous pairs (AChE\_BChE, CDK2\_ERK2) serve as an ``easy'' test:
+high pocket similarity facilitates dual-target generation.
+Heterologous AD pairs (BACE1\_GSK3B, GSK3B\_CDK5) provide a
+``hard'' test, probing the ability of \texttt{double} mode to
+find dual-active molecules for structurally dissimilar targets.
 
-Деление core/auxiliary зафиксировано до начала экспериментов; primary statistical
-tests проводятся только на core set (подробнее: \texttt{docs/selection\_criteria.md}).
+The core/auxiliary split is frozen before any generation runs;
+primary statistical tests are conducted on the core set only.
+
+\subsection{Pipeline Architecture}
+\label{sec:methods:pipeline}
+
+Orchestration is organized into eight stages, each implemented
+as an independent CLI script:
+\begin{enumerate}
+\item[0.] \textbf{Fetch} --- PDB, FASTA, MSA, calibration sets, ChEMBL actives, Docker build.
+\item[1.] \textbf{Prepare} --- receptor cleanup, binding box extraction, PDBQT conversion.
+\item[2.] \textbf{Calibrate} --- $z$-score normalization, re-docking QC (RMSD $\leq$~2\,\AA),
+  enrichment benchmark (AUROC, BEDROC, EF vs.\ ChEMBL actives).
+\item[3.] \textbf{Generate} --- FREED++ RL generation ($6~\text{modes} \times
+  5~\text{pairs} \times 5~\text{seeds}$).
+\item[4.] \textbf{Score} --- Boltz-2 affinity prediction for each molecule $\times$
+  2~targets (primary evaluation).
+\item[5.] \textbf{Analyze} --- aggregation into \texttt{all\_results.parquet},
+  hierarchical bootstrap~\citep{cameron2008bootstrap}, Cliff's~$\delta$~\citep{cliff1993dominance},
+  FDR correction~\citep{benjamini1995fdr}, degradation guard, sensitivity analyses.
+\item[6.] \textbf{Report} --- figures, molecule renders, \LaTeX\ manuscript assembly.
+\item[7.] \textbf{Audit} --- claim $\leftrightarrow$ evidence traceability mapping.
+\end{enumerate}
+
+Planned extensions not yet integrated into the automated pipeline include
+GNINA~CNN re-scoring~\citep{posex2025} for independent cross-validation
+and GROMACS molecular dynamics for binding-stability confirmation of
+top candidates.
+
+Stage~1 (\texttt{scripts/pipeline/run\_full\_experiment.py}) executes
+generation and scoring; Stage~2
+(\texttt{scripts/pipeline/run\_post\_pipeline.py}) performs aggregation,
+metrics, visualization, and manuscript compilation.

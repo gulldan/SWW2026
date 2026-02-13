@@ -135,7 +135,7 @@ def test_hypervolume_contributions_basic():
     a = np.array([-3.0, -1.0, -2.0])
     b = np.array([-1.0, -3.0, -2.0])
     hv = hypervolume_contributions(a, b, ref_a=0.0, ref_b=0.0)
-    # Все три точки на фронте Парето, каждая должна иметь вклад > 0
+    # All three points are on the Pareto front, each should contribute > 0
     assert np.all(hv > 0)
 
 
@@ -143,7 +143,7 @@ def test_hypervolume_dominated_point():
     a = np.array([-3.0, -1.0])
     b = np.array([-3.0, -1.0])
     hv = hypervolume_contributions(a, b, ref_a=0.0, ref_b=0.0)
-    # (-3,-3) доминирует (-1,-1), поэтому (-1,-1) не на фронте -> вклад 0
+    # (-3,-3) dominates (-1,-1), so (-1,-1) is not on the front -> contribution 0
     assert hv[0] > 0
     assert hv[1] == 0.0
 

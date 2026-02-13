@@ -22,7 +22,6 @@ import click
 from loguru import logger
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
 PILOT_PAIR: str = "CDK2_ERK2"
 """Default target pair for the pilot run."""

@@ -87,7 +87,7 @@ def validate_fairness(results_dir: str | Path) -> dict[str, Any]:
 
     generated_stem = results_path / "generated"
     if not stem_exists(generated_stem):
-        issues.append(f"generated.parquet/csv не найден в {results_path}")
+        issues.append(f"generated.parquet/csv not found in {results_path}")
         return {
             "budget_consistent": False,
             "issues": issues,
@@ -101,7 +101,7 @@ def validate_fairness(results_dir: str | Path) -> dict[str, Any]:
         gen_df = read_df(generated_stem)
         smiles = gen_df["smiles"].tolist()
     except Exception as exc:
-        issues.append(f"Ошибка чтения generated: {exc}")
+        issues.append(f"Error reading generated: {exc}")
         return {
             "budget_consistent": False,
             "issues": issues,
@@ -114,7 +114,7 @@ def validate_fairness(results_dir: str | Path) -> dict[str, Any]:
     duplication_rate = 0.0 if n_total == 0 else 1.0 - (n_unique / n_total)
 
     if not (990 <= n_total <= 1010):
-        issues.append(f"n_molecules вне диапазона [990, 1010]: {n_total}")
+        issues.append(f"n_molecules out of range [990, 1010]: {n_total}")
     if duplication_rate >= 0.20:
         issues.append(f"duplication_rate >= 0.20: {duplication_rate:.3f}")
 

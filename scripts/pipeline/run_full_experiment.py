@@ -372,31 +372,31 @@ def _run_one(
     "--prepare-freed-data/--skip-prepare-freed-data",
     default=True,
     show_default=True,
-    help="Перед запуском проверить/скачать docker/freedpp/data/{zinc_crem.json,alert_collections.csv}.",
+    help="Before running, check/download docker/freedpp/data/{zinc_crem.json,alert_collections.csv}."
 )
 @click.option(
     "--prepare-baseline/--skip-prepare-baseline",
     default=False,
     show_default=True,
-    help="Опционально скачать baseline archive data/baseline/zinc-druglike-cano.tar.xz.",
+    help="Optionally download baseline archive data/baseline/zinc-druglike-cano.tar.xz."
 )
 @click.option(
     "--baseline-url",
     default=None,
-    help="URL для baseline archive (или используйте переменную окружения ZINC_BASELINE_URL).",
+    help="URL for baseline archive (or use ZINC_BASELINE_URL environment variable)."
 )
 @click.option(
     "--with-post/--skip-post",
     default=False,
     show_default=True,
-    help="Опционально выполнить post-пайплайн (aggregate/metrics/plots/render/summarize/latex) после generate+score.",
+    help="Optionally run post-pipeline (aggregate/metrics/plots/render/summarize/latex) after generate+score."
 )
 @click.option(
     "--latex-mode",
     type=click.Choice(["off", "draft", "full"]),
     default="off",
     show_default=True,
-    help="Режим LaTeX, используется только с --with-post.",
+    help="LaTeX mode, only used with --with-post."
 )
 def main(
     dry_run: bool,

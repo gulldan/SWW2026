@@ -14,29 +14,35 @@ Methodological limitations:
 
 Boltz-2 limitations:
 \begin{itemize}
-\item \textbf{Data leakage:} all selected targets appear in the Boltz-2 training set
-(PDB cutoff 06/2023, $\sim$3M affinity records from ChEMBL). This does not invalidate
-the comparison between generation modes (bias is identical across modes), but predicted
-affinities may be optimistic in absolute terms. This must be noted when interpreting results.
-\item \textbf{Cofactor incompatibility:} the Boltz-2 affinity module does not explicitly
-model cofactors (Passaro et al. 2025, Rowan FAQ). For pairs COX1\_COX2 (heme in active site)
-and AChE\_MAOB (covalent FAD in MAO-B), Boltz-2 affinity predictions should be interpreted
-with caution. For MAO-B, \texttt{affinity\_probability\_binary} (binder vs decoy classifier)
-is recommended over \texttt{affinity\_pred\_value}, as the binary classifier is less
-sensitive to cofactor presence.
+\item \textbf{Data leakage:} all selected targets appear in the Boltz-2 training
+set~\citep{passaro2025boltz2} (PDB cutoff 06/2023, $\sim$3M affinity records from
+ChEMBL).  This does not invalidate the comparison between generation modes (bias is
+identical across modes), but predicted affinities may be optimistic in absolute terms.
+\item \textbf{Cofactor incompatibility:} the Boltz-2 affinity module does not
+explicitly model cofactors~\citep{passaro2025boltz2}.  For pairs COX1\_COX2 (heme)
+and AChE\_MAOB (covalent FAD), Boltz-2 predictions should be interpreted with
+caution.  For MAO-B, \texttt{affinity\_probability\_binary} is recommended over
+\texttt{affinity\_pred\_value}.
+\item \textbf{Mutation insensitivity:} \citet{bret2026boltz2docking} report that
+Boltz-2 affinity predictions may be insensitive to key binding-site mutations,
+suggesting limited sensitivity to fine structural differences.  This reinforces
+our use of Boltz-2 as a \emph{relative} ranking tool rather than an absolute
+predictor.
 \end{itemize}
 
 Docking score limitations:
 \begin{itemize}
-\item \textbf{Docking as a weak proxy:} PoseX benchmark (2025) shows that docking programs
-(including AutoDock Vina and UniDock) exhibit near-random performance on several targets
-in virtual screening. This is precisely why independent validation via Boltz-2 strengthens
-the study---if the \texttt{double} mode advantage is confirmed by two independent methods,
-the result is more convincing.
-\item \textbf{UniDock GPU as reward backend:} FREED++ uses UniDock GPU
-(\texttt{unidock\_gpu}) for docking-based reward computation. While UniDock GPU is
-significantly faster than CPU-based alternatives (QuickVina2), the underlying scoring
-function remains an approximation of binding free energy.
+\item \textbf{Docking as a weak proxy:} the PoseX benchmark~\citep{posex2025}
+shows that Vina-family scoring functions (including
+UniDock~\citep{yu2023unidock}) exhibit near-random performance on several
+targets in virtual screening.  This is precisely why independent validation
+via Boltz-2 strengthens the study---if the \texttt{double} mode advantage is
+confirmed by two independent methods, the result is more convincing.
+\item \textbf{UniDock GPU as reward backend:}
+FREED++~\citep{telepov2023freedpp} uses UniDock GPU for docking-based reward
+computation.  While significantly faster than CPU-based
+alternatives~\citep{trott2010vina}, the underlying scoring function remains an
+approximation of binding free energy~\citep{su2019casf2016}.
 \end{itemize}
 
 Surrogate mismatch limitations:
@@ -77,21 +83,24 @@ confirmation is beyond the scope of this workshop.
 
 Statistical design limitations:
 \begin{itemize}
-\item \textbf{Shared targets across pairs:} several targets (AChE, BACE1, GSK3B) appear in
-multiple pairs. Consequently, the 9~pairs (8~active) do not constitute 9~independent
-observations. Primary statistical tests are conducted on the pre-registered
-\emph{core set} (5~pairs, where target overlap is minimized), while auxiliary
-pairs serve as within-target sensitivity analyses rather than additional
-independent replicates.
-\item \textbf{Core vs.\ auxiliary designation:} the core/auxiliary split was fixed
-\emph{before} any generation runs to prevent cherry-picking. Results on auxiliary
-pairs are reported for transparency but do not contribute to the primary hypothesis test.
-\item \textbf{Bootstrap power at $m=5$ clusters:} the two-level bootstrap resamples
-over 5~RL seeds (clusters) at level~1. With only 5~clusters the bootstrap distribution
-is coarse-grained; confidence intervals and $p$-values should be interpreted with
-caution. The primary evidence for the effect rests on \emph{effect size} (Cliff's
-delta) and \emph{cross-pair consistency} ($\geq$3/5 core pairs), not on
-$p$-values alone.
+\item \textbf{Shared targets across pairs:} several targets (AChE, BACE1, GSK3B)
+appear in multiple pairs.  Consequently, the 9~pairs (8~active) do not constitute
+9~independent observations.  Primary statistical tests are conducted on the
+pre-registered \emph{core set} (5~pairs, where target overlap is minimized),
+while auxiliary pairs serve as within-target sensitivity analyses rather than
+additional independent replicates.
+\item \textbf{Core vs.\ auxiliary designation:} the core/auxiliary split was
+fixed \emph{before} any generation runs to prevent cherry-picking.  Results on
+auxiliary pairs are reported for transparency but do not contribute to the
+primary hypothesis test.
+\item \textbf{Bootstrap power at $m=5$ clusters:} the two-level
+bootstrap~\citep{cameron2008bootstrap, efron1993bootstrap} resamples over
+5~RL seeds (clusters) at level~1.  With only 5~clusters the bootstrap
+distribution is coarse-grained; confidence intervals and $p$-values should be
+interpreted with caution.  The primary evidence for the effect rests on
+\emph{effect size} (Cliff's delta~\citep{cliff1993dominance}, thresholds
+per \citet{romano2006ordinal}) and \emph{cross-pair consistency}
+($\geq$3/5 core pairs), not on $p$-values alone.
 \end{itemize}
 
 These limitations are tracked to prevent over-claiming and to guide future protocol upgrades.

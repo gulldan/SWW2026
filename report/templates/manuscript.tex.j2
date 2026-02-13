@@ -1,16 +1,21 @@
-\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
+\documentclass[journal=jcim,manuscript=article]{achemso}
+
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
-\usepackage{natbib}
-\usepackage{hyperref}
+\usepackage{amsmath}
 \usepackage{xcolor}
 
 \title{ {{ title }} }
 \author{ {{ author }} }
-\date{ {{ date }} }
+\affiliation{ {{ affiliation | default('SWW2026 Workshop') }} }
+{% if email %}
+\email{ {{ email }} }
+{% endif %}
+
+\abbreviations{RL, FREED++, UniDock, GNINA, QED, SA, PAINS, ADMET, FDR, AUROC, BEDROC}
+\keywords{ {{ keyword_text | default('dual-target docking, molecular generation, FREED++, Boltz-2, reproducibility') }} }
 
 {% macro fmt(val, nd=3) -%}
 {%- if val is number -%}
@@ -33,7 +38,6 @@
 {%- endmacro %}
 
 \begin{document}
-\maketitle
 
 \begin{abstract}
 {% if abstract_text %}
@@ -43,9 +47,6 @@ This manuscript reports a reproducible comparison of single-target and dual-targ
 under a common docking-driven evaluation protocol.
 {% endif %}
 \end{abstract}
-
-\noindent\textbf{Keywords:} {% if keyword_text %}{{ keyword_text }}{% else %}dual-target docking, reproducible pipeline{% endif %}\\
-\textbf{Experiment Run ID:} \texttt{ {{ run_id }} }
 
 {% for section in sections %}
 \section{ {{ section.title }} }
@@ -75,7 +76,7 @@ Pair & Mode & HR\_A (mean $\pm$ SEM) & HR\_B (mean $\pm$ SEM) & HR\_both (mean $
 \bottomrule
 \end{longtable}
 {% else %}
-No metric table available. Run \texttt{scripts/compute\_metrics.py} first.
+No metric table available. Run \texttt{scripts/s5\_analyze/compute\_metrics.py} first.
 {% endif %}
 
 {% if objective_columns is defined and objective_columns %}
@@ -113,7 +114,7 @@ Pair & Test & Comparison & Metric & $\Delta$ & p\_adj & Significant \\
 \bottomrule
 \end{longtable}
 {% else %}
-No statistical table available. Run \texttt{scripts/compute\_metrics.py} first.
+No statistical table available. Run \texttt{scripts/s5\_analyze/compute\_metrics.py} first.
 {% endif %}
 
 \section{Figures}
@@ -126,7 +127,7 @@ No statistical table available. Run \texttt{scripts/compute\_metrics.py} first.
 \end{figure}
 {% endfor %}
 {% else %}
-No figures available. Run \texttt{scripts/plot\_results.py} and \texttt{scripts/render\_molecules.py}.
+No figures available. Run \texttt{scripts/s6\_report/plot\_results.py} and \texttt{scripts/s6\_report/render\_molecules.py}.
 {% endif %}
 
 \section{Reproducibility and Artifact Traceability}
@@ -153,10 +154,9 @@ No figures available. Run \texttt{scripts/plot\_results.py} and \texttt{scripts/
 {{ summary_excerpt }}
 \end{verbatim}
 {% else %}
-No summary excerpt available. Run \texttt{scripts/summarize.py}.
+No summary excerpt available. Run \texttt{scripts/s5\_analyze/summarize.py}.
 {% endif %}
 
-\bibliographystyle{plain}
 \bibliography{references}
 
 \end{document}

@@ -1,6 +1,8 @@
 All experiments are executed under a two-stage orchestration model.
 
-\textbf{Stage 1} (\texttt{scripts/run\_full\_experiment.py}) performs generation and
+\textbf{Stage 1} (\texttt{scripts/run\_full\_experiment.py}) performs
+FREED++~\citep{telepov2023freedpp} molecule generation (UniDock
+GPU~\citep{yu2023unidock} reward) and Boltz-2~\citep{passaro2025boltz2}
 scoring for each pair, mode, and seed.
 
 \textbf{Stage 2} (\texttt{scripts/run\_post\_pipeline.py}) performs aggregation,
@@ -19,19 +21,35 @@ Any interrupted run is resumed only if required artifacts are missing; otherwise
 
 Pre-registration document: \texttt{docs/preregistration.md} (frozen at commit \texttt{f2eceb2}).
 
-\textbf{Compute parity.} All three modes (\texttt{single\_a}, \texttt{single\_b},
-\texttt{double}) share identical parameters: molecule budget (1000 per run),
-seed set ([42, 137, 256, 512, 1024]), RL epochs (200), and chemical-space
-constraints. The only difference between modes is the reward function
-(from UniDock docking scores $d_A, d_B$): $-d_A$, $-d_B$, or $-\max(d_A, d_B)$.
+\textbf{Compute parity.} All three pre-registered modes (\texttt{single\_a},
+\texttt{single\_b}, \texttt{double}) share identical parameters: molecule
+budget (1000 per run), seed set ([42, 137, 256, 512, 1024]), RL epochs (200),
+and chemical-space constraints.  The only difference between modes is the reward
+function (from UniDock docking scores $d_A, d_B$): $-z_A$, $-z_B$, or
+$-\max(z_A, z_B)$, where $z_X$ is the per-target $z$-score.
 Evaluation uses Boltz-2 affinity $a_A, a_B$ (orthogonal to the RL reward).
+Three additional exploratory modes (\texttt{linear\_equal},
+\texttt{biased\_a}, \texttt{selective\_a}) probe the weight-space
+spectrum from dual-target to selective design; their results are
+reported separately and do not contribute to the primary hypothesis test.
 
 \textbf{Docking calls trade-off.} In \texttt{double} mode each RL step invokes
 UniDock GPU twice (targets A and B), so total docking calls $\approx 2\times$
-those of \texttt{single}. The primary comparison uses \emph{fixed molecule count}
-(1000). A sensitivity baseline doubles the RL epochs for single modes
+those of \texttt{single}.  The primary comparison uses \emph{fixed molecule count}
+(1000).  A sensitivity baseline doubles the RL epochs for single modes
 (\texttt{epochs: 400}), equalizing the training-time docking budget rather
 than merely sampling more molecules from the same policy.
+
+\textbf{Statistical inference.} Each contrast (\texttt{double} vs.\
+\texttt{single\_x}) is evaluated by hierarchical
+bootstrap~\citep{cameron2008bootstrap, efron1993bootstrap} with 10\,000
+replicates, yielding percentile 95\% confidence intervals and one-sided
+$p$-values.  Multiple-testing correction uses
+Benjamini--Hochberg FDR~\citep{benjamini1995fdr} across the 10~primary
+contrasts (5~core pairs $\times$ 2~baselines).  Effect size is
+quantified by Cliff's delta~\citep{cliff1993dominance} (primary,
+thresholds per \citet{romano2006ordinal}) and Cohen's
+$d$~\citep{cohen1988statistical} (secondary).
 
 \textbf{Core vs.\ auxiliary.} Primary hypothesis tests are conducted on the
 pre-registered \emph{core set} (5~pairs); auxiliary pairs are used for

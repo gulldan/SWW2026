@@ -37,10 +37,10 @@ SCORE_CACHE_DIR = CACHE_DIR / "boltz_scores"
 DATA_DIR = PROJECT_ROOT / "output" / "data" / "targets"
 MSA_CACHE_DIR = CACHE_DIR / "boltz_msa"
 
-BOLTZ_TIMEOUT = 600  # секунд на одну молекулу
-BOLTZ_BATCH_TIMEOUT = 3600  # секунд на батч
+BOLTZ_TIMEOUT = 600  # seconds per molecule
+BOLTZ_BATCH_TIMEOUT = 3600  # seconds per batch
 MAX_LIGAND_ATOMS = 128
-_DEFAULT_BATCH_SIZE = 64  # молекул за один вызов boltz predict (internal batch=1, safe on any VRAM)
+_DEFAULT_BATCH_SIZE = 64  # molecules per boltz predict invocation (internal batch=1, safe on any VRAM)
 
 
 def _auto_batch_size() -> int:
@@ -96,7 +96,7 @@ def _auto_batch_size() -> int:
 
 BATCH_SIZE = _auto_batch_size()
 
-# Boltz CLI параметры
+# Boltz CLI parameters
 _BOLTZ_CLI_ARGS_BASE: list[str] = [
     "--model",
     "boltz2",
@@ -483,7 +483,7 @@ def prune_stale_cache() -> int:
 # Sequence cache + cache key helpers
 # ---------------------------------------------------------------------------
 
-# Кеш sequence в памяти (target_id -> sequence)
+# In-memory sequence cache (target_id -> sequence)
 _sequence_cache: dict[str, str] = {}
 
 
@@ -554,11 +554,11 @@ def _load_sequence(target_id: str) -> str:
 
     fasta_path = DATA_DIR / f"{target_id}.fasta"
     if not fasta_path.exists():
-        msg = f"FASTA не найден: {fasta_path}. Запустите: uv run python scripts/s1_prepare/prepare_targets.py --prepare-all"
+        msg = f"FASTA not found: {fasta_path}. Run: uv run python scripts/s1_prepare/prepare_targets.py --prepare-all"
         raise FileNotFoundError(msg)
 
     lines = fasta_path.read_text().strip().splitlines()
-    # Пропустить заголовки FASTA (строки начинающиеся с >)
+    # Skip FASTA headers (lines starting with >)
     seq = "".join(line.strip() for line in lines if not line.startswith(">"))
     _sequence_cache[target_id] = seq
     return seq
@@ -592,7 +592,7 @@ def _validate_smiles(smiles: str) -> bool:
     try:
         from rdkit import Chem
     except ImportError:
-        logger.warning("RDKit недоступен, пропускаем валидацию SMILES")
+        logger.warning("RDKit unavailable, skipping SMILES validation")
         return True
 
     mol = Chem.MolFromSmiles(smiles)
@@ -752,7 +752,7 @@ def _parse_affinity(out_dir: Path, stem: str) -> float:
     affinity_path = out_dir / f"boltz_results_{stem}" / "predictions" / stem / f"affinity_{stem}.json"
 
     if not affinity_path.exists():
-        msg = f"Affinity JSON не найден: {affinity_path}"
+        msg = f"Affinity JSON not found: {affinity_path}"
         raise FileNotFoundError(msg)
 
     data = json.loads(affinity_path.read_text())
@@ -853,7 +853,7 @@ def _run_boltz_predict_dir(
         env=_boltz_env(device=device),
         check=False,
     )
-    # Показываем ключевые строки Boltz stderr в логе (без шума warnings)
+    # Log key Boltz stderr lines (filter out warning noise)
     _boltz_noise = ("DeprecationWarning", "SyntaxWarning", "FutureWarning", "UserWarning", "warnings.warn")
     if result.stderr:
         for line in result.stderr.splitlines():
@@ -1176,13 +1176,13 @@ def _score_batch_internal(
 
     scores = [float("nan")] * len(smiles_list)
 
-    # Валидация SMILES
+    # SMILES validation
     valid_indices: list[int] = []
     for idx, smi in enumerate(smiles_list):
         if _validate_smiles(smi):
             valid_indices.append(idx)
         else:
-            logger.warning("Невалидный SMILES или слишком большая молекула (>{} атомов): {}", MAX_LIGAND_ATOMS, smi)
+            logger.warning("Invalid SMILES or molecule exceeds {} atoms: {}", MAX_LIGAND_ATOMS, smi)
 
     if not valid_indices:
         return scores
@@ -1195,7 +1195,7 @@ def _score_batch_internal(
         out_dir = tmp_path / "output"
         input_dir.mkdir(parents=True, exist_ok=True)
 
-        # Создаём YAML для каждой валидной молекулы (FIX 1: neutralize SMILES)
+        # Create YAML for each valid molecule (FIX 1: neutralize SMILES)
         stem_to_idx: dict[str, int] = {}
         for idx in valid_indices:
             smi_neutralized = _neutralize_smiles(smiles_list[idx])
@@ -1204,29 +1204,29 @@ def _score_batch_internal(
             _write_boltz_yaml(sequence, smi_neutralized, yaml_path, msa_path=msa_path)
             stem_to_idx[stem] = idx
 
-        # Один вызов boltz predict на директорию
+        # Single boltz predict call for directory
         timeout = BOLTZ_BATCH_TIMEOUT
         try:
             result = _run_boltz_predict_dir(input_dir, out_dir, timeout=timeout, device=device)
         except subprocess.TimeoutExpired:
             # FIX 3: don't return — fall through to parse partial results
-            logger.error("Boltz batch таймаут ({} сек) для {} молекул, парсим partial results", timeout, len(valid_indices))
+            logger.error("Boltz batch timeout ({} sec) for {} molecules, parsing partial results", timeout, len(valid_indices))
             batch_failed = True
         else:
             if result.returncode != 0:
                 stderr = result.stderr or ""
                 if "CUDA out of memory" in stderr:
-                    logger.error("Boltz batch OOM GPU для {} молекул", len(valid_indices))
+                    logger.error("Boltz batch GPU OOM for {} molecules", len(valid_indices))
                 else:
                     logger.error(
-                        "Boltz batch ошибка (rc={}) для {} молекул\nstderr: {}",
+                        "Boltz batch error (rc={}) for {} molecules\nstderr: {}",
                         result.returncode,
                         len(valid_indices),
                         stderr[-2000:],
                     )
                 batch_failed = True
 
-        # Парсим результаты (всегда — даже после timeout/error, для partial recovery)
+        # Parse results (always — even after timeout/error, for partial recovery)
         results_dir = out_dir / f"boltz_results_{input_dir.name}"
         parsed_ok = 0
         for stem, idx in stem_to_idx.items():
@@ -1238,7 +1238,7 @@ def _score_batch_internal(
                 scores[idx] = float(data["affinity_pred_value"])
                 parsed_ok += 1
             except (KeyError, json.JSONDecodeError) as exc:
-                logger.debug("Не удалось распарсить affinity для {}: {}", stem, exc)
+                logger.debug("Failed to parse affinity for {}: {}", stem, exc)
 
         if batch_failed:
             logger.info(
@@ -1284,12 +1284,12 @@ def score_single(target_id: str, smiles: str) -> float:
         FileNotFoundError: If the FASTA or MSA file is missing (CLI
             backend only).
     """
-    # Валидация SMILES
+    # SMILES validation
     if not _validate_smiles(smiles):
-        logger.warning("Невалидный SMILES или слишком большая молекула (>{} атомов): {}", MAX_LIGAND_ATOMS, smiles)
+        logger.warning("Invalid SMILES or molecule exceeds {} atoms: {}", MAX_LIGAND_ATOMS, smiles)
         return float("nan")
 
-    # Загрузить sequence
+    # Load sequence
     sequence = _load_sequence(target_id)
 
     # NIM backend: no MSA/subprocess needed, just HTTP
@@ -1297,12 +1297,12 @@ def score_single(target_id: str, smiles: str) -> float:
         smi_neutralized = _neutralize_smiles(smiles)
         return _nim_predict_affinity(sequence, smi_neutralized)
 
-    # Найти pre-computed MSA
+    # Find pre-computed MSA
     msa_path = _get_msa_path(target_id)
     if msa_path is None:
         msg = (
-            f"Pre-computed MSA не найден для {target_id}. "
-            f"Запустите: uv run python scripts/s1_prepare/prepare_targets.py --pair <pair> --prepare-all"
+            f"Pre-computed MSA not found for {target_id}. "
+            f"Run: uv run python scripts/s1_prepare/prepare_targets.py --pair <pair> --prepare-all"
         )
         raise FileNotFoundError(msg)
 
@@ -1318,16 +1318,16 @@ def score_single(target_id: str, smiles: str) -> float:
         try:
             result = _run_boltz_predict(yaml_path, out_dir)
         except subprocess.TimeoutExpired:
-            logger.error("Boltz таймаут ({} сек) для SMILES: {}", BOLTZ_TIMEOUT, smiles)
+            logger.error("Boltz timeout ({} sec) for SMILES: {}", BOLTZ_TIMEOUT, smiles)
             return float("nan")
 
         if result.returncode != 0:
             stderr = result.stderr or ""
             if "CUDA out of memory" in stderr:
-                logger.error("Boltz OOM GPU для SMILES: {}", smiles)
+                logger.error("Boltz GPU OOM for SMILES: {}", smiles)
             else:
                 logger.error(
-                    "Boltz ошибка (rc={}) для SMILES: {}\nstderr: {}",
+                    "Boltz error (rc={}) for SMILES: {}\nstderr: {}",
                     result.returncode,
                     smiles,
                     stderr[-2000:],
@@ -1337,10 +1337,10 @@ def score_single(target_id: str, smiles: str) -> float:
         try:
             log_ic50_um = _parse_affinity(out_dir, yaml_stem)
         except (FileNotFoundError, KeyError, json.JSONDecodeError) as exc:
-            logger.error("Не удалось распарсить affinity для SMILES {}: {}", smiles, exc)
+            logger.error("Failed to parse affinity for SMILES {}: {}", smiles, exc)
             return float("nan")
 
-    # Конвенция: log10(IC50 в микромолях), меньше = лучше
+    # Convention: log10(IC50 in uM), lower = better
     return log_ic50_um
 
 
@@ -1375,13 +1375,13 @@ def score_batch(
     """
     from tqdm import tqdm
 
-    # Загрузить sequence и MSA один раз
+    # Load sequence and MSA once
     sequence = _load_sequence(target_id)
     msa_path = _get_msa_path(target_id)
     if msa_path is None and _BOLTZ_BACKEND != "nim":
         msg = (
-            f"Pre-computed MSA не найден для {target_id}. "
-            f"Запустите: uv run python scripts/s1_prepare/prepare_targets.py --pair <pair> --prepare-all"
+            f"Pre-computed MSA not found for {target_id}. "
+            f"Run: uv run python scripts/s1_prepare/prepare_targets.py --pair <pair> --prepare-all"
         )
         raise FileNotFoundError(msg)
 
@@ -1394,7 +1394,7 @@ def score_batch(
     scores: list[float] = [float("nan")] * len(smiles_list)
     to_score: list[tuple[int, str]] = []
 
-    # Проверяем кеш
+    # Check cache
     for idx, smi in enumerate(smiles_list):
         key = _cache_key(target_id, smi, ctx_hash=ctx, seq_hash=seq_hash, msa_hash=msa_hash)
         if key in cache:
@@ -1403,18 +1403,18 @@ def score_batch(
             to_score.append((idx, smi))
 
     if not to_score:
-        logger.info("Все {} молекул для мишени {} найдены в кеше", len(smiles_list), target_id)
+        logger.info("All {} molecules for target {} found in cache", len(smiles_list), target_id)
         return np.array(scores, dtype=np.float64)
 
     logger.info(
-        "Скоринг {} новых молекул для мишени {} (из {} всего, batch_size={})",
+        "Scoring {} new molecules for target {} ({} total, batch_size={})",
         len(to_score),
         target_id,
         len(smiles_list),
         batch_size,
     )
 
-    # Группируем в батчи
+    # Group into batches
     num_batches = (len(to_score) + batch_size - 1) // batch_size
     scoring_start = time.monotonic()
     scored_so_far = 0
@@ -1424,15 +1424,15 @@ def score_batch(
         end = min(start + batch_size, len(to_score))
         batch = to_score[start:end]
 
-        # Извлекаем SMILES для батча
+        # Extract SMILES for batch
         batch_smiles = [smi for _, smi in batch]
 
         batch_t0 = time.monotonic()
-        # Скорим батч за один вызов boltz predict
+        # Score batch in a single boltz predict call
         batch_scores = _score_batch_internal(target_id, batch_smiles, sequence, msa_path, device=device)
         batch_elapsed = time.monotonic() - batch_t0
 
-        # Записываем результаты
+        # Record results
         batch_ok = 0
         for i, (idx, smi) in enumerate(batch):
             s = batch_scores[i]
@@ -1459,7 +1459,7 @@ def score_batch(
             eta_min,
         )
 
-        # Сохраняем кеш после каждого батча (не после каждой молекулы)
+        # Save cache after each batch (not after each molecule)
         if use_cache:
             _save_cache(target_id, cache)
 

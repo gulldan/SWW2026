@@ -468,6 +468,25 @@ def _build_freedpp_args(
 
 
 # ---------------------------------------------------------------------------
+# Log parsing regexes (used by _run_freedpp and parse_training_log)
+# ---------------------------------------------------------------------------
+
+# Matches patterns like: loss=0.123, reward=-7.5, score: -6.2
+_METRIC_RE = re.compile(
+    r"(?P<key>loss|reward|score|entropy|lr|kl)\s*[=:]\s*(?P<value>-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)",
+    re.IGNORECASE,
+)
+
+# Epoch/iteration number extraction
+_EPOCH_RE = re.compile(
+    r"[Ee](?:poch|pisode)\s*[:\[#]?\s*(\d+)"
+    r"|#(\d+)"
+    r"|\[(\d+)/\d+\]"
+    r"|[Ii]ter(?:ation)?\s*[:\[#]?\s*(\d+)"
+)
+
+
+# ---------------------------------------------------------------------------
 # Docker run
 # ---------------------------------------------------------------------------
 
@@ -612,13 +631,6 @@ def _run_freedpp(
         last_epoch_logged = -1
         line_count = 0
 
-        # Multiple patterns to catch FREED++ epoch/iteration progress
-        _epoch_re = re.compile(
-            r"[Ee](?:poch|pisode)\s*[:\[#]?\s*(\d+)"  # Epoch 1, Episode 1, epoch: 1
-            r"|#(\d+)"  # #1, #001
-            r"|\[(\d+)/\d+\]"  # [1/200]
-            r"|[Ii]ter(?:ation)?\s*[:\[#]?\s*(\d+)"  # Iter 1, Iteration: 1
-        )
         _noise_patterns = ("DeprecationWarning", "SyntaxWarning", "FutureWarning", "UserWarning", "warnings.warn")
 
         for line in process.stdout:  # type: ignore[union-attr]
@@ -633,7 +645,7 @@ def _run_freedpp(
                 continue
 
             if epoch_bar is not None:
-                match = _epoch_re.search(stripped)
+                match = _EPOCH_RE.search(stripped)
                 if match:
                     # Take first non-None group
                     epoch_num = int(next(g for g in match.groups() if g is not None))
@@ -680,6 +692,60 @@ def _run_freedpp(
         raise subprocess.CalledProcessError(rc, docker_cmd, output=stdout_text)
 
     return subprocess.CompletedProcess(docker_cmd, process.returncode, stdout=stdout_text, stderr="")
+
+
+# ---------------------------------------------------------------------------
+# Training log parsing
+# ---------------------------------------------------------------------------
+
+
+def parse_training_log(log_path: Path) -> list[dict]:
+    """Parse a FREED++ training log and extract per-epoch metrics.
+
+    Reads the log file produced by :func:`_run_freedpp` and extracts
+    epoch numbers along with any ``loss``, ``reward``, ``score``,
+    ``entropy``, ``lr``, or ``kl`` values found on the same line.
+
+    Args:
+        log_path: Path to a ``freedpp_*.log`` file.
+
+    Returns:
+        List of dicts, each with ``"epoch"`` (int) and any extracted
+        metric keys (float).  Returns an empty list on any error.
+    """
+    if not log_path.exists():
+        return []
+
+    records: list[dict] = []
+    seen_epochs: set[int] = set()
+
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+
+    for line in text.splitlines():
+        epoch_match = _EPOCH_RE.search(line)
+        if not epoch_match:
+            continue
+        epoch_num = int(next(g for g in epoch_match.groups() if g is not None))
+
+        metrics = {m.group("key").lower(): float(m.group("value")) for m in _METRIC_RE.finditer(line)}
+        if not metrics:
+            continue
+
+        # Keep the last occurrence per epoch (later lines overwrite earlier)
+        if epoch_num in seen_epochs:
+            # Update the existing record
+            for rec in records:
+                if rec["epoch"] == epoch_num:
+                    rec.update(metrics)
+                    break
+        else:
+            seen_epochs.add(epoch_num)
+            records.append({"epoch": epoch_num, **metrics})
+
+    return records
 
 
 # ---------------------------------------------------------------------------

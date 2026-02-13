@@ -57,3 +57,37 @@ def test_hardware_info_uses_torch_cuda_device(monkeypatch) -> None:
 
     assert hw["gpu"] == "GPU1"
     assert hw["cuda_version"] == "12.4"
+
+
+def test_normalization_meta_missing_file(tmp_path: Path, monkeypatch) -> None:
+    """Missing normalization.yaml returns defaults."""
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    program, version = mod._normalization_meta()
+    assert program == "unidock_gpu"
+    assert version == "unknown"
+
+
+def test_master_config_version_reads_yaml(tmp_path: Path, monkeypatch) -> None:
+    """Read version field from master_config.yaml."""
+    cfg_dir = tmp_path / "configs"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "master_config.yaml").write_text("version: '2.1.0'\n")
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+
+    assert mod._master_config_version() == "2.1.0"
+
+
+def test_git_commit_worktree(tmp_path: Path, monkeypatch) -> None:
+    """Resolve git commit through worktree .git file."""
+    actual_git = tmp_path / "actual_git"
+    refs = actual_git / "refs" / "heads"
+    refs.mkdir(parents=True)
+    (actual_git / "HEAD").write_text("ref: refs/heads/main\n")
+    (refs / "main").write_text("fedcba9876543210fedcba9876543210fedcba98\n")
+
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    (worktree / ".git").write_text(f"gitdir: {actual_git}\n")
+    monkeypatch.setattr(mod, "PROJECT_ROOT", worktree)
+
+    assert mod._git_commit() == "fedcba9"

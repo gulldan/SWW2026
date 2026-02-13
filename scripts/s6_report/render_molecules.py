@@ -98,7 +98,7 @@ def _render_grid(
         primary_col: Column used to sort molecules (ascending).
     """
     if df.empty:
-        logger.warning("Нет данных для {}", title)
+        logger.warning("No data for {}", title)
         return
 
     sort_col = primary_col if primary_col in df.columns else "combined_min"
@@ -168,7 +168,7 @@ def _render_grid(
             family="monospace",
         )
 
-    # Скрыть пустые ячейки
+    # Hide empty cells
     for idx in range(n, n_rows * n_cols):
         r, c = divmod(idx, n_cols)
         axes[r][c].axis("off")
@@ -177,15 +177,15 @@ def _render_grid(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    logger.info("Сохранено: {}", output_path)
+    logger.info("Saved: {}", output_path)
 
 
 @click.command()
-@click.option("--input", "input_path", default="report/data/all_results.parquet", help="Parquet с результатами")
-@click.option("--output-dir", default="report/figures", help="Каталог для PNG")
-@click.option("--config", default="configs/pairs.yaml", help="Конфиг пар мишеней")
-@click.option("--thresholds", default="configs/metrics.yaml", help="Пороги хитов")
-@click.option("--top-n", default=5, type=int, help="Число топовых молекул для top_hits")
+@click.option("--input", "input_path", default="report/data/all_results.parquet", help="Parquet with results")
+@click.option("--output-dir", default="report/figures", help="Output directory for PNGs")
+@click.option("--config", default="configs/pairs.yaml", help="Target pairs config")
+@click.option("--thresholds", default="configs/metrics.yaml", help="Hit thresholds")
+@click.option("--top-n", default=5, type=int, help="Number of top molecules for top_hits")
 def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: int) -> None:
     """Render 2D molecule grids with score annotations for each pair.
 
@@ -201,7 +201,7 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
     """
     in_path = PROJECT_ROOT / input_path
     if not in_path.exists():
-        logger.error("Входной файл не найден: {}. Сначала запустите агрегацию.", in_path)
+        logger.error("Input file not found: {}. Run aggregation first.", in_path)
         sys.exit(1)
 
     df = pd.read_parquet(in_path)
@@ -216,7 +216,7 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
         exp_cfg = load_experiment(PROJECT_ROOT / "configs")
         modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
     except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("Не удалось загрузить experiment.yaml: {}. Использую дефолтные режимы.", exc)
+        logger.warning("Failed to load experiment.yaml: {}. Using default modes.", exc)
         exp_cfg = {}
         modes = ["single_a", "single_b", "double"]
 
@@ -246,7 +246,7 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
                 primary_col=primary_col,
             )
 
-        # Top hits: лучшие из всех режимов
+        # Top hits: best across all modes
         sort_col = primary_col if primary_col in df_pair.columns else "combined_min"
         frames = []
         for mode in modes:
@@ -267,7 +267,7 @@ def main(input_path: str, output_dir: str, config: str, thresholds: str, top_n: 
                 primary_col=primary_col,
             )
 
-    logger.info("Все молекулы отрисованы в {}", fig_dir)
+    logger.info("All molecules rendered in {}", fig_dir)
 
 
 if __name__ == "__main__":

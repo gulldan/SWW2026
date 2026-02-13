@@ -18,7 +18,7 @@ Technical details of scoring, generation, and data flow.
 Boltz-2 output is **log10(IC50 in uM)**, NOT pIC50.
 Convert: `pIC50 = 6 - log10(IC50_uM)`.
 
-Full notation: see `docs/goal.md` (Section "Nотация").
+Full notation: see `docs/goal.md` (Notation section).
 
 ## Scoring Backends
 

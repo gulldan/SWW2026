@@ -253,7 +253,7 @@ def _capped_zscore(
     if score == error_val:
         return penalty_cap, True
     if std == 0:
-        raise ZeroDivisionError("std=0 в normalization.yaml")
+        raise ZeroDivisionError("std=0 in normalization.yaml")
     z = (score - mean) / std
     z = max(-_MAX_Z_ABS, min(_MAX_Z_ABS, z))
     return z, False
@@ -306,7 +306,7 @@ def _load_normalization(path: str) -> dict[str, Any]:
     with Path(path).open() as f:
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
-        raise TypeError("normalization.yaml должен быть словарём")
+        raise TypeError("normalization.yaml must be a dictionary")
     return data
 
 
@@ -391,7 +391,7 @@ def _apply_dual_patch() -> None:
     targets = normalization.get("targets", {})
 
     if target_id_a not in targets:
-        raise KeyError(f"Target A '{target_id_a}' не найден в normalization.yaml")
+        raise KeyError(f"Target A '{target_id_a}' not found in normalization.yaml")
 
     mean_a = float(targets[target_id_a]["mean"])
     std_a = float(targets[target_id_a]["std"])
@@ -402,7 +402,7 @@ def _apply_dual_patch() -> None:
     mean_b = std_b = 0.0  # sentinels; only used when mode needs B
     if reward_mode in {"single_b", "double", "linear_equal", "biased_a", "selective_a"}:
         if target_id_b not in targets:
-            raise KeyError(f"Target B '{target_id_b}' не найден в normalization.yaml")
+            raise KeyError(f"Target B '{target_id_b}' not found in normalization.yaml")
         mean_b = float(targets[target_id_b]["mean"])
         std_b = float(targets[target_id_b]["std"])
 
@@ -411,7 +411,7 @@ def _apply_dual_patch() -> None:
     dual_cfg = None
     if reward_mode in _dual_modes:
         if not dual_receptor_b:
-            raise RuntimeError("DUAL_RECEPTOR_B обязателен для double режима")
+            raise RuntimeError("DUAL_RECEPTOR_B is required for double mode")
         config_path = Path(os.environ.get("DUAL_CONFIG", "/workspace/dual_config.json"))
         with config_path.open() as f:
             dual_cfg = json.load(f)
@@ -570,7 +570,7 @@ def _apply_dual_patch() -> None:
 
         # double mode: also score B via config swap
         if dual_cfg is None:
-            raise RuntimeError("dual_cfg отсутствует при режиме double")
+            raise RuntimeError("dual_cfg missing for double mode")
 
         receptor_b = dual_cfg["receptor_b"]
         center_b = dual_cfg["center_b"]

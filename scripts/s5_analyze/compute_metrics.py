@@ -20,7 +20,6 @@ import pandas as pd
 from loguru import logger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
 _N_BOOTSTRAP = 10_000
 
@@ -721,8 +720,8 @@ def main(
     out_metrics_path.write_text(json.dumps(metrics_out, indent=2))
     out_stats_path.write_text(json.dumps(stats_out, indent=2))
 
-    logger.info("Метрики -> {}", out_metrics_path)
-    logger.info("Статистика -> {}", out_stats_path)
+    logger.info("Metrics -> {}", out_metrics_path)
+    logger.info("Stats -> {}", out_stats_path)
 
 
 if __name__ == "__main__":

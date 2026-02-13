@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Запуск NIM Boltz-2 инстансов — по одному на каждую GPU.
+# Start NIM Boltz-2 instances — one per GPU.
 #
-# Использование:
-#   ./scripts/4_score/start_boltz_nim.sh          # auto-detect GPUs
-#   ./scripts/4_score/start_boltz_nim.sh 2        # явно 2 GPU
-#   ./scripts/4_score/start_boltz_nim.sh stop     # остановить все инстансы
+# Usage:
+#   ./scripts/s4_score/start_boltz_nim.sh          # auto-detect GPUs
+#   ./scripts/s4_score/start_boltz_nim.sh 2        # explicitly 2 GPUs
+#   ./scripts/s4_score/start_boltz_nim.sh stop     # stop all instances
 #
-# GPU 0 → порт 8000 (контейнер boltz2_nim_gpu0)
-# GPU 1 → порт 8001 (контейнер boltz2_nim_gpu1)
+# GPU 0 → port 8000 (container boltz2_nim_gpu0)
+# GPU 1 → port 8001 (container boltz2_nim_gpu1)
 # ...
 #
-# Требования:
-#   - Docker с nvidia runtime
-#   - Образ nvcr.io/nim/mit/boltz2:1.5.0 (или docker load из boltz2_1.5.0.tar)
-#   - Кеш моделей в output/cache/boltz_nim/ (подготовить через docker/boltz2/boltz2nim.sh)
+# Requirements:
+#   - Docker with nvidia runtime
+#   - Image nvcr.io/nim/mit/boltz2:1.5.0 (or docker load from boltz2_1.5.0.tar)
+#   - Model cache in output/cache/boltz_nim/ (prepare via docker/boltz2/boltz2nim.sh)
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -120,4 +120,4 @@ for gpu_id in $(seq 0 $((N_GPUS - 1))); do
     echo "  - http://localhost:$port   # GPU $gpu_id"
 done
 echo ""
-echo "To stop:  ./scripts/4_score/start_boltz_nim.sh stop"
+echo "To stop:  ./scripts/s4_score/start_boltz_nim.sh stop"

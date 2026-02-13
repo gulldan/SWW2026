@@ -19,27 +19,28 @@ from dualdocking.generation.freedpp import (
     _parse_output_smiles,
     _resolve_pdb_path,
     _run_freedpp,
+    parse_training_log,
 )
 
 # --- _cache_key ---
 
 
 def test_cache_key_deterministic() -> None:
-    """Одинаковый config → одинаковый hash."""
+    """Same config produces the same hash."""
     cfg1 = GenerationConfig(target_id="CDK2", seed=42, epochs=200)
     cfg2 = GenerationConfig(target_id="CDK2", seed=42, epochs=200)
     assert _cache_key(cfg1) == _cache_key(cfg2)
 
 
 def test_cache_key_varies() -> None:
-    """Разные targets → разные hash."""
+    """Different targets produce different hashes."""
     cfg1 = GenerationConfig(target_id="CDK2", seed=42)
     cfg2 = GenerationConfig(target_id="ERK2", seed=42)
     assert _cache_key(cfg1) != _cache_key(cfg2)
 
 
 def test_cache_key_varies_by_mode() -> None:
-    """Single_a vs double → разные hash."""
+    """single_a vs double produce different hashes."""
     cfg1 = GenerationConfig(target_id="CDK2", reward_mode="single_a")
     cfg2 = GenerationConfig(target_id="CDK2", reward_mode="double", second_target_id="ERK2")
     assert _cache_key(cfg1) != _cache_key(cfg2)
@@ -49,7 +50,7 @@ def test_cache_key_varies_by_mode() -> None:
 
 
 def test_parse_output_smiles(tmp_path: Path) -> None:
-    """Mock CSV в формате FREED++ → корректные SMILES."""
+    """Mock CSV in FREED++ format yields correct SMILES."""
     mols_dir = tmp_path / "output" / "run" / "mols"
     mols_dir.mkdir(parents=True)
 
@@ -65,7 +66,7 @@ def test_parse_output_smiles(tmp_path: Path) -> None:
 
 
 def test_parse_output_smiles_empty(tmp_path: Path) -> None:
-    """Нет CSV файлов → пустой список."""
+    """No CSV files yields an empty list."""
     smiles = _parse_output_smiles(tmp_path)
     assert smiles == []
 
@@ -74,7 +75,7 @@ def test_parse_output_smiles_empty(tmp_path: Path) -> None:
 
 
 def test_build_freedpp_args_single() -> None:
-    """Single_a mode — корректные CLI args."""
+    """single_a mode produces correct CLI args."""
     cfg = GenerationConfig(
         target_id="CDK2",
         n_molecules=100,
@@ -98,7 +99,7 @@ def test_build_freedpp_args_single() -> None:
 
 
 def test_build_freedpp_args_double() -> None:
-    """Double mode args содержат те же базовые аргументы (dual обрабатывается через env vars)."""
+    """Double mode includes the same base args (dual handled via env vars)."""
     cfg = GenerationConfig(
         target_id="CDK2",
         reward_mode="double",
@@ -113,7 +114,7 @@ def test_build_freedpp_args_double() -> None:
 
 
 def test_resolve_pdb_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Находит PDB по target_id через meta.yaml."""
+    """Resolves PDB by target_id via meta.yaml."""
     pair_dir = tmp_path / "CDK2_ERK2" / "A"
     pair_dir.mkdir(parents=True)
 
@@ -131,7 +132,7 @@ def test_resolve_pdb_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_resolve_pdb_path_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Target не найден → FileNotFoundError."""
+    """Unknown target raises FileNotFoundError."""
     import dualdocking.generation.freedpp as gen_mod
 
     monkeypatch.setattr(gen_mod, "DATA_DIR", tmp_path)
@@ -285,3 +286,72 @@ def test_ensure_docker_image_uses_stage0_fetch_script(tmp_path: Path, monkeypatc
 
     assert fetch_calls, "Expected fetch script call for missing FREED data files"
     assert fetch_calls[0] == ["python", "scripts/s0_fetch/fetch_freed_fragments.py"]
+
+
+# --- parse_training_log ---
+
+
+def test_parse_training_log_basic(tmp_path: Path) -> None:
+    """Extract epoch, reward, and loss from typical FREED++ log lines."""
+    log = tmp_path / "freedpp_double_seed_42_adhoc_20260101T000000Z.log"
+    log.write_text(
+        "[2026-01-01T00:00:00Z] Starting training\n"
+        "[2026-01-01T00:01:00Z] Epoch 1 loss=0.523 reward=-6.2\n"
+        "[2026-01-01T00:02:00Z] Epoch 2 loss=0.412 reward=-7.1\n"
+        "[2026-01-01T00:03:00Z] Epoch 3 loss=0.310 reward=-7.8 score=-8.0\n"
+    )
+    records = parse_training_log(log)
+    assert len(records) == 3
+    assert records[0]["epoch"] == 1
+    assert records[0]["loss"] == pytest.approx(0.523)
+    assert records[0]["reward"] == pytest.approx(-6.2)
+    assert records[2]["score"] == pytest.approx(-8.0)
+
+
+def test_parse_training_log_bracket_format(tmp_path: Path) -> None:
+    """Parse [epoch/total] format used by some FREED++ versions."""
+    log = tmp_path / "freedpp.log"
+    log.write_text(
+        "[2026-01-01T00:00:00Z] [1/200] loss=1.5 reward=-3.0\n"
+        "[2026-01-01T00:01:00Z] [2/200] loss=1.2 reward=-4.5\n"
+    )
+    records = parse_training_log(log)
+    assert len(records) == 2
+    assert records[0]["epoch"] == 1
+    assert records[1]["epoch"] == 2
+
+
+def test_parse_training_log_empty(tmp_path: Path) -> None:
+    """Empty log returns empty list."""
+    log = tmp_path / "empty.log"
+    log.write_text("")
+    assert parse_training_log(log) == []
+
+
+def test_parse_training_log_missing_file(tmp_path: Path) -> None:
+    """Missing file returns empty list without error."""
+    assert parse_training_log(tmp_path / "nonexistent.log") == []
+
+
+def test_parse_training_log_no_metrics(tmp_path: Path) -> None:
+    """Lines with epoch but no metrics are skipped."""
+    log = tmp_path / "freedpp.log"
+    log.write_text(
+        "[2026-01-01T00:00:00Z] Epoch 1 — starting\n"
+        "[2026-01-01T00:01:00Z] Epoch 2 — starting\n"
+    )
+    assert parse_training_log(log) == []
+
+
+def test_parse_training_log_duplicate_epoch(tmp_path: Path) -> None:
+    """Later occurrence of same epoch updates the record."""
+    log = tmp_path / "freedpp.log"
+    log.write_text(
+        "[2026-01-01T00:00:00Z] Epoch 1 loss=0.5\n"
+        "[2026-01-01T00:00:01Z] Epoch 1 reward=-7.0\n"
+    )
+    records = parse_training_log(log)
+    assert len(records) == 1
+    assert records[0]["epoch"] == 1
+    assert records[0]["loss"] == pytest.approx(0.5)
+    assert records[0]["reward"] == pytest.approx(-7.0)

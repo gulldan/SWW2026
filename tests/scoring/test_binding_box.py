@@ -27,7 +27,7 @@ def _write_pdb(tmp_path: Path, content: str, name: str = "test.pdb") -> Path:
 
 
 def test_extract_ligand_coords_with_ligand(tmp_path: Path) -> None:
-    """PDB с лигандом → корректные координаты."""
+    """PDB with ligand -> correct coordinates."""
     pdb = _write_pdb(
         tmp_path,
         """\
@@ -46,7 +46,7 @@ def test_extract_ligand_coords_with_ligand(tmp_path: Path) -> None:
 
 
 def test_extract_ligand_coords_water_only(tmp_path: Path) -> None:
-    """PDB без лиганда (только вода) → None."""
+    """PDB without ligand (water only) -> None."""
     pdb = _write_pdb(
         tmp_path,
         """\
@@ -60,7 +60,7 @@ def test_extract_ligand_coords_water_only(tmp_path: Path) -> None:
 
 
 def test_exclude_ions(tmp_path: Path) -> None:
-    """Ионы (NA, CL, SO4) исключаются."""
+    """Ions (NA, CL, SO4) are excluded."""
     pdb = _write_pdb(
         tmp_path,
         """\
@@ -79,7 +79,7 @@ def test_exclude_ions(tmp_path: Path) -> None:
 
 
 def test_compute_box_padding() -> None:
-    """Padding расчёт: extent = max-min + 2*padding."""
+    """Padding calculation: extent = max-min + 2*padding."""
     coords = np.array([[0.0, 0.0, 0.0], [10.0, 20.0, 30.0]])
     center_str, size_str = compute_box(coords, padding=5.0)
 
@@ -95,7 +95,7 @@ def test_compute_box_padding() -> None:
 
 
 def test_extract_binding_box_with_ligand(tmp_path: Path) -> None:
-    """Лиганд есть → box по лиганду."""
+    """Ligand present -> box from ligand coordinates."""
     pdb = _write_pdb(
         tmp_path,
         """\
@@ -111,7 +111,7 @@ def test_extract_binding_box_with_ligand(tmp_path: Path) -> None:
 
 
 def test_extract_binding_box_fallback(tmp_path: Path) -> None:
-    """Нет лиганда → fallback на центр белка + куб 30×30×30."""
+    """No ligand -> fallback to protein centre + 30×30×30 cube."""
     pdb = _write_pdb(
         tmp_path,
         """\

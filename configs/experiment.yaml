@@ -1,80 +1,80 @@
-# ТЕСТОВЫЙ ПРОГОН: проверка полного пайплайна end-to-end.
-# epochs=10, Boltz-2 diffusion_samples=1/sampling_steps=50 (fast mode).
-# Для production вернуть epochs>=80, валидировать Boltz-2 корреляцию.
+# Experimental budget and reproducibility settings.
 #
-# Экспериментальный бюджет и настройки воспроизводимости.
+# All single-target and double-target runs use the SAME budget
+# to ensure a fair comparison.
 #
-# Все single-target и double-target запуски используют ОДИНАКОВЫЙ бюджет,
-# чтобы сравнение было честным.
+# For smoke tests: override epochs via CLI (--epochs 10) or env FREEDPP_EPOCHS=10.
 
 budget:
-  n_molecules: 1000          # молекул на запуск генерации
-  n_scoring_calls: 2000      # макс. вызовов Boltz-2 на запуск (1000 * 2 мишени)
+  n_molecules: 1000          # molecules per generation run
+  n_scoring_calls: 2000      # max Boltz-2 calls per run (1000 * 2 targets)
 
-# Фиксированные сиды для воспроизводимости
+# Fixed seeds for reproducibility
 seeds: [42, 137, 256, 512, 1024]
 
-# Количество независимых запусков на комбинацию (пара, режим)
+# Number of independent runs per (pair, mode) combination
 n_runs: 5
 
-# Режимы для сравнения
+# Modes for comparison.
+# Pre-registered (primary): single_a, single_b, double.
+# Exploratory (not pre-registered): linear_equal, biased_a, selective_a.
 modes:
-  - single_a       # оптимизация только под мишень A, затем оценка по обеим
-  - single_b       # оптимизация только под мишень B, затем оценка по обеим
-  - double         # оптимизация под combined(A, B) одновременно
-  - linear_equal   # z_a + z_b — равновзвешенная линейная комбинация
-  - biased_a       # z_a + 0.3*z_b — приоритет мишени A
-  - selective_a    # z_a - z_b — максимизация селективности к A
+  - single_a       # optimize for target A only, then evaluate on both        [pre-registered]
+  - single_b       # optimize for target B only, then evaluate on both        [pre-registered]
+  - double         # optimize for combined(A, B) simultaneously               [pre-registered]
+  - linear_equal   # z_a + z_b — equally weighted linear combination          [exploratory]
+  - biased_a       # z_a + 0.3*z_b — target A priority                       [exploratory]
+  - selective_a    # z_a - z_b — maximize selectivity for A                   [exploratory]
 
-# Целевые функции для double-target режима
-# Основная (baseline) + альтернативы для анализа чувствительности
+# Objective functions for double-target mode
+# Baseline + alternatives for sensitivity analysis
 objectives:
-  baseline: "min"               # worst-case - основная гипотеза
+  baseline: "min"               # worst-case — primary hypothesis
   alternatives:
-    - kind: "geometric"         # геометрическое среднее
-    - kind: "harmonic"          # гармоническое среднее
-    - kind: "weighted_sum"      # линейная скаляризация
+    - kind: "geometric"         # geometric mean
+    - kind: "harmonic"          # harmonic mean
+    - kind: "weighted_sum"      # linear scalarization
       weight_a: 0.5
-    - kind: "weighted_product"  # мультипликативная скаляризация
+    - kind: "weighted_product"  # multiplicative scalarization
       weight_a: 0.5
-    - kind: "tchebycheff"       # декомпозиция Чебышёва (невыпуклый фронт Парето)
+    - kind: "tchebycheff"       # Tchebycheff decomposition (non-convex Pareto front)
       weight_a: 0.5
-      utopia_a: -3.0            # идеальная log10(IC50, μM): 1 nM -> -3
-      utopia_b: -3.0            # идеальная log10(IC50, μM)
+      utopia_a: -3.0            # ideal log10(IC50, μM): 1 nM -> -3
+      utopia_b: -3.0            # ideal log10(IC50, μM)
 
-# Парето-анализ (пост-обработка, не используется как reward)
+# Pareto analysis (post-processing, not used as reward)
 pareto_analysis:
   enabled: true
-  ref_point_a: 2.0              # реферальная точка (хуже): 100 μM -> 2.0 (= T + 2)
+  ref_point_a: 2.0              # reference point (worse): 100 μM -> 2.0 (= T + 2)
   ref_point_b: 2.0
 
-# Настройки генератора (FREED++)
+# Generator settings (FREED++)
 generator:
   name: "FREED++"
   freedpp:
-    epochs: 10
+    epochs: 200
     num_sub_proc: 0            # 0 = auto-detect: 12 for 4090/24GB, 24 for H100/80GB
     starting_smile: "c1([*:1])c([*:2])ccc([*:3])c1"
     docker_image: "dualdocking/freedpp:latest"
     use_model_cache: true
-    training_timeout: 86400  # 24ч
+    training_timeout: 86400  # 24h
     box_padding: 10.0        # Å
     vina_program: unidock_gpu    # "qvina02" for CPU fallback
 
-# Порог качества reward-прогона (quality gate)
+# Reward run quality threshold (quality gate)
 quality_gate:
   max_invalid_fraction: 0.10
   max_timeout_fraction: 0.05
 
-# Настройки скорера (Boltz-2)
+# Scorer settings (Boltz-2)
 scorer:
   name: "Boltz-2"
-  backend: nim                    # "cli" (subprocess boltz predict) или "nim" (REST API, быстрее)
+  backend: nim                    # "cli" (subprocess boltz predict) or "nim" (REST API, faster)
   cache_enabled: true
   timeout_seconds: 300
   nim:
-    # По одному NIM-инстансу на каждую GPU для параллельного скоринга
-    # GPU 0 → порт 8000, GPU 1 → порт 8001
+    # One NIM instance per GPU for parallel scoring
+    # GPU 0 → port 8000, GPU 1 → port 8001
     base_port: 8000
     urls:
       - "http://localhost:8000"   # GPU 0

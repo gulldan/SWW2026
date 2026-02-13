@@ -23,7 +23,6 @@ Outputs:
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import click
@@ -33,7 +32,6 @@ from loguru import logger
 from scipy import stats as sp_stats
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
 _N_BOOTSTRAP = 5_000
 

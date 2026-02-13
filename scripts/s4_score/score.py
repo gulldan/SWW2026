@@ -76,29 +76,33 @@ def _score_one_target(
     from dualdocking.data.io_utils import stem_exists
 
     if not force and stem_exists(scores_path.with_suffix("")):
-        logger.info("Чекпоинт: скоры мишени {} уже существуют ({}), пропускаем", target_id, scores_path)
+        logger.info("Checkpoint: scores for target {} already exist ({}), skipping", target_id, scores_path)
         from dualdocking.data.io_utils import read_df
 
         saved = read_df(scores_path.with_suffix(""))
         return label, saved["score"].to_numpy()
 
-    logger.info("Скоринг {} молекул по мишени {} (device={})", len(smiles_list), target_id, device)
+    logger.info("Scoring {} molecules against target {} (device={})", len(smiles_list), target_id, device)
     scores = np.asarray(scoring_backend.score_batch(target_id, smiles_list, use_cache=use_cache, device=device), dtype=float)
 
     from dualdocking.data.io_utils import write_df
 
     write_df(pd.DataFrame({"smiles": smiles_list, "score": scores}), scores_path.with_suffix(""), csv_too=True)
-    logger.info("Скоры мишени {} сохранены: {}", target_id, scores_path)
+    logger.info("Scores for target {} saved: {}", target_id, scores_path)
     return label, scores
 
 
 @click.command()
-@click.option("--pair", required=True, help="ID пары из configs/pairs.yaml")
-@click.option("--mode", type=click.Choice(["single_a", "single_b", "double"]), required=True)
+@click.option("--pair", required=True, help="Pair ID from configs/pairs.yaml")
+@click.option(
+    "--mode",
+    type=click.Choice(["single_a", "single_b", "double", "linear_equal", "biased_a", "selective_a"]),
+    required=True,
+)
 @click.option("--seed", default=42, type=int)
 @click.option("--config", default="configs/pairs.yaml")
 @click.option("--experiment-config", default="configs/experiment.yaml", help="Experiment config for objectives")
-@click.option("--force", is_flag=True, default=False, help="Пересчитать даже если scores уже есть")
+@click.option("--force", is_flag=True, default=False, help="Re-score even if scores already exist")
 @click.option("--prune-cache", is_flag=True, default=False, help="Remove stale cache files before scoring")
 @click.option(
     "--parallel-scoring",
@@ -157,7 +161,7 @@ def main(
 
     pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
     if pair not in pairs:
-        logger.error("Пара '{}' не найдена", pair)
+        logger.error("Pair '{}' not found", pair)
         sys.exit(1)
 
     pair_cfg = pairs[pair]
@@ -167,11 +171,11 @@ def main(
 
     if molecules:
         smiles_list = read_molecules(Path(molecules))
-        logger.info("Загружено {} молекул из {}", len(smiles_list), molecules)
+        logger.info("Loaded {} molecules from {}", len(smiles_list), molecules)
     else:
         generated_stem = result_dir / "generated"
         if not stem_exists(generated_stem):
-            logger.error("Молекулы не найдены: {}.parquet/.csv", generated_stem)
+            logger.error("Molecules not found: {}.parquet/.csv", generated_stem)
             sys.exit(1)
         gen_df = read_df(generated_stem)
         smiles_list = gen_df["smiles"].tolist()
@@ -182,7 +186,7 @@ def main(
     scores_a_path = result_dir / "scores_A.csv"
     scores_b_path = result_dir / "scores_B.csv"
 
-    # --- Скоринг мишеней (адаптивно: параллельно на 2+ GPU, последовательно на 1 GPU) ---
+    # --- Target scoring (adaptive: parallel on 2+ GPUs, sequential on 1 GPU) ---
     targets = [
         (target_a_id, scores_a_path, "A"),
         (target_b_id, scores_b_path, "B"),
@@ -198,7 +202,7 @@ def main(
     if use_parallel:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        logger.info("Параллельный скоринг двух мишеней на {} GPU", n_gpus)
+        logger.info("Parallel scoring of two targets on {} GPUs", n_gpus)
         with ThreadPoolExecutor(max_workers=2) as pool:
             futures = {}
             for i, (target_id, scores_path, label) in enumerate(targets):
@@ -220,8 +224,8 @@ def main(
                 all_scores[label] = scores
     else:
         if parallel_scoring == "auto" and n_gpus < 2:
-            logger.info("Один GPU обнаружен — последовательный скоринг")
-        progress = tqdm(targets, desc=f"Скоринг [{pair}/{mode}]", unit="target")
+            logger.info("Single GPU detected — sequential scoring")
+        progress = tqdm(targets, desc=f"Scoring [{pair}/{mode}]", unit="target")
         for target_id, scores_path, label in progress:
             progress.set_postfix(target=target_id)
             _, scores = _score_one_target(
@@ -241,7 +245,7 @@ def main(
     # Parse objectives from experiment config
     objectives = parse_objectives_config(exp_cfg)
 
-    # Сохранить объединённую таблицу (schema contract: smiles_canonical, affinity_a, affinity_b, is_hit_both)
+    # Build joined table (schema: smiles_canonical, affinity_a, affinity_b, is_hit_both)
     from dualdocking.config import load_metrics
     from dualdocking.data.chem_sanitize import canonicalize
 
@@ -314,9 +318,9 @@ def main(
     (result_dir / "scoring_context.json").write_text(_json.dumps(scoring_meta, indent=2))
     logger.info("Scoring context -> {}", result_dir / "scoring_context.json")
 
-    logger.info("Скоры сохранены в {}", result_dir)
+    logger.info("Scores saved to {}", result_dir)
     logger.info(
-        "Статистика скоров - A: mean={:.2f} std={:.2f} | B: mean={:.2f} std={:.2f}",
+        "Score stats — A: mean={:.2f} std={:.2f} | B: mean={:.2f} std={:.2f}",
         np.nanmean(scores_a),
         np.nanstd(scores_a),
         np.nanmean(scores_b),

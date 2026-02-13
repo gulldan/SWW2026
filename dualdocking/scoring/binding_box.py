@@ -34,13 +34,13 @@ class LigandInfo:
     coords: NDArray[np.float64]
 
 
-# HETATM-записи, которые НЕ являются лигандами
+# HETATM records that are NOT ligands
 _EXCLUDED_RESNAMES: set[str] = {
-    # Вода
+    # Water
     "HOH",
     "WAT",
     "H2O",
-    # Ионы
+    # Ions
     "NA",
     "CL",
     "MG",
@@ -52,12 +52,12 @@ _EXCLUDED_RESNAMES: set[str] = {
     "CO",
     "NI",
     "K",
-    # Многоатомные ионы
+    # Polyatomic ions
     "SO4",
     "PO4",
     "NO3",
     "CO3",
-    # Буферы и криопротекторы
+    # Buffers and cryoprotectants
     "GOL",
     "EDO",
     "PEG",
@@ -102,7 +102,7 @@ def extract_ligand_coords(pdb_path: str | Path) -> NDArray[np.float64] | None:
             resname = line[17:20].strip()
             if resname in _EXCLUDED_RESNAMES:
                 continue
-            # Только тяжёлые атомы (не водород)
+            # Heavy atoms only (exclude hydrogen)
             element = line[76:78].strip()
             if element == "H":
                 continue
@@ -227,7 +227,7 @@ def extract_binding_box(
     if ligand_coords is not None and len(ligand_coords) > 0:
         return compute_box(ligand_coords, padding=padding)
 
-    # Fallback: центр масс белка + куб 30×30×30
+    # Fallback: protein centre of mass + 30×30×30 cube
     protein_coords: list[list[float]] = []
     pdb_path = Path(pdb_path)
     with pdb_path.open() as f:
@@ -243,7 +243,7 @@ def extract_binding_box(
                 continue
 
     if not protein_coords:
-        raise ValueError(f"Не удалось извлечь координаты из PDB: {pdb_path}")
+        raise ValueError(f"Failed to extract coordinates from PDB: {pdb_path}")
 
     center = np.array(protein_coords, dtype=np.float64).mean(axis=0)
     center_str = ",".join(f"{v:.2f}" for v in center)

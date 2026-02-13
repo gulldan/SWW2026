@@ -1,36 +1,36 @@
-# Критерии выбора пар белков
+# Protein Pair Selection Criteria
 
-## Требования к парам (primary analysis)
+## Pair Requirements (Primary Analysis)
 
-### Для FREED++ (UniDock GPU-генерация)
+### For FREED++ (UniDock GPU Generation)
 
-1. **PDB-структура**: разрешение <= 2.5 Å с со-кристаллизованным лигандом (определяет grid box center). Исключение: EGFR 1M17 (2.6 Å) — auxiliary pair, допущена как единственный Human EGFR co-crystal с erlotinib; на primary analysis не влияет.
-2. **Чёткий binding site**: однозначный связывающий карман для корректного reward signal.
-3. **Размер**: белок <= 600 остатков (в `double` режиме UniDock GPU вызывается дважды на каждый шаг RL-эпизода).
-4. **Биологическое обоснование**: пара должна иметь обоснование в multi-target дизайне лекарств.
+1. **PDB structure**: resolution ≤ 2.5 Å with a co-crystallized ligand (defines the grid box center). Exception: EGFR 1M17 (2.6 Å) — auxiliary pair, accepted as the only human EGFR co-crystal with erlotinib; does not affect primary analysis.
+2. **Well-defined binding site**: unambiguous binding pocket for a correct reward signal.
+3. **Size**: protein ≤ 600 residues (in `double` mode UniDock GPU is invoked twice per RL episode step).
+4. **Biological rationale**: the pair must have justification in multi-target drug design.
 
-### Для Boltz-2 (валидация)
+### For Boltz-2 (Validation)
 
-5. **Совместимость**: растворимые белки без кофакторов в binding pocket (Boltz-2 affinity head не моделирует кофакторы). Пары с кофакторами (AChE_MAOB) допускаются только в exploratory analysis с `affinity_probability_binary` и помечаются `warning` в таблице пар.
-6. **Последовательность**: UniProt FASTA достаточно (PDB не нужен для Boltz-2).
-7. **Размер**: <= 1000 токенов (ограничение Boltz-2).
+5. **Compatibility**: soluble proteins without cofactors in the binding pocket (Boltz-2 affinity head does not model cofactors). Pairs with cofactors (AChE_MAOB) are allowed only in exploratory analysis with `affinity_probability_binary` and are marked `warning` in the pair table.
+6. **Sequence**: UniProt FASTA is sufficient (PDB is not required for Boltz-2).
+7. **Size**: ≤ 1000 tokens (Boltz-2 limit).
 
-### Кофакторы — критичное ограничение Boltz-2
+### Cofactors — A Critical Boltz-2 Limitation
 
 > Boltz-2 paper (Limitations): *"the affinity module does not explicitly handle such cofactors, including ions, water, or multimeric binding partners"*
-> Rowan FAQ: *"affinity predictions will be unreliable"* для targets с кофакторами в binding pocket.
+> Rowan FAQ: *"affinity predictions will be unreliable"* for targets with cofactors in the binding pocket.
 
-Пары с кофакторами (COX1_COX2 — гем, AChE_MAOB — FAD): ось «Cofactor: Present» относится к **биологии мишени и надёжности Boltz-2**, а не к состоянию docking-рецептора. Протокол подготовки рецептора (`removeHeterogens(keepWater=False)`) удаляет **все** HETATM, включая кофакторы; таким образом, UniDock докирует к **cofactor-free** рецептору для всех мишеней без исключения. Это означает, что docking-скоры для COX/MAO-B отражают связывание к «очищенному» карману и могут быть менее репрезентативны биологически. **Boltz-2 affinity** для мишеней с кофакторами также ненадёжен (affinity head не моделирует кофакторы). Для MAO-B рекомендуется `affinity_probability_binary` вместо `affinity_pred_value`.
+Pairs with cofactors (COX1_COX2 — heme, AChE_MAOB — FAD): the "Cofactor: Present" axis refers to the **target biology and Boltz-2 reliability**, not to the docking receptor state. The receptor preparation protocol (`removeHeterogens(keepWater=False)`) removes **all** HETATM records, including cofactors; thus UniDock docks to a **cofactor-free** receptor for all targets without exception. This means that docking scores for COX/MAO-B reflect binding to a "stripped" pocket and may be less biologically representative. **Boltz-2 affinity** for cofactor-bearing targets is also unreliable (the affinity head does not model cofactors). For MAO-B, `affinity_probability_binary` is recommended instead of `affinity_pred_value`.
 
-## Сводная таблица всех 9 пар
+## Summary Table of All 9 Pairs
 
-Классификация по трём осям: **Disease** (AD / Non-AD), **Structure** (Homo / Hetero), **Cofactor** (Clean / Present). Подробнее: см. [Факторный дизайн](#факторный-дизайн-эксперимента).
+Classification along three axes: **Disease** (AD / Non-AD), **Structure** (Homo / Hetero), **Cofactor** (Clean / Present). See also: [Factorial Design](#factorial-experiment-design).
 
-| # | Пара | Disease | Structure | Cofactor | Set | PDB A / PDB B | Размер* | Boltz-2 |
-|---|------|---------|-----------|----------|-----|---------------|---------|---------|
+| # | Pair | Disease | Structure | Cofactor | Set | PDB A / PDB B | Size* | Boltz-2 |
+|---|------|---------|-----------|----------|-----|---------------|-------|---------|
 | 1 | CDK2_ERK2 | Non-AD | Homo | Clean | **Core** | 1HCL¹ / 4QTA | ~629 | ok |
 | 2 | EGFR_HER2 | Non-AD | Homo | Clean | Auxiliary | 1M17 / 3PP0 | ~671 | ok |
-| 3 | COX1_COX2 | Non-AD | Homo | Present | Blocked | 1EQG / 3LN1 | ~1120 | warning (гем) |
+| 3 | COX1_COX2 | Non-AD | Homo | Present | Blocked | 1EQG / 3LN1 | ~1120 | warning (heme) |
 | 4 | AChE_BChE | AD | Homo | Clean | **Core** | 4EY7 / 4BDS | ~1073 | ok |
 | 5 | **BACE1_GSK3B** | AD | Hetero | Clean | **Core** | 6EQM / 5KPK | ~724 | ok |
 | 6 | **AChE_BACE1** | AD | Hetero | Clean | **Core** | 4EY7 / 6EQM | ~943 | ok |
@@ -38,7 +38,7 @@
 | 8 | **BACE1_CDK5** | AD | Hetero | Clean | Auxiliary | 6EQM / 1UNL | ~692 | ok |
 | 9 | AChE_MAOB | AD | Hetero | Present | Auxiliary | 4EY7 / 2V5Z | ~1063 | warning (FAD) |
 
-\* **Размер** — приблизительное суммарное число остатков обоих белков после обработки PDBFixer (trimming, удаление HETATM). Отличия ±20–50 aa от RCSB deposited sequence возможны из-за missing residues, non-standard residue replacement и removal of terminal tags.
+\* **Size** — approximate total residue count for both proteins after PDBFixer processing (trimming, HETATM removal). Deviations of ±20–50 aa from the RCSB deposited sequence are possible due to missing residues, non-standard residue replacement, and removal of terminal tags.
 
 ## Human-Only Enforcement
 
@@ -48,202 +48,202 @@ Non-human targets (e.g. COX1 — Ovis aries) are blocked by default.
 - **Bypass**: Set `DUALDOCKING_ALLOW_NON_HUMAN=true` for exploratory runs
 - **COX1_COX2**: Blocked in production. Available for exploratory analysis only.
 
-## Факторный дизайн эксперимента
+## Factorial Experiment Design
 
-Выбор 9 пар определяется заранее зафиксированным факторным дизайном по трём осям:
+The selection of 9 pairs is determined by a pre-fixed factorial design along three axes:
 
-- **Structural relation**: Homo (одно семейство, высокая гомология) / Hetero (разные семейства)
-- **Cofactor**: Clean (нет кофактора в кармане биологически) / Present (кофактор присутствует биологически; влияет на интерпретацию docking и Boltz-2 — см. [Кофакторы](#кофакторы--критичное-ограничение-boltz-2))
-- **Disease context**: AD (болезнь Альцгеймера) / Non-AD (контрольные)
+- **Structural relation**: Homo (same family, high homology) / Hetero (different families)
+- **Cofactor**: Clean (no cofactor in the pocket biologically) / Present (cofactor present biologically; affects interpretation of docking and Boltz-2 — see [Cofactors](#cofactors--a-critical-boltz-2-limitation))
+- **Disease context**: AD (Alzheimer's disease) / Non-AD (controls)
 
-### Матрица дизайна
+### Design Matrix
 
-| # | Пара | Structure | Cofactor | Disease | Set | ML-гипотеза |
-|---|------|-----------|----------|---------|-----|-------------|
-| 1 | CDK2_ERK2 | Homo | Clean | Non-AD | **Core** | При высокой гомологии double-dock должен легко находить dual ингибиторы — тест «лёгкого» случая |
-| 2 | EGFR_HER2 | Homo | Clean | Non-AD | Auxiliary | Второй homo-контроль: обобщаемость на другое киназное подсемейство (ErbB) |
-| 3 | COX1_COX2 | Homo | Present | Non-AD | Blocked | Non-human PDB: COX1 (Ovis aries), COX2 (Mus musculus); cofactor (гем). Только exploratory |
-| 4 | AChE_BChE | Homo | Clean | AD | **Core** | AD-relevant homo-пара: сохраняет ли double-dock преимущество для крупных белков (~1073 остатка) |
-| 5 | BACE1_GSK3B | Hetero | Clean | AD | **Core** | **Центральный тест**: может ли double-dock находить молекулы, активные на структурно различных мишенях |
-| 6 | AChE_BACE1 | Hetero | Clean | AD | **Core** | Максимум ChEMBL данных (3524 dual-compound) — гипотеза + валидация через химическое сходство |
-| 7 | GSK3B_CDK5 | Hetero | Clean | AD | **Core** | Dual tau-киназы при минимальном compute (~642 остатка). Тест функциональной близости vs структурной |
-| 8 | BACE1_CDK5 | Hetero | Clean | AD | Auxiliary | Robustness: сохраняется ли выигрыш double-dock при замене GSK3B→CDK5 как tau-киназы |
-| 9 | AChE_MAOB | Hetero | Present | AD | Auxiliary | Sensitivity: влияние кофактора (FAD) на reward signal. Boltz-2 affinity только exploratory |
+| # | Pair | Structure | Cofactor | Disease | Set | ML Hypothesis |
+|---|------|-----------|----------|---------|-----|---------------|
+| 1 | CDK2_ERK2 | Homo | Clean | Non-AD | **Core** | High homology — double-dock should easily find dual inhibitors; "easy case" test |
+| 2 | EGFR_HER2 | Homo | Clean | Non-AD | Auxiliary | Second homo control: generalizability to another kinase subfamily (ErbB) |
+| 3 | COX1_COX2 | Homo | Present | Non-AD | Blocked | Non-human PDB: COX1 (Ovis aries), COX2 (Mus musculus); cofactor (heme). Exploratory only |
+| 4 | AChE_BChE | Homo | Clean | AD | **Core** | AD-relevant homo pair: does double-dock retain advantage for large proteins (~1073 residues) |
+| 5 | BACE1_GSK3B | Hetero | Clean | AD | **Core** | **Central test**: can double-dock find molecules active on structurally dissimilar targets |
+| 6 | AChE_BACE1 | Hetero | Clean | AD | **Core** | Maximum ChEMBL data (3524 dual compounds) — hypothesis + validation via chemical similarity |
+| 7 | GSK3B_CDK5 | Hetero | Clean | AD | **Core** | Dual tau kinases at minimal compute (~642 residues). Functional proximity vs structural test |
+| 8 | BACE1_CDK5 | Hetero | Clean | AD | Auxiliary | Robustness: does double-dock advantage persist when replacing GSK3B→CDK5 as tau kinase |
+| 9 | AChE_MAOB | Hetero | Present | AD | Auxiliary | Sensitivity: cofactor (FAD) impact on reward signal. Boltz-2 affinity exploratory only |
 
 ### Core vs Auxiliary
 
-**Core set (5 пар)** — основная проверка гипотезы. Статистические выводы делаются по этим парам:
-- Покрывают оба уровня гомологии (homo: CDK2_ERK2, AChE_BChE; hetero: BACE1_GSK3B, AChE_BACE1, GSK3B_CDK5)
-- Все без кофакторов → Boltz-2 affinity рассматривается как достаточно надёжная ортогональная метрика при наличии согласованности с docking и ChEMBL-валидацией
-- Каждый белок участвует не более чем в 2 core-парах (AChE в 2, BACE1 в 2, GSK3B в 2; CDK2, ERK2, BChE, CDK5 — в 1)
+**Core set (5 pairs)** — primary hypothesis test. Statistical conclusions are drawn from these pairs:
+- Cover both homology levels (homo: CDK2_ERK2, AChE_BChE; hetero: BACE1_GSK3B, AChE_BACE1, GSK3B_CDK5)
+- All cofactor-free → Boltz-2 affinity is considered a sufficiently reliable orthogonal metric given concordance with docking and ChEMBL validation
+- Each protein participates in at most 2 core pairs (AChE in 2, BACE1 in 2, GSK3B in 2; CDK2, ERK2, BChE, CDK5 — in 1)
 
-**Auxiliary set (3 пары + 1 blocked)** — robustness и sensitivity анализ:
-- EGFR_HER2: второй homo Non-AD контроль (не в core, т.к. CDK2_ERK2 уже покрывает)
-- BACE1_CDK5: тест замены tau-киназы (перекрывается с BACE1_GSK3B и GSK3B_CDK5)
-- AChE_MAOB: cofactor-sensitive пара, только docking + binary Boltz-2
+**Auxiliary set (3 pairs + 1 blocked)** — robustness and sensitivity analysis:
+- EGFR_HER2: second homo Non-AD control (not in core since CDK2_ERK2 already covers this)
+- BACE1_CDK5: tau kinase substitution test (overlaps with BACE1_GSK3B and GSK3B_CDK5)
+- AChE_MAOB: cofactor-sensitive pair, docking + binary Boltz-2 only
 
-**Blocked:** COX1_COX2 (non-human PDB structures: COX1 — Ovis aries, COX2 — Mus musculus). Не входит в основной и вспомогательный анализ.
+**Blocked:** COX1_COX2 (non-human PDB structures: COX1 — Ovis aries, COX2 — Mus musculus). Excluded from both primary and auxiliary analyses.
 
-> Основная гипотеза проверяется на 5 заранее зафиксированных core-парах; auxiliary пары используются для robustness/sensitivity анализов. Это деление зафиксировано **до начала экспериментов** для исключения cherry-picking.
+> The primary hypothesis is tested on 5 pre-fixed core pairs; auxiliary pairs are used for robustness/sensitivity analyses. This division was fixed **before experiments began** to preclude cherry-picking.
 
-### Перекрытие таргетов и статистическая независимость
+### Target Overlap and Statistical Independence
 
-Одни и те же белки (AChE, BACE1, GSK3B) участвуют в нескольких парах.
-Это полезно для анализа влияния второй мишени, но наивное «N=9 пар» не является
-9 независимыми наблюдениями.
+The same proteins (AChE, BACE1, GSK3B) participate in multiple pairs.
+This is useful for analyzing the effect of the second target, but a naive "N=9 pairs" does not constitute
+9 independent observations.
 
-- Primary statistical tests проводятся на **core set** (5 пар), где перекрытие минимизировано
-- Auxiliary пары используются как **within-target sensitivity analysis**, а не как дополнительные независимые наблюдения
-- В limitations явно указывается: *«поскольку core-пары разделяют ряд белков, размер эффекта трактуется с осторожностью»*
+- Primary statistical tests are conducted on the **core set** (5 pairs), where overlap is minimized
+- Auxiliary pairs are used as **within-target sensitivity analysis**, not as additional independent observations
+- The limitations section explicitly states: *"because core pairs share certain proteins, effect sizes are interpreted with caution"*
 
-## Non-AD контроль (пары 1-3)
+## Non-AD Controls (Pairs 1–3)
 
-- **Киназные пары** (CDK2/ERK2, EGFR/HER2): хорошо изученные связывающие карманы, множество известных ингибиторов, обширные бенчмарки докинга.
-- **COX-пара**: золотой стандарт задачи селективности в медицинской химии. Гем в активном сайте — проблема для Boltz-2. Blocked (non-human PDB: COX1 — Ovis aries, COX2 — Mus musculus).
+- **Kinase pairs** (CDK2/ERK2, EGFR/HER2): well-studied binding pockets, numerous known inhibitors, extensive docking benchmarks.
+- **COX pair**: gold standard for the selectivity problem in medicinal chemistry. Heme in the active site is problematic for Boltz-2. Blocked (non-human PDB: COX1 — Ovis aries, COX2 — Mus musculus).
 
-## AD-гомологичная пара (пара 4)
+## AD Homologous Pair (Pair 4)
 
-- **AChE_BChE**: формально AD-relevant (оба таргета — мишени для AD-терапии), но используется также как **homology control** — единственная AD-пара с высокой структурной гомологией. Служит «мостом» между Non-AD homo-контролем (CDK2_ERK2, EGFR_HER2) и AD hetero-парами (BACE1_GSK3B и др.).
+- **AChE_BChE**: formally AD-relevant (both targets are therapeutic targets for AD), but also serves as a **homology control** — the only AD pair with high structural homology. Acts as a bridge between the Non-AD homo controls (CDK2_ERK2, EGFR_HER2) and the AD hetero pairs (BACE1_GSK3B, etc.).
 
-## AD-специфичные пары (пары 5-9)
+## AD-Specific Pairs (Pairs 5–9)
 
-### BACE1_GSK3B — лучшая пара
+### BACE1_GSK3B — Best Pair
 
-- **Биология**: GSK3B регулирует экспрессию BACE1 через NF-kB (Ly et al. 2013, J Clin Invest). Notopterol — валидированный in vivo dual ингибитор (Jiang et al. 2020, APP/PS1 мыши).
-- **Структуры**: BACE1 6EQM (1.35 Å, CNP520 IC50 11 nM) + GSK3B 5KPK (2.4 Å, BRD0209).
-- **ChEMBL**: >8000 записей BACE1, >4000 записей GSK3B.
-- **Compute**: суммарно ~750 остатков — быстрый UniDock GPU, комфортный для Boltz-2.
+- **Biology**: GSK3B regulates BACE1 expression via NF-κB (Ly et al. 2013, J Clin Invest). Notopterol — a validated in vivo dual inhibitor (Jiang et al. 2020, APP/PS1 mice).
+- **Structures**: BACE1 6EQM (1.35 Å, CNP520 IC50 11 nM) + GSK3B 5KPK (2.4 Å, BRD0209).
+- **ChEMBL**: >8000 BACE1 records, >4000 GSK3B records.
+- **Compute**: ~750 total residues — fast UniDock GPU, comfortable for Boltz-2.
 
-### AChE_BACE1 — классическая пара
+### AChE_BACE1 — Classic Pair
 
-- **Биология**: Самая изученная dual-target комбинация в AD. Stern et al. 2022 — от in silico до in vivo.
-- **ChEMBL**: 3524 dual-compound записей (максимальный overlap для валидации).
-- **Compute**: суммарно ~943 остатка — на грани, но работает.
+- **Biology**: The most studied dual-target combination in AD. Stern et al. 2022 — from in silico to in vivo.
+- **ChEMBL**: 3524 dual-compound records (maximum overlap for validation).
+- **Compute**: ~943 total residues — borderline but workable.
 
-### GSK3B_CDK5 — оптимальная для compute
+### GSK3B_CDK5 — Compute-Optimal
 
-- **Биология**: Dual tau-киназы. GSK3B фосфорилирует Ser396/Ser404, CDK5 — Ser202/Thr205 (AT8 epitope). Оба — причина NFT в AD.
-- **Структуры**: GSK3B 5KPK (2.4 Å) + CDK5 1UNL (2.2 Å, Roscovitine IC50 0.2 μM).
-- **Compute**: суммарно ~642 остатка — **самая маленькая пара**, самый быстрый `double` run.
+- **Biology**: Dual tau kinases. GSK3B phosphorylates Ser396/Ser404, CDK5 — Ser202/Thr205 (AT8 epitope). Both cause NFT in AD.
+- **Structures**: GSK3B 5KPK (2.4 Å) + CDK5 1UNL (2.2 Å, Roscovitine IC50 0.2 μM).
+- **Compute**: ~642 total residues — **smallest pair**, fastest `double` run.
 
-### BACE1_CDK5 — robustness test (auxiliary)
+### BACE1_CDK5 — Robustness Test (Auxiliary)
 
-- **Биология**: Amyloid (BACE1) + Tau (CDK5). p25/CDK5 complex регулирует BACE1 активность. Менее изученная пара — оригинальность.
-- **Compute**: суммарно ~692 остатка — быстро.
-- **Роль**: Auxiliary pair для **robustness analysis** — проверяет, сохраняется ли выигрыш double-dock при замене tau-киназы GSK3B→CDK5. Перекрывается с core-парами BACE1_GSK3B и GSK3B_CDK5, поэтому не входит в core set.
+- **Biology**: Amyloid (BACE1) + Tau (CDK5). The p25/CDK5 complex regulates BACE1 activity. Less studied pair — originality.
+- **Compute**: ~692 total residues — fast.
+- **Role**: Auxiliary pair for **robustness analysis** — tests whether the double-dock advantage persists when substituting the tau kinase GSK3B→CDK5. Overlaps with core pairs BACE1_GSK3B and GSK3B_CDK5, hence excluded from the core set.
 
-### AChE_MAOB — с оговоркой
+### AChE_MAOB — With Caveats
 
-- **Биология**: Клинический прецедент — ladostigil (Phase II). Rivastigmine + rasagiline фармакофоры.
-- **Оговорка**: MAO-B содержит ковалентный FAD биологически. Однако протокол подготовки рецептора удаляет все HETATM (`removeHeterogens`), поэтому UniDock докирует к **cofactor-free** рецептору MAO-B. Это означает, что docking-скоры для MAO-B отражают связывание к очищенному карману и могут не учитывать стерические/электростатические эффекты FAD. Boltz-2 affinity для MAO-B также **ненадёжен** (affinity head не моделирует кофакторы) — интерпретировать с осторожностью; рекомендуется `affinity_probability_binary`.
+- **Biology**: Clinical precedent — ladostigil (Phase II). Rivastigmine + rasagiline pharmacophores.
+- **Caveat**: MAO-B contains a covalent FAD biologically. However, the receptor preparation protocol removes all HETATM (`removeHeterogens`), so UniDock docks to a **cofactor-free** MAO-B receptor. This means docking scores for MAO-B reflect binding to a stripped pocket and may not capture steric/electrostatic effects of FAD. Boltz-2 affinity for MAO-B is also **unreliable** (affinity head does not model cofactors) — interpret with caution; `affinity_probability_binary` is recommended.
 
-## Протокол Boltz-2 скоринга
+## Boltz-2 Scoring Protocol
 
-### Два режима использования
+### Two Usage Modes
 
-Boltz-2 используется как **ортогональный scorer** (независимый от UniDock reward) в двух режимах:
+Boltz-2 is used as an **orthogonal scorer** (independent of the UniDock reward) in two modes:
 
-| Режим | Когда применяется | Метрика | Статус |
-|-------|-------------------|---------|--------|
-| **Primary (quantitative)** | Все пары без кофакторов: 5 core + 2 auxiliary (7 из 8 активных) | `affinity_pred_value` (log10 IC50-like, μM) | Primary endpoint |
-| **Exploratory (binary)** | Пары с кофактором (AChE_MAOB) | `affinity_probability_binary` (hit/non-hit) | Exploratory only |
+| Mode | When Applied | Metric | Status |
+|------|-------------|--------|--------|
+| **Primary (quantitative)** | All cofactor-free pairs: 5 core + 2 auxiliary (7 of 8 active) | `affinity_pred_value` (log10 IC50-like, μM) | Primary endpoint |
+| **Exploratory (binary)** | Cofactor-bearing pairs (AChE_MAOB) | `affinity_probability_binary` (hit/non-hit) | Exploratory only |
 
-### Primary режим: `affinity_pred_value`
+### Primary Mode: `affinity_pred_value`
 
-Для всех пар **без кофакторов** в binding pocket:
-- Непрерывная метрика: предсказание log10(IC50-like, μM) — surrogate, обученный на смеси Ki/Kd/IC50/EC50
-- Используется для ранжирования молекул и вычисления hr_both, enrichment@K
-- Параметры стандартизированы в `configs/master_config.yaml`:
+For all pairs **without cofactors** in the binding pocket:
+- Continuous metric: predicted log10(IC50-like, μM) — a surrogate trained on a mixture of Ki/Kd/IC50/EC50
+- Used for molecule ranking and computing hr_both, enrichment@K
+- Parameters are standardized in `configs/master_config.yaml`:
   `recycling_steps: 3, sampling_steps: 200, diffusion_samples: 4,
    sampling_steps_affinity: 200, diffusion_samples_affinity: 5`
 
-### Exploratory режим: `affinity_probability_binary`
+### Exploratory Mode: `affinity_probability_binary`
 
-Для пар с кофакторами (AChE_MAOB — FAD):
-- Бинарная метрика: вероятность связывания (hit/non-hit)
-- **Не входит в primary endpoint** — только для качественного анализа
-- Причина: Boltz-2 affinity head не моделирует кофакторы (Passaro et al. 2025, Limitations)
+For cofactor-bearing pairs (AChE_MAOB — FAD):
+- Binary metric: binding probability (hit/non-hit)
+- **Not included in the primary endpoint** — qualitative analysis only
+- Reason: Boltz-2 affinity head does not model cofactors (Passaro et al. 2025, Limitations)
 
-> Для AChE_MAOB основная метрика — docking score (UniDock GPU). Boltz-2 используется
-> только как вспомогательный бинарный индикатор. Результаты по этой паре
-> **не входят в primary statistical analysis**.
+> For AChE_MAOB the primary metric is the docking score (UniDock GPU). Boltz-2 is used
+> only as an auxiliary binary indicator. Results for this pair
+> **are not included in the primary statistical analysis**.
 
-### In-domain bias и интерпретация
+### In-Domain Bias and Interpretation
 
-Boltz-2 обучен на масштабных датасетах структур и комплексов белок-лиганд.
-С высокой вероятностью используемые PDB-структуры (или их близкие аналоги)
-входили в train set.
+Boltz-2 was trained on large-scale datasets of protein structures and protein–ligand complexes.
+The PDB structures used here (or their close analogues) were very likely
+part of the training set.
 
-Поэтому:
-- Метрики Boltz-2 интерпретируются как **relative ranking** между стратегиями
-  (single vs double), а не как абсолютные предсказания экспериментальной IC50
-- Основная ценность Boltz-2 в данном проекте — **ортогональность** к UniDock:
-  два независимых метода (physics-based docking vs learned affinity) должны
-  давать согласованный сигнал для повышения доверия к результатам
-- Для пар с обширными ChEMBL данными (BACE1, AChE, GSK3B) дополнительно
-  проводится enrichment по Tanimoto-сходству к известным активам — это
-  третий, независимый от обоих скореров, источник валидации
+Therefore:
+- Boltz-2 metrics are interpreted as a **relative ranking** between strategies
+  (single vs double), not as absolute predictions of experimental IC50
+- The primary value of Boltz-2 in this project is its **orthogonality** to UniDock:
+  two independent methods (physics-based docking vs learned affinity) should
+  yield a concordant signal, thereby increasing confidence in the results
+- For pairs with extensive ChEMBL data (BACE1, AChE, GSK3B), Tanimoto-similarity
+  enrichment against known actives is additionally performed — this constitutes
+  a third validation source, independent of both scorers
 
-## Протокол подготовки рецептора
+## Receptor Preparation Protocol
 
-Для всех мишеней используется **идентичный** протокол подготовки,
-исключающий скрытую вариабельность между парами.
+An **identical** preparation protocol is used for all targets,
+eliminating hidden variability between pairs.
 
-### Шаг 1: PDB → Fixed PDB (`pdbfixer_add_h.py`)
+### Step 1: PDB → Fixed PDB (`pdbfixer_add_h.py`)
 
-Выполняется в Docker-контейнере (`dualdocking/freedpp`) с PDBFixer + OpenMM:
+Executed inside a Docker container (`dualdocking/freedpp`) with PDBFixer + OpenMM:
 
-1. `findMissingResidues()` — обнаружение пропущенных остатков
-2. `findNonstandardResidues()` + `replaceNonstandardResidues()` — замена нестандартных аминокислот
-3. `removeHeterogens(keepWater=False)` — удаление **всех** HETATM (вода, ионы, лиганды, кофакторы). **Важно**: это означает, что кофакторы (HEM для COX, FAD для MAO-B) также удаляются; docking выполняется к cofactor-free рецептору для всех мишеней без исключения
-4. `findMissingAtoms()` + `addMissingAtoms()` — достройка пропущенных атомов
-5. `addMissingHydrogens(pH=7.0)` — протонирование при pH 7.0
+1. `findMissingResidues()` — detect missing residues
+2. `findNonstandardResidues()` + `replaceNonstandardResidues()` — replace non-standard amino acids
+3. `removeHeterogens(keepWater=False)` — remove **all** HETATM records (water, ions, ligands, cofactors). **Important**: this means cofactors (HEM for COX, FAD for MAO-B) are also removed; docking is performed against a cofactor-free receptor for all targets without exception
+4. `findMissingAtoms()` + `addMissingAtoms()` — rebuild missing atoms
+5. `addMissingHydrogens(pH=7.0)` — protonation at pH 7.0
 
-Post-processing для совместимости с Meeko:
-- HIS → HID/HIE/HIP в зависимости от протонирования (HD1, HE2)
-- CYS → CYX для дисульфидных мостиков (SSBOND или SG-SG ≤ 2.3 Å)
-- Удаление терминальных атомов H2/H3/OXT
+Post-processing for Meeko compatibility:
+- HIS → HID/HIE/HIP depending on protonation state (HD1, HE2)
+- CYS → CYX for disulfide bridges (SSBOND or SG–SG ≤ 2.3 Å)
+- Removal of terminal atoms H2/H3/OXT
 
-### Шаг 2: Fixed PDB → PDBQT (`mk_prepare_receptor.py`)
+### Step 2: Fixed PDB → PDBQT (`mk_prepare_receptor.py`)
 
-Meeko конвертирует PDB в формат PDBQT для AutoDock/UniDock:
-- Назначение парциальных зарядов (Gasteiger)
-- Назначение типов атомов AutoDock
-- Флаг `--skip_gpf` (grid parameter файл не нужен — box из co-ligand)
+Meeko converts PDB to PDBQT format for AutoDock/UniDock:
+- Assignment of partial charges (Gasteiger)
+- Assignment of AutoDock atom types
+- Flag `--skip_gpf` (grid parameter file not needed — box derived from co-ligand)
 
-### Шаг 3: Binding box
+### Step 3: Binding Box
 
-Автоматическое определение из co-crystallized ligand (HETATM) **исходного PDB** (до `removeHeterogens`):
-- Координаты лиганда извлекаются из оригинального PDB-файла модулем `scoring/binding_box.py`
-- Центр = центроид тяжёлых атомов лиганда
-- Размер = extent + `box_padding` (10.0 Å по умолчанию)
-- Fallback: центр масс белка + куб 30×30×30 Å
+Automatically determined from the co-crystallized ligand (HETATM) of the **original PDB** (before `removeHeterogens`):
+- Ligand coordinates are extracted from the original PDB file by `scoring/binding_box.py`
+- Center = centroid of heavy atoms of the ligand
+- Size = extent + `box_padding` (10.0 Å by default)
+- Fallback: protein center of mass + 30×30×30 Å cube
 
-> **Порядок операций**: binding box определяется из исходного PDB → затем `pdbfixer_add_h.py` очищает PDB (удаляя HETATM) → Meeko конвертирует очищенный PDB в PDBQT. Таким образом, координаты бокса берутся до удаления лиганда/кофакторов.
+> **Order of operations**: the binding box is determined from the original PDB → then `pdbfixer_add_h.py` cleans the PDB (removing HETATM) → Meeko converts the cleaned PDB to PDBQT. Thus, box coordinates are derived before ligand/cofactor removal.
 
-### Валидация: re-docking
+### Validation: Re-docking
 
-Для каждой мишени проводится re-docking co-crystallized ligand:
-- Лиганд извлекается из PDB, SMILES получается из RCSB
-- Docking с теми же параметрами, что и в эксперименте
-- RMSD ≤ 2.0 Å между docked и crystal позой = PASS
-- Скрипт: `scripts/s2_calibrate/validate_redocking.py`
+Re-docking of the co-crystallized ligand is performed for each target:
+- Ligand is extracted from PDB; SMILES is obtained from RCSB
+- Docking uses the same parameters as the main experiment
+- RMSD ≤ 2.0 Å between the docked and crystal pose = PASS
+- Script: `scripts/s2_calibrate/validate_redocking.py`
 
-> Идентичность протокола подготовки для всех мишеней — критичная гарантия
-> того, что различия в результатах между парами не являются артефактами
-> разной обработки рецепторов.
+> An identical preparation protocol for all targets is a critical guarantee
+> that differences in results between pairs are not artifacts
+> of different receptor processing.
 
-## Общие свойства всех пар
+## Common Properties of All Pairs
 
-- PDB-структуры с со-кристаллизованными лигандами (кроме 1HCL — см. ¹)
-- Обширные данные по активности в ChEMBL
-- Управляемые размеры белков (< 600 остатков на мишень)
+- PDB structures with co-crystallized ligands (except 1HCL — see ¹)
+- Extensive activity data in ChEMBL
+- Manageable protein sizes (< 600 residues per target)
 
-> ¹ **1HCL (CDK2)** — apo-структура (без лиганда). Binding box определяется по координатам ATP-связывающего кармана из PDB 4GCJ (CDK2 с лигандом) или через fallback (центр масс белка + 30×30×30 Å куб). Влияние на docking-качество минимально: CDK2 ATP-карман хорошо определён структурно, что подтверждается re-docking валидацией (RMSD ≤ 2.0 Å, см. `scripts/s2_calibrate/validate_redocking.py`).
+> ¹ **1HCL (CDK2)** — apo structure (no ligand). The binding box is determined from ATP-binding pocket coordinates of PDB 4GCJ (CDK2 with ligand) or via fallback (protein center of mass + 30×30×30 Å cube). Impact on docking quality is minimal: the CDK2 ATP pocket is well-defined structurally, confirmed by re-docking validation (RMSD ≤ 2.0 Å, see `scripts/s2_calibrate/validate_redocking.py`).
 
-## Ключевые источники
+## Key References
 
-- Ly et al. (2013) J Clin Invest — GSK3B регулирует BACE1
+- Ly et al. (2013) J Clin Invest — GSK3B regulates BACE1
 - Stern et al. (2022) IJMS — AChE/BACE1 dual-target
 - Ivanova et al. (2020) Molecules 25:1846 — AD multi-target
 - Jiang et al. (2020) Clin Transl Med — Notopterol dual BACE1/GSK3B in vivo (DOI: 10.1002/ctm2.50)

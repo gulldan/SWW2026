@@ -107,13 +107,13 @@ def sanitize_smiles(
             continue
 
         if mol.GetNumHeavyAtoms() > max_heavy_atoms:
-            logger.debug("Пропуск idx={}: {} тяжёлых атомов", idx, mol.GetNumHeavyAtoms())
+            logger.debug("Skipping idx={}: {} heavy atoms", idx, mol.GetNumHeavyAtoms())
             invalid_indices.append(idx)
             continue
 
         mw = Descriptors.MolWt(mol)  # type: ignore[attr-defined]
         if mw > max_mw:
-            logger.debug("Пропуск idx={}: MW={:.1f}", idx, mw)
+            logger.debug("Skipping idx={}: MW={:.1f}", idx, mw)
             invalid_indices.append(idx)
             continue
 
@@ -130,7 +130,7 @@ def sanitize_smiles(
         invalid_indices=invalid_indices,
     )
     logger.info(
-        "Санитизация: {}/{} валидных, {}/{} уникальных",
+        "Sanitization: {}/{} valid, {}/{} unique",
         stats.valid,
         stats.total,
         stats.unique,

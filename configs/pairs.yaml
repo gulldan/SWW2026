@@ -1,188 +1,188 @@
-# Пары белковых мишеней для dual-target воркшопа.
-# Каждая пара определяет две мишени (A и B) с их PDB-структурами и метаданными.
+# Protein target pairs for the dual-target experiment.
+# Each pair defines two targets (A and B) with their PDB structures and metadata.
 #
-# Обоснование выбора: см. docs/selection_criteria.md
-# Факторный дизайн и core/auxiliary: см. docs/selection_criteria.md#факторный-дизайн-эксперимента
+# Selection rationale: see docs/selection_criteria.md
+# Factorial design and core/auxiliary: see docs/selection_criteria.md
 #
-# set: core    — primary hypothesis test (5 пар)
-# set: auxiliary — robustness/sensitivity analysis (3 пары)
-# set: blocked — excluded from production runs (1 пара)
+# set: core    — primary hypothesis test (5 pairs)
+# set: auxiliary — robustness/sensitivity analysis (3 pairs)
+# set: blocked — excluded from production runs (1 pair)
 #
-# Пары 1-4: non-AD контроль + AD-homo bridge
-# Пары 5-9: AD-специфичные (гетерогенные мишени)
+# Pairs 1-4: non-AD control + AD-homo bridge
+# Pairs 5-9: AD-specific (heterogeneous targets)
 
 pairs:
-  # --- Исходные 4 пары (non-AD контроль) ---
+  # --- Original 4 pairs (non-AD control) ---
 
   CDK2_ERK2:
-    description: "Селективность киназ - CDK2 vs ERK2 (обе Ser/Thr киназы, схожие ATP-связывающие карманы)"
+    description: "Kinase selectivity - CDK2 vs ERK2 (both Ser/Thr kinases, similar ATP-binding pockets)"
     boltz2_status: "ok"
     set: "core"
     target_a:
       id: CDK2
-      name: "Циклин-зависимая киназа 2"
+      name: "Cyclin-dependent kinase 2"
       uniprot: P24941
       pdb_id: 1HCL
       organism: "Homo sapiens"
-      binding_site: "ATP-связывающий карман"
+      binding_site: "ATP-binding pocket"
     target_b:
       id: ERK2
-      name: "Митоген-активируемая протеинкиназа 1 (ERK2)"
+      name: "Mitogen-activated protein kinase 1 (ERK2)"
       uniprot: P28482
       pdb_id: 4QTA
       organism: "Homo sapiens"
-      binding_site: "ATP-связывающий карман"
+      binding_site: "ATP-binding pocket"
 
   EGFR_HER2:
-    description: "Двойное ингибирование EGFR/HER2 - актуально для НМРЛ и рака молочной железы"
+    description: "Dual EGFR/HER2 inhibition - relevant for NSCLC and breast cancer"
     boltz2_status: "ok"
     set: "auxiliary"
     target_a:
       id: EGFR
-      name: "Рецептор эпидермального фактора роста"
+      name: "Epidermal growth factor receptor"
       uniprot: P00533
       pdb_id: 1M17
       organism: "Homo sapiens"
-      binding_site: "ATP-связывающий сайт, киназный домен"
+      binding_site: "ATP-binding site, kinase domain"
     target_b:
       id: HER2
-      name: "Рецепторная тирозинкиназа erbB-2"
+      name: "Receptor tyrosine kinase erbB-2"
       uniprot: P04626
       pdb_id: 3PP0
       organism: "Homo sapiens"
-      binding_site: "ATP-связывающий сайт, киназный домен"
+      binding_site: "ATP-binding site, kinase domain"
 
   COX1_COX2:
-    description: "Селективность циклооксигеназ - COX-1 vs COX-2, классический dual-target дизайн НПВС"
+    description: "Cyclooxygenase selectivity - COX-1 vs COX-2, classic dual-target NSAID design"
     boltz2_status: "warning_cofactor_heme"
     set: "blocked"
     target_a:
       id: COX1
-      name: "Простагландин G/H синтаза 1 (COX-1)"
+      name: "Prostaglandin G/H synthase 1 (COX-1)"
       uniprot: P23219
       pdb_id: 1EQG
       organism: "Ovis aries"
-      binding_site: "Активный сайт циклооксигеназы"
+      binding_site: "Cyclooxygenase active site"
     target_b:
       id: COX2
-      name: "Простагландин G/H синтаза 2 (COX-2)"
+      name: "Prostaglandin G/H synthase 2 (COX-2)"
       uniprot: P35354
       pdb_id: 3LN1
       organism: "Mus musculus"
-      binding_site: "Активный сайт циклооксигеназы"
+      binding_site: "Cyclooxygenase active site"
 
   AChE_BChE:
-    description: "Двойное ингибирование холинэстераз - multi-target стратегия при болезни Альцгеймера"
+    description: "Dual cholinesterase inhibition - multi-target strategy for Alzheimer's disease"
     boltz2_status: "ok"
     set: "core"
     target_a:
       id: AChE
-      name: "Ацетилхолинэстераза"
+      name: "Acetylcholinesterase"
       uniprot: P22303
       pdb_id: 4EY7
       organism: "Homo sapiens"
-      binding_site: "Каталитический активный сайт (ущелье)"
+      binding_site: "Catalytic active site (gorge)"
     target_b:
       id: BChE
-      name: "Бутирилхолинэстераза"
+      name: "Butyrylcholinesterase"
       uniprot: P06276
       pdb_id: 4BDS
       organism: "Homo sapiens"
-      binding_site: "Каталитический активный сайт (ущелье)"
+      binding_site: "Catalytic active site (gorge)"
 
-  # --- AD-специфичные пары (гетерогенные мишени) ---
+  # --- AD-specific pairs (heterogeneous targets) ---
 
   BACE1_GSK3B:
-    description: "Лучшая AD-пара: β-секретаза (amyloid) + GSK3β (tau) — разные семейства, валидированная in vivo связь (Ly 2013, Jiang 2020 Notopterol)"
+    description: "Best AD pair: beta-secretase (amyloid) + GSK3beta (tau) - different families, validated in vivo link (Ly 2013, Jiang 2020 Notopterol)"
     boltz2_status: "ok"
     set: "core"
     target_a:
       id: BACE1
-      name: "β-секретаза 1 (BACE1)"
+      name: "Beta-secretase 1 (BACE1)"
       uniprot: P56817
       pdb_id: 6EQM
       organism: "Homo sapiens"
-      binding_site: "Каталитический сайт аспартил-протеазы"
+      binding_site: "Aspartyl protease catalytic site"
     target_b:
       id: GSK3B
-      name: "Гликоген-синтаза киназа 3β"
+      name: "Glycogen synthase kinase 3 beta"
       uniprot: P49841
       pdb_id: 5KPK
       organism: "Homo sapiens"
-      binding_site: "ATP-связывающий карман"
+      binding_site: "ATP-binding pocket"
 
   AChE_BACE1:
-    description: "Классическая AD dual-target пара: AChE (холинергическая) + BACE1 (amyloid) — максимальные данные в ChEMBL (3524 dual-compound записей)"
+    description: "Classic AD dual-target pair: AChE (cholinergic) + BACE1 (amyloid) - most ChEMBL data (3524 dual-compound records)"
     boltz2_status: "ok"
     set: "core"
     target_a:
       id: AChE
-      name: "Ацетилхолинэстераза"
+      name: "Acetylcholinesterase"
       uniprot: P22303
       pdb_id: 4EY7
       organism: "Homo sapiens"
-      binding_site: "Каталитический активный сайт (ущелье)"
+      binding_site: "Catalytic active site (gorge)"
     target_b:
       id: BACE1
-      name: "β-секретаза 1 (BACE1)"
+      name: "Beta-secretase 1 (BACE1)"
       uniprot: P56817
       pdb_id: 6EQM
       organism: "Homo sapiens"
-      binding_site: "Каталитический сайт аспартил-протеазы"
+      binding_site: "Aspartyl protease catalytic site"
 
   GSK3B_CDK5:
-    description: "Оптимальная по compute AD-пара: dual tau-киназы — GSK3β (Ser396/Ser404) + CDK5 (Ser202/Thr205, AT8), наименьший суммарный размер (~642 остатка)"
+    description: "Compute-optimal AD pair: dual tau-kinases - GSK3beta (Ser396/Ser404) + CDK5 (Ser202/Thr205, AT8), smallest combined size (~642 residues)"
     boltz2_status: "ok"
     set: "core"
     target_a:
       id: GSK3B
-      name: "Гликоген-синтаза киназа 3β"
+      name: "Glycogen synthase kinase 3 beta"
       uniprot: P49841
       pdb_id: 5KPK
       organism: "Homo sapiens"
-      binding_site: "ATP-связывающий карман"
+      binding_site: "ATP-binding pocket"
     target_b:
       id: CDK5
-      name: "Циклин-зависимая киназа 5"
+      name: "Cyclin-dependent kinase 5"
       uniprot: Q00535
       pdb_id: 1UNL
       organism: "Homo sapiens"
-      binding_site: "ATP-связывающий карман"
+      binding_site: "ATP-binding pocket"
 
   BACE1_CDK5:
-    description: "Оригинальная AD-пара: amyloid (BACE1) × tau (CDK5) — p25/CDK5 регулирует BACE1, менее изученная комбинация"
+    description: "Original AD pair: amyloid (BACE1) x tau (CDK5) - p25/CDK5 regulates BACE1, less studied combination"
     boltz2_status: "ok"
     set: "auxiliary"
     target_a:
       id: BACE1
-      name: "β-секретаза 1 (BACE1)"
+      name: "Beta-secretase 1 (BACE1)"
       uniprot: P56817
       pdb_id: 6EQM
       organism: "Homo sapiens"
-      binding_site: "Каталитический сайт аспартил-протеазы"
+      binding_site: "Aspartyl protease catalytic site"
     target_b:
       id: CDK5
-      name: "Циклин-зависимая киназа 5"
+      name: "Cyclin-dependent kinase 5"
       uniprot: Q00535
       pdb_id: 1UNL
       organism: "Homo sapiens"
-      binding_site: "ATP-связывающий карман"
+      binding_site: "ATP-binding pocket"
 
   AChE_MAOB:
-    description: "AD-пара с клиническим прецедентом (ladostigil Phase II): AChE + MAO-B. ВНИМАНИЕ: MAO-B содержит ковалентный FAD — Boltz-2 affinity ненадёжен"
+    description: "AD pair with clinical precedent (ladostigil Phase II): AChE + MAO-B. WARNING: MAO-B contains covalent FAD - Boltz-2 affinity unreliable"
     boltz2_status: "warning_cofactor_fad"
     set: "auxiliary"
     target_a:
       id: AChE
-      name: "Ацетилхолинэстераза"
+      name: "Acetylcholinesterase"
       uniprot: P22303
       pdb_id: 4EY7
       organism: "Homo sapiens"
-      binding_site: "Каталитический активный сайт (ущелье)"
+      binding_site: "Catalytic active site (gorge)"
     target_b:
       id: MAOB
-      name: "Моноаминоксидаза B"
+      name: "Monoamine oxidase B"
       uniprot: P27338
       pdb_id: 2V5Z
       organism: "Homo sapiens"
-      binding_site: "Субстратный карман (рядом с FAD-кофактором)"
+      binding_site: "Substrate pocket (adjacent to FAD cofactor)"

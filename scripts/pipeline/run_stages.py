@@ -23,7 +23,7 @@ from dualdocking.command_runner import run_project_command
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-STAGE_ORDER = ["fetch", "calibrate", "generate", "score", "analyze", "report", "audit"]
+STAGE_ORDER = ["fetch", "calibrate", "generate", "score", "analyze", "report", "audit", "gnina", "md"]
 
 STAGE_DEPS = {
     "fetch": [],
@@ -33,6 +33,8 @@ STAGE_DEPS = {
     "analyze": ["score"],
     "report": ["analyze"],
     "audit": ["analyze"],
+    "gnina": ["score"],
+    "md": ["score"],
 }
 
 STAGE_DESCRIPTIONS = {
@@ -43,6 +45,8 @@ STAGE_DESCRIPTIONS = {
     "analyze": "Aggregate results, compute metrics, sensitivity, correlation",
     "report": "Generate plots, render molecules, LaTeX report",
     "audit": "Run claim traceability audit",
+    "gnina": "Cross-validate with GNINA CNN scoring",
+    "md": "MD validation (GROMACS 50 ns) for top candidates",
 }
 
 
@@ -279,6 +283,33 @@ def _run_audit() -> None:
     _run_cmd(["uv", "run", "python", "scripts/s7_audit/claim_audit.py"])
 
 
+def _run_gnina(pair: str, mode: str, seed: int) -> None:
+    """Score molecules with GNINA for one pair/mode/seed combination.
+
+    Args:
+        pair: Protein pair identifier.
+        mode: Docking mode.
+        seed: Random seed.
+    """
+    _run_cmd(
+        [
+            "uv", "run", "python", "scripts/s6_report/score_gnina.py",
+            "--pair", pair, "--mode", mode, "--seed", str(seed),
+        ]
+    )
+
+
+def _run_md(pair: str) -> None:
+    """Run MD validation for a single pair (top-3 molecules per mode).
+
+    Args:
+        pair: Protein pair identifier.
+    """
+    _run_cmd(
+        ["uv", "run", "python", "scripts/s6_md/run_md.py", "--pair", pair]
+    )
+
+
 def _preflight_check(stage: str, pairs: dict, exp_cfg: dict, pair_filter: str | None, seeds: list[int]) -> list[str]:
     """Check prerequisites for a stage.
 
@@ -470,6 +501,18 @@ def main(
             _run_report(latex_mode)
         elif stage == "audit":
             _run_audit()
+        elif stage == "gnina":
+            for pair_id in active_pairs:
+                if pair and pair_id != pair:
+                    continue
+                for mode in modes:
+                    for seed in seed_list:
+                        _run_gnina(pair_id, mode, seed)
+        elif stage == "md":
+            for pair_id in active_pairs:
+                if pair and pair_id != pair:
+                    continue
+                _run_md(pair_id)
 
         logger.info("=== Stage {} complete ===", stage)
 

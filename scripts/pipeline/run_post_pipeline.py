@@ -89,7 +89,7 @@ def _run_cmd(cmd: list[str], log_path: Path) -> None:
     type=click.Choice(["off", "draft", "full"]),
     default="draft",
     show_default=True,
-    help="Режим LaTeX-генерации статьи.",
+    help="LaTeX report generation mode."
 )
 def main(dry_run: bool, latex_mode: str) -> None:
     """Run the post-processing pipeline (aggregate, metrics, plots, report).

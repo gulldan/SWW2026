@@ -388,12 +388,12 @@ def hypervolume_contributions(
     ref_u_a = float(_to_utility(np.array([ref_a], dtype=np.float64), lower_is_better)[0])
     ref_u_b = float(_to_utility(np.array([ref_b], dtype=np.float64), lower_is_better)[0])
 
-    # Фильтруем точки, лучше реферальной (больше = лучше для обоих)
+    # Filter points better than reference (higher = better for both)
     valid = (util_a > ref_u_a) & (util_b > ref_u_b)
     if not np.any(valid):
         return contributions
 
-    # Сортируем по score_a по убыванию
+    # Sort by score_a descending
     indices = np.where(valid)[0]
     order = np.argsort(-util_a[indices])
     sorted_idx = indices[order]
@@ -401,8 +401,8 @@ def hypervolume_contributions(
     sorted_a = util_a[sorted_idx]
     sorted_b = util_b[sorted_idx]
 
-    # Только не-доминируемые точки вносят вклад
-    # Проходим слева направо (убывание a), отслеживаем макс b
+    # Only non-dominated points contribute
+    # Sweep left to right (descending a), track max b
     max_b_so_far = ref_u_b
     front_indices = []
     front_a = []
@@ -422,9 +422,9 @@ def hypervolume_contributions(
     m = len(fa)
 
     for k in range(m):
-        # Ширина по a: от текущей до следующей (или до ref_a)
+        # Width along a: from current to next (or to ref_a)
         right_a = fa[k + 1] if k + 1 < m else ref_u_a
-        # Высота по b: от ref_b до текущей
+        # Height along b: from ref_b to current
         lower_b = fb[k - 1] if k > 0 else ref_u_b
         contributions[front_indices[k]] = (fa[k] - right_a) * (fb[k] - lower_b)
 
@@ -477,5 +477,5 @@ def compute_combined(
             utopia_b,
             lower_is_better=lower_is_better,
         )
-    msg = f"Неизвестный тип целевой функции: {kind}"
+    msg = f"Unknown objective function type: {kind}"
     raise ValueError(msg)

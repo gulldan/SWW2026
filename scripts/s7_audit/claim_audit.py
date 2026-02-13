@@ -27,9 +27,8 @@ import click
 from loguru import logger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
-# SAP-frozen thresholds (pre-registered, do not change).
+# SAP-frozen thresholds
 P_THRESHOLD = 0.05
 CLIFFS_DELTA_THRESHOLD = 0.33
 SUCCESS_MIN_PAIRS = 3

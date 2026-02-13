@@ -231,16 +231,16 @@ def _master_config_version() -> str:
 
 
 @click.command()
-@click.option("--pair", required=True, help="ID пары из configs/pairs.yaml")
+@click.option("--pair", required=True, help="Pair ID from configs/pairs.yaml")
 @click.option(
     "--mode",
     type=click.Choice(["single_a", "single_b", "double", "linear_equal", "biased_a", "selective_a"]),
     required=True,
 )
-@click.option("--n-molecules", default=None, type=int, help="Кол-во молекул (default из experiment.yaml)")
+@click.option("--n-molecules", default=None, type=int, help="Number of molecules (default from experiment.yaml)")
 @click.option("--seed", default=42, type=int)
-@click.option("--epochs", default=None, type=int, help="Эпохи FREED++ (default из experiment.yaml)")
-@click.option("--steps-per-epoch", default=None, type=int, help="Шагов на эпоху (default 256)")
+@click.option("--epochs", default=None, type=int, help="FREED++ epochs (default from experiment.yaml)")
+@click.option("--steps-per-epoch", default=None, type=int, help="Steps per epoch (default 256)")
 @click.option("--config", default="configs/pairs.yaml")
 @click.option("--experiment-config", default="configs/experiment.yaml")
 def main(
@@ -274,17 +274,17 @@ def main(
 
     pairs = load_pairs(PROJECT_ROOT / config)["pairs"]
     if pair not in pairs:
-        logger.error("Пара '{}' не найдена", pair)
+        logger.error("Pair '{}' not found", pair)
         sys.exit(1)
 
     pair_cfg = pairs[pair]
     output_dir = PROJECT_ROOT / "output" / "results" / pair / mode / f"seed_{seed}"
 
-    # Загрузить параметры FREED++ из experiment.yaml
+    # Load FREED++ parameters from experiment.yaml
     exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
     generator_cfg = exp_cfg.get("generator", {})
 
-    # Проверка калибровки нормализации для таргетов
+    # Validate calibration normalization for targets
     norm_path = PROJECT_ROOT / "configs" / "normalization.yaml"
     if norm_path.exists():
         import yaml
@@ -295,12 +295,12 @@ def main(
             tid = pair_cfg[role]["id"]
             entry = norm_targets.get(tid, {})
             if not entry:
-                logger.error("Таргет '{}' отсутствует в normalization.yaml. Запустите compute_normalization.py", tid)
+                logger.error("Target '{}' missing from normalization.yaml. Run compute_normalization.py", tid)
                 sys.exit(1)
             if not entry.get("stable_mean") or not entry.get("stable_std"):
                 logger.error(
-                    "Таргет '{}' не калиброван (stable=false, n_samples={}). "
-                    "Запустите: dock_calibration.py + compute_normalization.py",
+                    "Target '{}' not calibrated (stable=false, n_samples={}). "
+                    "Run: dock_calibration.py + compute_normalization.py",
                     tid,
                     entry.get("n_samples", 0),
                 )
@@ -338,7 +338,22 @@ def main(
 
     diversity = compute_all_diversity_metrics(smiles).to_dict()
     if diversity.get("uniqueness", 0.0) < 0.90:
-        logger.warning("Низкая уникальность: {:.3f}", diversity.get("uniqueness", 0.0))
+        logger.warning("Low uniqueness: {:.3f}", diversity.get("uniqueness", 0.0))
+
+    # Post-generation drug-likeness filters
+    filter_stats_dict: dict = {}
+    try:
+        from dualdocking.data.filters import compute_filters, load_filter_config
+
+        filters_path = PROJECT_ROOT / "configs" / "filters.yaml"
+        if filters_path.exists():
+            filter_cfg = load_filter_config(filters_path)
+            _filter_results, filter_stats = compute_filters(smiles, filter_cfg)
+            filter_stats_dict = filter_stats.to_dict()
+        else:
+            logger.warning("filters.yaml not found, skipping drug-likeness filters")
+    except Exception as exc:
+        logger.warning("Filter computation failed ({}), skipping", exc)
 
     freedpp_cfg = generator_cfg.get("freedpp", {}) if isinstance(generator_cfg, dict) else {}
     docker_image = (
@@ -348,6 +363,19 @@ def main(
     )
     docker_digest = _docker_image_digest(str(docker_image)) if docker_image != "unknown" else "unknown"
     docking_program, docking_version = _normalization_meta()
+
+    # Extract training curve from FREED++ log (if available)
+    training_curve: list[dict] = []
+    if backend_name == "freedpp":
+        try:
+            from dualdocking.generation.freedpp import parse_training_log
+
+            ws_dir = output_dir / "freedpp_workspace"
+            log_files = sorted(ws_dir.glob("freedpp_*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if log_files:
+                training_curve = parse_training_log(log_files[0])
+        except Exception as exc:
+            logger.warning("Training log parsing failed ({}), skipping", exc)
 
     metadata = {
         "pair_id": pair,
@@ -365,13 +393,15 @@ def main(
         "n_molecules_unique": n_unique,
         "duplication_rate": round(duplication_rate, 4),
         "diversity": diversity,
+        "filter_stats": filter_stats_dict,
+        "training_curve": training_curve,
         "training_time_seconds": int(duration),
         "hardware": _hardware_info(),
     }
 
     (output_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
     logger.info("Metadata -> {}", output_dir / "metadata.json")
-    logger.info("Сгенерировано {} молекул в режиме {} для пары {}", len(smiles), mode, pair)
+    logger.info("Generated {} molecules in mode {} for pair {}", len(smiles), mode, pair)
 
 
 if __name__ == "__main__":

@@ -1,12 +1,49 @@
-The repository is organized to produce publication-ready artifacts from executable
-pipeline stages, rather than from manual post-hoc editing.
+% >>> PLACEHOLDER: first paragraph should state the verdict (accept/reject H1)
+% based on the pre-registered criteria after pipeline completion. <<<
 
-Next steps for A*/Q1 readiness:
-\begin{enumerate}
-\item complete all planned pair/mode/seed runs without missing artifacts;
-\item freeze software/data snapshots and rerun Stage 2 for final tables and figures;
-\item tighten narrative around hypothesis acceptance/rejection using only pre-registered criteria;
-\item prepare a compact supplementary section with reproducibility commands and checksums.
-\end{enumerate}
+This study investigated whether dual-target reinforcement-learning
+generation with a worst-case scalarization reward improves dual hit-rate
+relative to single-target baselines, as evaluated by an orthogonal learned
+affinity surrogate (Boltz-2).  The experimental design---pre-registered
+pairs, fixed budgets, hierarchical bootstrap with FDR correction, and
+a conjunctive significance criterion---was chosen to minimize the risk
+of over-claiming.
 
-This structure keeps scientific claims auditable and directly linked to generated evidence.
+% >>> PLACEHOLDER: insert 1-2 sentences summarizing the primary finding
+% (N/5 core pairs, effect size range, degradation status). <<<
+% >>> END PLACEHOLDER <<<
+
+Three methodological contributions extend beyond the specific hypothesis:
+(1)~the systematic exploration of a continuous reward-weight space unifies
+target selectivity and polypharmacology within a single parametric framework;
+(2)~orthogonal evaluation (UniDock training, Boltz-2 evaluation) avoids the
+circular evaluation common in generative drug design;
+(3)~the fully automated eight-stage pipeline produces reproducible,
+auditable results from configuration files alone.
+
+\subsection*{Future Work}
+
+\begin{itemize}
+\item \textbf{Independent cross-validation:} GNINA CNN re-scoring of
+  generated poses would add a third independent evaluation layer.
+\item \textbf{Binding stability:} molecular dynamics simulations
+  (GROMACS, $\geq$50\,ns) for top dual-hit candidates to assess
+  binding-mode stability beyond static scoring.
+\item \textbf{Pareto-based generation:} replacing the worst-case
+  scalarization with Pareto-based RL methods
+  (e.g., PMMG~\citep{pmmg2025}, ParetoDrug~\citep{paretodrug2024})
+  could improve Pareto-front coverage at the cost of additional
+  architectural complexity.
+\item \textbf{Synthesis-aware generation:} coupling dual-target
+  rewards with synthesis-constrained generators such as
+  SynFlowNet~\citep{cretu2025synflownet} or
+  RxnFlow~\citep{lee2025rxnflow} would produce immediately
+  synthesizable dual-active candidates.
+\item \textbf{Increased statistical power:} expanding to
+  $\geq$10 seeds and applying wild cluster
+  bootstrap~\citep{cameron2008bootstrap} would tighten confidence
+  intervals and strengthen $p$-value reliability.
+\item \textbf{Experimental validation:} synthesis and IC$_{50}$
+  measurement of top-ranked dual hits is the ultimate test of
+  the computational predictions.
+\end{itemize}

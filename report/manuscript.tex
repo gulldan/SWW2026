@@ -1,178 +1,67 @@
-\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
+\documentclass[journal=jcim,manuscript=article]{achemso}
+
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{amsmath}
-\usepackage{natbib}
-\usepackage{hyperref}
 \usepackage{xcolor}
 
-\title{ Dual-Target Docking for Multi-Target Hit Discovery: A Reproducible Empirical Study }
-\author{ SWW2026 Workshop Team }
-\date{ 2026-02-05 }
+\title{Dual-Target Docking for Multi-Target Hit Discovery:
+  A Reproducible Empirical Study}
+\author{SWW2026 Workshop Team}
+\affiliation{SWW2026 Workshop}
 
-
-
-
+\abbreviations{RL, FREED++, UniDock, GNINA, QED, SA, PAINS, ADMET, FDR, AUROC, BEDROC}
+\keywords{dual-target docking, molecular generation, FREED++, Boltz-2, reproducibility}
 
 \begin{document}
-\maketitle
 
 \begin{abstract}
-
-This study evaluates whether dual-target reinforcement-learning generation
-increases the probability of obtaining simultaneous hits on two protein targets
-relative to single-target baselines.
-
-We implement a fully reproducible two-stage pipeline: Stage 1 performs molecular
-generation and scoring, while Stage 2 performs aggregation, statistical testing,
-visualization, and manuscript assembly.
-
-The experimental protocol enforces fairness by using matched molecular budgets,
-fixed seed sets, shared hit definitions, and uniform post-processing rules.
-Final conclusions are derived from pair-wise comparisons between
-\texttt{double} and both baselines (\texttt{single\_a}, \texttt{single\_b})
-with multiple-testing control.
-
-
+\input{chapters/00_abstract}
 \end{abstract}
 
-\noindent\textbf{Keywords:} dual-target docking, molecular generation, FREED++, Boltz-2, reproducibility\\
-\textbf{Experiment Run ID:} \texttt{ adhoc }
+\section{Introduction}
+\input{chapters/01_introduction}
 
-
-\section{ Introduction }
-
-This project tests the hypothesis that optimizing molecular generation
-simultaneously for two targets (\texttt{double}) increases the probability
-of dual-hit discovery relative to single-target modes
-\texttt{single\_a} and \texttt{single\_b}.
-
-The experiment is structured as a reproducible pipeline:
-target preparation, FREED++ generation, Boltz-2 scoring, aggregation,
-statistical testing, visualization, and reporting.
-
-The key design principle is fair comparison of modes under identical
-molecular budgets, fixed seeds, and uniform hit-evaluation rules.
-
-
-
-\section{ Related Work }
-
+\section{Related Work}
 \input{chapters/02_related_work}
 
+\section{Methods}
+\input{chapters/03_methods_notes}
 
-
-\section{ Methods }
-
-Generation is performed in three modes:
-\texttt{single\_a}, \texttt{single\_b}, and \texttt{double}.
-For \texttt{double}, the reward is $R = -\max(d_A, d_B)$ (worst-case docking score).
-
-Scoring is performed by \texttt{scripts/score.py}, which evaluates each generated
-molecule against both targets of the pair, producing
-\texttt{scored\_joined.csv}. Metrics and statistical tests are computed by
-\texttt{scripts/compute\_metrics.py} using two-level bootstrap with
-multiple-comparison correction.
-
-Orchestration is split into two stages:
-\begin{enumerate}
-\item Stage~1: \texttt{scripts/run\_full\_experiment.py} (generate + score).
-\item Stage~2: \texttt{scripts/run\_post\_pipeline.py} (aggregate, metrics, plots, render, summary, \LaTeX).
-\end{enumerate}
-
-
-
-\section{ Experimental Protocol and Fairness Controls }
-
+\section{Experimental Protocol and Fairness Controls}
 \input{chapters/04_experimental_protocol}
 
+\section{Results}
+\input{chapters/05_results_scope}
 
+\section{Discussion}
+\input{chapters/08_discussion}
 
-\section{ Result Scope and Decision Criteria }
-
-This manuscript distinguishes between:
-\begin{itemize}
-\item \textbf{operational results} (all generated artifacts and intermediate statistics),
-\item \textbf{claim-bearing results} (tests that pass predefined significance and effect-size gates).
-\end{itemize}
-
-The primary claim criterion is improvement in dual-hit rate for \texttt{double}
-against both single-target baselines on the majority of target pairs, with
-FDR-adjusted significance support.
-
-Secondary criteria include balance between target scores and practical robustness
-across seeds.
-
-Where data are incomplete, the manuscript records the gap explicitly instead of
-backfilling with extrapolations.
-
-
-
-\section{ Limitations }
-
+\section{Limitations}
+\label{sec:limitations}
 \input{chapters/06_limitations}
 
-
-
-\section{ Conclusion and Next Steps }
-
-The repository is organized to produce publication-ready artifacts from executable
-pipeline stages, rather than from manual post-hoc editing.
-
-Next steps for A*/Q1 readiness:
-\begin{enumerate}
-\item complete all planned pair/mode/seed runs without missing artifacts;
-\item freeze software/data snapshots and rerun Stage 2 for final tables and figures;
-\item tighten narrative around hypothesis acceptance/rejection using only pre-registered criteria;
-\item prepare a compact supplementary section with reproducibility commands and checksums.
-\end{enumerate}
-
-This structure keeps scientific claims auditable and directly linked to generated evidence.
-
-
-
-
-\section{Quantitative Results}
-
-No metric table available. Run \texttt{scripts/compute\_metrics.py} first.
-
-
-
-No statistical table available. Run \texttt{scripts/compute\_metrics.py} first.
-
-
-\section{Figures}
-
-No figures available. Run \texttt{scripts/plot\_results.py} and \texttt{scripts/render\_molecules.py}.
-
+\section{Conclusion}
+\input{chapters/07_conclusion}
 
 \section{Reproducibility and Artifact Traceability}
 \subsection{Software Snapshot}
 \begin{itemize}
-\item Master config version: \texttt{ 2.4 }
-
-\item Docker image digest:\\ {\footnotesize\texttt{sha256:84621724917265ea8f72445ced88af441730b45342b4613f4355ed5663c71d4a}}
-\item Boltz version: \texttt{ 2.2.1 }
-\item Docking program/version: \texttt{ unidock\_gpu } / \texttt{ Uni-Dock v1.1.3 }
+\item Master config version: \texttt{2.5}
+\item Docker image digest:\\
+  {\footnotesize\texttt{sha256:84621724917265ea8f72445ced88af441730b45342b4613f4355ed5663c71d4a}}
+\item Boltz version: \texttt{2.2.1}
+\item Docking program/version: \texttt{unidock\_gpu} / \texttt{Uni-Dock v1.1.3}
 \end{itemize}
 
 \subsection{Data Snapshot}
-
 \begin{itemize}
-\item Calibration set: \texttt{ data/calibration/zinc\_druglike\_calibration\_1000\_v2024.smi }
-\item Baseline set: \texttt{ data/baseline/zinc\_druglike\_baseline\_1000\_seed42.smi }
+\item Calibration set: \texttt{data/calibration/zinc\_druglike\_calibration\_1000\_v2024.smi}
+\item Baseline set: \texttt{data/baseline/zinc\_druglike\_baseline\_1000\_seed42.smi}
 \end{itemize}
 
-\appendix
-\section{Machine Summary Excerpt}
-
-No summary excerpt available. Run \texttt{scripts/summarize.py}.
-
-
-\bibliographystyle{plainnat}
 \bibliography{references}
 
 \end{document}

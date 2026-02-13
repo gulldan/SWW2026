@@ -41,24 +41,24 @@ def plot_score_comparison(
 
     col_a = "affinity_a" if "affinity_a" in df_pair.columns else "score_a"
     col_b = "affinity_b" if "affinity_b" in df_pair.columns else "score_b"
-    score_cols: list[tuple[str, str]] = [(col_a, "Скор A"), (col_b, "Скор B")]
+    score_cols: list[tuple[str, str]] = [(col_a, "Score A"), (col_b, "Score B")]
     if objective_columns:
         score_cols.extend((c, lbl) for c, lbl in objective_columns if c in df_pair.columns)
     elif "combined_min" in df_pair.columns:
-        score_cols.append(("combined_min", "Комбинированный (worst-case)"))
+        score_cols.append(("combined_min", "Combined (worst-case)"))
     for col, label in score_cols:
         if col not in df_pair.columns:
             continue
         fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
-        # Гистограмма
+        # Histogram
         for mode in modes:
             subset = df_pair[df_pair["mode"] == mode][col].dropna()
             axes[0].hist(subset, bins=40, alpha=0.6, label=mode, density=True)
         axes[0].set_xlabel(label)
-        axes[0].set_ylabel("Плотность")
+        axes[0].set_ylabel("Density")
         axes[0].legend()
-        axes[0].set_title(f"{pair_id} - распределение {label}")
+        axes[0].set_title(f"{pair_id} - {label} distribution")
 
         # ECDF
         for mode in modes:
@@ -74,9 +74,9 @@ def plot_score_comparison(
         safe_col = col.replace("_", "")
         fig.savefig(fig_dir / f"{pair_id}_{safe_col}_modes.png", dpi=150)
         plt.close(fig)
-        logger.info("Сохранено: {}", fig_dir / f"{pair_id}_{safe_col}_modes.png")
+        logger.info("Saved: {}", fig_dir / f"{pair_id}_{safe_col}_modes.png")
 
-    # Боксплот (matplotlib, чтобы избежать deprecation warning seaborn)
+    # Boxplot (matplotlib to avoid seaborn deprecation warning)
     fig, ax = plt.subplots(figsize=(9, 5))
     metrics = [col_a, col_b] + [c for c, _ in score_cols if c not in (col_a, col_b) and c in df_pair.columns]
     data: list[np.ndarray] = []
@@ -108,7 +108,7 @@ def plot_score_comparison(
         patch.set_alpha(0.6)
 
     ax.set_xticks(tick_positions, tick_labels)
-    ax.set_title(f"{pair_id} - сравнение скоров")
+    ax.set_title(f"{pair_id} - score comparison")
     ax.set_ylabel("score")
 
     legend_handles = [Patch(facecolor=palette[i], label=modes[i], alpha=0.6) for i in range(len(modes))]
@@ -134,7 +134,7 @@ def main(input_path: str, output_dir: str) -> None:
     """
     in_path = PROJECT_ROOT / input_path
     if not in_path.exists():
-        logger.error("Входной файл не найден: {}. Сначала запустите агрегацию.", in_path)
+        logger.error("Input file not found: {}. Run aggregation first.", in_path)
         sys.exit(1)
 
     df = pd.read_parquet(in_path)
@@ -147,7 +147,7 @@ def main(input_path: str, output_dir: str) -> None:
         exp_cfg = load_experiment(PROJECT_ROOT / "configs")
         modes = exp_cfg.get("modes", ["single_a", "single_b", "double"])
     except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("Не удалось загрузить experiment.yaml: {}. Использую дефолтные режимы.", exc)
+        logger.warning("Failed to load experiment.yaml: {}. Using default modes.", exc)
         exp_cfg = {}
         modes = ["single_a", "single_b", "double"]
 
@@ -155,11 +155,11 @@ def main(input_path: str, output_dir: str) -> None:
     objective_columns = [(obj.column_name, obj.column_name) for obj in objectives]
 
     for pair_id in df["pair"].unique():
-        logger.info("Построение графиков для пары: {}", pair_id)
+        logger.info("Generating plots for pair: {}", pair_id)
         df_pair = df[df["pair"] == pair_id]
         plot_score_comparison(df_pair, pair_id, fig_dir, modes, objective_columns=objective_columns)
 
-    logger.info("Все графики сохранены в {}", fig_dir)
+    logger.info("All plots saved to {}", fig_dir)
 
 
 if __name__ == "__main__":

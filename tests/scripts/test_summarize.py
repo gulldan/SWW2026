@@ -62,7 +62,7 @@ def test_score_distribution_block():
 def test_score_distribution_block_empty():
     scores = pd.Series([], dtype=float)
     text = _score_distribution_block(scores, "TargetA")
-    assert "нет данных" in text
+    assert "no data" in text
 
 
 def test_top_molecules_block():
@@ -113,7 +113,7 @@ def test_build_report_structure():
         primary_col="combined_min",
     )
 
-    assert "СВОДНЫЙ ОТЧЁТ" in report
+    assert "SUMMARY REPORT" in report
     assert "pair1" in report
     assert "SINGLE_A" in report
     assert "SINGLE_B" in report
@@ -177,7 +177,7 @@ def test_main_cli(tmp_path, monkeypatch):
     out = tmp_path / "report" / "summary.txt"
     assert out.exists()
     content = out.read_text()
-    assert "СВОДНЫЙ ОТЧЁТ" in content
+    assert "SUMMARY REPORT" in content
     assert "combined_min" in content
     assert "combined_harmonic" in content
 

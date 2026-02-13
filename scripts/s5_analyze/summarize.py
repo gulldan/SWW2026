@@ -70,7 +70,7 @@ def _score_distribution_block(scores: pd.Series, label: str) -> str:
         Multi-line string with median, min, max, and IQR.
     """
     if scores.empty or scores.isna().all():
-        return f"  {label}: нет данных\n"
+        return f"  {label}: no data\n"
     q1, median, q3 = np.nanpercentile(scores, [25, 50, 75])
     return (
         f"  {label}:\n"
@@ -99,10 +99,10 @@ def _top_molecules_block(
         Multi-line formatted string.
     """
     if df.empty:
-        return "  Нет молекул для топа\n"
+        return "  No molecules for top-N\n"
     sort_col = primary_col if primary_col in df.columns else "combined_min"
     top = df.nsmallest(n, sort_col)
-    lines = [f"  Топ-{n} молекул (по {sort_col}):"]
+    lines = [f"  Top-{n} molecules (by {sort_col}):"]
     for i, (_, row) in enumerate(top.iterrows(), 1):
         smiles = row.get("smiles") or row.get("smiles_canonical") or ""
         if len(smiles) > 60:
@@ -143,7 +143,7 @@ def _build_report(
     """
     lines: list[str] = []
     lines.append("=" * 72)
-    lines.append("DUAL-TARGET DOCKING: СВОДНЫЙ ОТЧЁТ")
+    lines.append("DUAL-TARGET DOCKING: SUMMARY REPORT")
     lines.append("=" * 72)
     lines.append("")
 
@@ -158,11 +158,11 @@ def _build_report(
         th_b = thresholds.get(pair_id, {}).get("target_b", 0.0)
 
         lines.append("-" * 72)
-        lines.append(f"Пара: {pair_id}")
+        lines.append(f"Pair: {pair_id}")
         desc = pair_info.get("description", "")
         if desc:
             lines.append(f"  {desc}")
-        lines.append(f"  Пороги: {name_a} <= {th_a}, {name_b} <= {th_b}")
+        lines.append(f"  Thresholds: {name_a} <= {th_a}, {name_b} <= {th_b}")
         lines.append("")
 
         df_pair = df[df["pair"] == pair_id]
@@ -174,7 +174,7 @@ def _build_report(
             n = len(df_mode)
             lines.append(f"  [{mode.upper()}] N={n}")
             if df_mode.empty:
-                lines.append("    нет данных\n")
+                lines.append("    no data\n")
                 continue
 
             lines.append(_score_distribution_block(df_mode[col_a], name_a))
@@ -191,14 +191,14 @@ def _build_report(
                 hr_b = pair_metrics.get("hr_b_mean")
                 hr_both = pair_metrics.get("hr_both_mean")
                 balance = pair_metrics.get("balance_mean")
-                lines.append(f"  Метрики: HR_A={_fmt(hr_a)}  HR_B={_fmt(hr_b)}  HR_both={_fmt(hr_both)}  balance={_fmt(balance)}")
+                lines.append(f"  Metrics: HR_A={_fmt(hr_a)}  HR_B={_fmt(hr_b)}  HR_both={_fmt(hr_both)}  balance={_fmt(balance)}")
                 lines.append("")
 
             lines.append(_top_molecules_block(df_mode, name_a, name_b, primary_col=primary_col))
 
         pair_stats = stats.get(pair_id, {})
         if pair_stats:
-            lines.append("  Статистические тесты:")
+            lines.append("  Statistical tests:")
             for test_id, entry in pair_stats.items():
                 p_adj = entry.get("p_value_adjusted", float("nan"))
                 diff = entry.get("observed_diff", float("nan"))
@@ -215,12 +215,12 @@ def _build_report(
 
 
 @click.command()
-@click.option("--input", "input_path", default="report/data/all_results.parquet", help="Parquet с результатами")
-@click.option("--metrics", "metrics_path", default="report/metrics.json", help="Метрики")
-@click.option("--stats", "stats_path", default="report/stats.json", help="Статистические тесты")
-@click.option("--config", default="configs/pairs.yaml", help="Конфиг пар мишеней")
-@click.option("--thresholds", default="configs/metrics.yaml", help="Пороги хитов")
-@click.option("--output", default="report/summary.txt", help="Выходной файл")
+@click.option("--input", "input_path", default="report/data/all_results.parquet", help="Parquet with results")
+@click.option("--metrics", "metrics_path", default="report/metrics.json", help="Metrics JSON")
+@click.option("--stats", "stats_path", default="report/stats.json", help="Statistical tests JSON")
+@click.option("--config", default="configs/pairs.yaml", help="Target pair config")
+@click.option("--thresholds", default="configs/metrics.yaml", help="Hit thresholds")
+@click.option("--output", default="report/summary.txt", help="Output file")
 def main(
     input_path: str,
     metrics_path: str,
@@ -244,7 +244,7 @@ def main(
     """
     in_path = PROJECT_ROOT / input_path
     if not in_path.exists():
-        logger.error("Входной файл не найден: {}. Сначала запустите агрегацию.", in_path)
+        logger.error("Input file not found: {}. Run aggregation first.", in_path)
         sys.exit(1)
 
     df = pd.read_parquet(in_path)
@@ -280,7 +280,7 @@ def main(
     out_path = PROJECT_ROOT / output
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report)
-    logger.info("Отчёт сохранён: {}", out_path)
+    logger.info("Report saved: {}", out_path)
 
 
 if __name__ == "__main__":

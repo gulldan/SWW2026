@@ -15,7 +15,6 @@ import pandas as pd
 from loguru import logger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
 
 @click.command()
@@ -54,7 +53,7 @@ def main(config: str, experiment_config: str, output: str) -> None:
                 run_dir = PROJECT_ROOT / "output" / "results" / pair_id / mode / f"seed_{seed}"
                 scored_stem = run_dir / "scored_joined"
                 if not stem_exists(scored_stem):
-                    logger.warning("Отсутствует: {}", scored_stem)
+                    logger.warning("Missing: {}", scored_stem)
                     continue
                 rq = validate_reward_quality(
                     run_dir,
@@ -84,17 +83,17 @@ def main(config: str, experiment_config: str, output: str) -> None:
                 df["mode"] = mode
                 df["seed"] = seed
                 frames.append(df)
-                logger.info("Загружено {} строк из {}", len(df), scored_stem)
+                logger.info("Loaded {} rows from {}", len(df), scored_stem)
 
     if not frames:
-        logger.error("Результаты не найдены. Сначала запустите генерацию и скоринг.")
+        logger.error("No results found. Run generation and scoring first.")
         sys.exit(1)
 
     combined = pd.concat(frames, ignore_index=True)
     out_path = PROJECT_ROOT / output
     out_path.parent.mkdir(parents=True, exist_ok=True)
     combined.to_parquet(out_path, index=False)
-    logger.info("Агрегировано {} строк -> {}", len(combined), out_path)
+    logger.info("Aggregated {} rows -> {}", len(combined), out_path)
 
 
 if __name__ == "__main__":
