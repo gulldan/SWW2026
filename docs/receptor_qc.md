@@ -49,6 +49,8 @@ Applied identically to all 10 targets:
 
 **Protonation:** pH 7.0 for all targets. Histidine tautomers assigned automatically by PDBFixer (HID/HIE/HIP based on H-bond network). No manual protonation overrides.
 
+**File separation:** Raw PDB files (`{pdb_id}.pdb`) reside in `output/data/targets/{pair}/{A,B}/`. The `.fixed.pdb` and `.pdbqt` intermediate artifacts are produced by calibration/validation scripts and stored in their respective work directories (`output/data/calibration/receptors/`, etc.) — never in the raw targets directory. The generation stage's `_resolve_pdb_path()` explicitly excludes `.fixed.pdb` to prevent accidental name collisions.
+
 ---
 
 ## Per-Target QC Details

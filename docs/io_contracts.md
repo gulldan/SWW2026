@@ -77,6 +77,15 @@ z-score normalization parameters for FREED++ reward.
 | `output/data/calibration/scores/manifest.json` | JSON | `docking_program`, `docking_version`, `docker_image_digest`, `params.*`, `targets[]`, `date` |
 | `configs/normalization.yaml` | YAML | Per-target: `mean`, `std`, `ci_mean`, `ci_std`, `n_samples`, `stable_mean`, `stable_std`; global: `version`, `calibration_set`, `checksum`, `boltz_version` |
 
+### Intermediate Artifacts (Calibration)
+
+| File | Format | Contents |
+|------|--------|----------|
+| `output/data/calibration/receptors/{target_id}.pdbqt` | PDBQT | Prepared docking receptor |
+| `output/data/calibration/receptors/{target_id}.fixed.pdb` | PDB | PDBFixer-processed PDB (hydrogens added, HETATM removed) |
+
+> **Important**: `.fixed.pdb` files are intermediate artifacts created by `ensure_receptor_pdbqt()` in `dualdocking/scoring/docking.py`. They should only exist in calibration/validation work directories — never in the raw targets directory (`output/data/targets/{pair}/{A,B}/`). The generation stage (`_resolve_pdb_path()`) explicitly excludes `.fixed.pdb` files to avoid name collisions.
+
 ### Validation Outputs (Optional)
 
 | File | Format | Schema |

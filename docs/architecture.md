@@ -192,7 +192,7 @@ After that, the entire pipeline (generation, scoring, analysis) runs offline.
 | Data | Location | Source |
 |------|----------|--------|
 | Protein sequences | `output/data/targets/{id}.fasta` | UniProt |
-| PDB structures | `output/data/targets/{pair}/{A,B}/` | RCSB |
+| PDB structures | `output/data/targets/{pair}/{A,B}/{pdb_id}.pdb` | RCSB |
 | MSA | `output/cache/boltz_msa/{id}.csv` | ColabFold API |
 | Boltz checkpoints | `~/.boltz/` | Auto on first run |
 | Score cache | `output/cache/boltz_scores/{target}.{ctx}.json` | Computed |

@@ -311,7 +311,12 @@ def _resolve_pdb_path(target_id: str) -> Path:
             with meta_path.open() as f:
                 meta = yaml.safe_load(f)
             if meta.get("id") == target_id:
-                pdb_files = list(role_dir.glob("*.pdb"))
+                pdb_files = [
+                    f for f in role_dir.glob("*.pdb") if ".fixed" not in f.name
+                ]
+                if not pdb_files:
+                    # Fall back to any .pdb (including .fixed.pdb)
+                    pdb_files = list(role_dir.glob("*.pdb"))
                 if pdb_files:
                     return pdb_files[0]
 

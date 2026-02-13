@@ -131,6 +131,24 @@ def test_resolve_pdb_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     assert result == pdb_path
 
 
+def test_resolve_pdb_path_skips_fixed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When both 1hcl.pdb and 1hcl.fixed.pdb exist, prefer the non-fixed one."""
+    pair_dir = tmp_path / "CDK2_ERK2" / "A"
+    pair_dir.mkdir(parents=True)
+
+    meta = {"id": "CDK2", "pdb_id": "1HCL", "uniprot": "P24941"}
+    (pair_dir / "meta.yaml").write_text(yaml.dump(meta))
+    (pair_dir / "1hcl.pdb").write_text("ATOM ...")
+    (pair_dir / "1hcl.fixed.pdb").write_text("ATOM fixed ...")
+
+    import dualdocking.generation.freedpp as gen_mod
+
+    monkeypatch.setattr(gen_mod, "DATA_DIR", tmp_path)
+
+    result = _resolve_pdb_path("CDK2")
+    assert result.name == "1hcl.pdb"
+
+
 def test_resolve_pdb_path_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Unknown target raises FileNotFoundError."""
     import dualdocking.generation.freedpp as gen_mod
