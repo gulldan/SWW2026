@@ -11,6 +11,7 @@ for provenance tracking.
 from __future__ import annotations
 
 import os
+import queue
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -620,11 +621,28 @@ def main(
             pbar.set_postfix_str(f"done={n_completed} failed={n_failed}")
             pbar.close()
         else:
+            # GPU pool: each worker acquires a GPU id before running, releases after.
+            gpu_pool: queue.Queue[int | None] = queue.Queue()
+            if n_gpus > 1:
+                for g in range(n_gpus):
+                    gpu_pool.put(g)
+            else:
+                for _ in range(parallel):
+                    gpu_pool.put(None)
+
+            def _run_with_gpu_pool(
+                pair_id: str, mode: str, seed: int,
+            ) -> None:
+                gid = gpu_pool.get()
+                try:
+                    _run_one(pair_id, mode, seed, log_path, resume, mf_path, gpu_id=gid)
+                finally:
+                    gpu_pool.put(gid)
+
             with ThreadPoolExecutor(max_workers=parallel) as executor:
                 futures = {}
-                for i, (pair_id, mode, seed) in enumerate(tasks):
-                    gid = i % n_gpus if n_gpus > 1 else None
-                    fut = executor.submit(_run_one, pair_id, mode, seed, log_path, resume, mf_path, gpu_id=gid)
+                for pair_id, mode, seed in tasks:
+                    fut = executor.submit(_run_with_gpu_pool, pair_id, mode, seed)
                     futures[fut] = f"{pair_id}/{mode}/seed_{seed}"
                 with tqdm(total=total, desc="Tasks", unit="task", dynamic_ncols=True) as pbar:
                     for future in as_completed(futures):
