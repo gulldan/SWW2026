@@ -209,9 +209,17 @@ The two scorers are never mixed: FREED++ optimizes only `d_A, d_B`; Boltz-2 eval
 
 ### Generation Modes
 
-- **single_a**: RL reward based on docking to target A only
-- **single_b**: RL reward based on docking to target B only
-- **double**: RL reward = `max(d_A, d_B)` (worst-case, after per-target z-score normalization)
+**Pre-registered (primary):**
+
+- **single_a**: RL reward = `-z_A` — optimize docking to target A only
+- **single_b**: RL reward = `-z_B` — optimize docking to target B only
+- **double**: RL reward = `-max(z_A, z_B)` — worst-case over both targets
+
+**Exploratory:**
+
+- **linear_equal**: RL reward = `-(z_A + z_B)` — equally weighted
+- **biased_a**: RL reward = `-(z_A + 0.3·z_B)` — target A priority
+- **selective_a**: RL reward = `-(z_A - z_B)` — maximize selectivity for A
 
 ### Target Pairs
 

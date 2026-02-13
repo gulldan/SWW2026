@@ -8,8 +8,12 @@ Technical details of scoring, generation, and data flow.
 
 | Score | Source | Units | Role |
 |-------|--------|-------|------|
-| `d_A`, `d_B` | UniDock GPU | kcal/mol | RL reward signal |
-| `a_A`, `a_B` | Boltz-2 | log10(IC50-like, uM) | Evaluation surrogate |
+| `d_A`, `d_B` | UniDock GPU | kcal/mol | **RL reward** — drives molecule generation |
+| `a_A`, `a_B` | Boltz-2 | log10(IC50-like, uM) | **Evaluation surrogate** — orthogonal post-hoc assessment |
+
+**Important:** The two scorers are never mixed. FREED++ optimizes only docking scores
+`d_A, d_B` (UniDock); Boltz-2 evaluates generated molecules independently after generation
+is complete. Boltz-2 is **not** used in the RL reward loop.
 
 - IC50 = 1 nM = 0.001 uM -> log10 = -3 (strong binder)
 - IC50 = 1 uM = 1.0 uM -> log10 = 0 (threshold)
@@ -71,8 +75,8 @@ properties:
 uv run boltz predict input.yaml \
   --out_dir output/cache/boltz_runs/{target_id}/{hash} \
   --model boltz2 --accelerator gpu \
-  --recycling_steps 3 --sampling_steps 200 --diffusion_samples 4 \
-  --sampling_steps_affinity 200 --diffusion_samples_affinity 5 --override
+  --recycling_steps 3 --sampling_steps 50 --diffusion_samples 1 \
+  --sampling_steps_affinity 50 --diffusion_samples_affinity 1 --override
 
 # Online MSA warmup (for prepare_targets.py --prepare-all):
 uv run boltz predict warmup.yaml \
@@ -129,13 +133,25 @@ scripts/s3_generate/generate.py
 
 ### Modes
 
+**Pre-registered (primary hypothesis):**
+
 | Mode | Reward | Description |
 |------|--------|-------------|
 | `single_a` | `-z_A` | Optimize for target A only |
 | `single_b` | `-z_B` | Optimize for target B only |
 | `double` | `-max(z_A, z_B)` | Worst-case over both targets |
 
+**Exploratory (not pre-registered):**
+
+| Mode | Reward | Description |
+|------|--------|-------------|
+| `linear_equal` | `-(z_A + z_B)` | Equally weighted linear combination |
+| `biased_a` | `-(z_A + 0.3·z_B)` | Target A priority |
+| `selective_a` | `-(z_A - z_B)` | Maximize selectivity for A over B |
+
 Where `z_X = (d_X - mu_X) / sigma_X` (per-target z-score from calibration).
+Z-scores are clamped to ±10 (`MAX_Z_ABS`) to prevent corrupt docking scores from
+dominating the RL gradient.
 
 ### Model Cache
 

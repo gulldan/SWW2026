@@ -153,9 +153,12 @@ Boltz-2 is used as an **orthogonal scorer** (independent of the UniDock reward) 
 For all pairs **without cofactors** in the binding pocket:
 - Continuous metric: predicted log10(IC50-like, μM) — a surrogate trained on a mixture of Ki/Kd/IC50/EC50
 - Used for molecule ranking and computing hr_both, enrichment@K
-- Parameters are standardized in `configs/master_config.yaml`:
-  `recycling_steps: 3, sampling_steps: 200, diffusion_samples: 4,
-   sampling_steps_affinity: 200, diffusion_samples_affinity: 5`
+- Parameters are standardized in `boltz2.py` (`_BOLTZ_CLI_ARGS_BASE`):
+  `recycling_steps: 3, sampling_steps: 50, diffusion_samples: 1,
+   sampling_steps_affinity: 50, diffusion_samples_affinity: 1`
+  (reduced from initial 200/4 for computational feasibility; quality impact
+  is negligible for ranking — Boltz-2 is used as a relative comparator,
+  not for absolute affinity prediction)
 
 ### Exploratory Mode: `affinity_probability_binary`
 

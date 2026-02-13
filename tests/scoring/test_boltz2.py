@@ -37,6 +37,7 @@ def _reset_scorer_state(monkeypatch):
     monkeypatch.setattr(mod, "_BOLTZ_BACKEND", "cli")
     monkeypatch.setattr(mod, "_NIM_ACTIVE_URLS", None)
     monkeypatch.setattr(mod, "_NIM_ACTIVE_URLS_KEY", None)
+    monkeypatch.setattr(mod, "_NIM_ACTIVE_URLS_TIME", 0.0)
     mod._sequence_cache.clear()
     yield
     mod._sequence_cache.clear()
@@ -572,11 +573,11 @@ class TestNimPredictAffinity:
         score = _nim_predict_affinity("MKTAY", "CCO")
         assert math.isnan(score)
 
-    def test_connection_refused_returns_nan(self, monkeypatch):
+    def test_connection_refused_raises(self, monkeypatch):
         monkeypatch.setattr(mod, "_BOLTZ_NIM_URL", "http://127.0.0.1:1")
         monkeypatch.setattr(mod, "_BOLTZ_NIM_URLS", ["http://127.0.0.1:1"])
-        score = _nim_predict_affinity("MKTAY", "CCO")
-        assert math.isnan(score)
+        with pytest.raises(RuntimeError, match="No healthy NIM URL"):
+            _nim_predict_affinity("MKTAY", "CCO")
 
 
 class TestNimScoreBatchInternal:

@@ -8,6 +8,10 @@
 - `step_scale=1.5` (boltz2 default; NIM default was 1.638, fixed)
 - Diffusion is stochastic -- scores vary between runs
 
+> These are the **production parameters** used in `boltz2.py:_BOLTZ_CLI_ARGS_BASE`.
+> Reduced from initial 200/4 for computational feasibility; Boltz-2 is used as a
+> relative ranking tool (not absolute affinity), so the quality trade-off is acceptable.
+
 ## Performance
 
 RTX 4090, CDK2 (298 residues), 6 molecules.

@@ -216,6 +216,37 @@ _SCORER_ENGINE: str = "boltz2"
 _SCORER_BOLTZ_BACKEND: str = "cli"
 _SCORER_NIM_URLS: list[str] = ["http://localhost:8000"]
 
+_NIM_HEALTH_ENDPOINT = "/v1/health/ready"
+_NIM_HEALTH_TIMEOUT = 5.0  # seconds
+
+
+def _check_nim_health(urls: list[str]) -> list[str]:
+    """Probe NIM URLs and return only healthy ones.
+
+    Args:
+        urls: List of NIM base URLs to check.
+
+    Returns:
+        Subset of *urls* that responded as healthy.
+    """
+    import urllib.request
+
+    healthy: list[str] = []
+    for url in urls:
+        health_url = f"{url.rstrip('/')}{_NIM_HEALTH_ENDPOINT}"
+        try:
+            req = urllib.request.Request(health_url)  # noqa: S310
+            with urllib.request.urlopen(req, timeout=_NIM_HEALTH_TIMEOUT) as resp:  # noqa: S310
+                body = resp.read().lower()
+            if b"false" not in body:
+                healthy.append(url)
+                logger.info("NIM health OK: {}", url)
+            else:
+                logger.warning("NIM not ready: {} (responded false)", url)
+        except Exception as exc:
+            logger.warning("NIM not reachable: {} ({})", url, exc)
+    return healthy
+
 
 def _canonical_scorer_engine(name: str) -> str:
     """Normalize scorer engine name to canonical built-in aliases."""
@@ -445,20 +476,37 @@ def main(
     if _SCORER_ENGINE == "boltz2":
         _SCORER_BOLTZ_BACKEND = str(scorer_cfg.get("backend", "cli")).lower()
         if _SCORER_BOLTZ_BACKEND == "nim":
-            nim_cfg = scorer_cfg.get("nim", {})
-            raw_urls = nim_cfg.get("urls", ["http://localhost:8000"]) if isinstance(nim_cfg, dict) else ["http://localhost:8000"]
-            if isinstance(raw_urls, list):
-                _SCORER_NIM_URLS = [str(u).strip() for u in raw_urls if str(u).strip()]
-            else:
-                value = str(raw_urls).strip()
-                _SCORER_NIM_URLS = [value] if value else []
-            if not _SCORER_NIM_URLS:
-                _SCORER_NIM_URLS = ["http://localhost:8000"]
+            nim_cfg = scorer_cfg.get("nim", {}) if isinstance(scorer_cfg.get("nim"), dict) else {}
+            base_port = int(nim_cfg.get("base_port", 8000))
+
+            # Auto-generate NIM URLs: one per detected GPU, starting at base_port.
+            n_gpus = _detect_gpu_count()
+            _SCORER_NIM_URLS = [f"http://localhost:{base_port + i}" for i in range(n_gpus)]
             logger.info(
-                "Scorer engine: boltz2 (backend: NIM, {} instance(s): {})",
+                "Scorer engine: boltz2 (backend: NIM, {} GPU(s) → {} instance(s): {})",
+                n_gpus,
                 len(_SCORER_NIM_URLS),
                 ", ".join(_SCORER_NIM_URLS),
             )
+
+            # Health-check: probe each URL and warn/remove dead ones before starting.
+            _healthy_urls = _check_nim_health(_SCORER_NIM_URLS)
+            if not _healthy_urls:
+                raise RuntimeError(
+                    f"No NIM Boltz-2 instances are healthy. "
+                    f"Expected {len(_SCORER_NIM_URLS)} instance(s) at ports "
+                    f"{base_port}-{base_port + n_gpus - 1}. "
+                    f"Start NIM containers first (see docs/setup.md)."
+                )
+            if len(_healthy_urls) < len(_SCORER_NIM_URLS):
+                dead = [u for u in _SCORER_NIM_URLS if u not in _healthy_urls]
+                logger.warning(
+                    "Only {}/{} NIM instances healthy. Dead: {}. Proceeding with healthy only.",
+                    len(_healthy_urls),
+                    len(_SCORER_NIM_URLS),
+                    ", ".join(dead),
+                )
+            _SCORER_NIM_URLS = _healthy_urls
         else:
             logger.info("Scorer engine: boltz2 (backend: CLI)")
     else:

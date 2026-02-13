@@ -62,15 +62,23 @@ uv run python scripts/s2_calibrate/enrichment_benchmark.py        # SCI-05: AURO
 Orchestrated run — generation, scoring, and analysis:
 
 ```bash
+# Multi-GPU (requires 2+ GPUs):
 EXPERIMENT_RUN_ID=run01 uv run python scripts/pipeline/run_full_experiment.py \
   --resume --parallel 2 --with-post --latex-mode draft
+
+# Single GPU (24 GB, e.g. RTX 4090):
+EXPERIMENT_RUN_ID=run01 uv run python scripts/pipeline/run_full_experiment.py \
+  --resume --parallel 1 --with-post --latex-mode draft
 ```
+
+> **Note:** `--parallel 2` requires 2+ GPUs. On a single GPU, FREED++ (576 MiB) and
+> Boltz-2 (15.5 GB) compete for VRAM, causing OOM failures. Use `--parallel 1`.
 
 Or split into stages:
 
 ```bash
 # Stage 1: generate + score (all pairs x modes x seeds)
-EXPERIMENT_RUN_ID=run01 uv run python scripts/pipeline/run_full_experiment.py --resume --parallel 2
+EXPERIMENT_RUN_ID=run01 uv run python scripts/pipeline/run_full_experiment.py --resume --parallel 1
 
 # Stage 2: aggregate + metrics + plots + report
 EXPERIMENT_RUN_ID=run01 uv run python scripts/pipeline/run_post_pipeline.py --latex-mode draft

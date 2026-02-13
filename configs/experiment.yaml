@@ -73,9 +73,7 @@ scorer:
   cache_enabled: true
   timeout_seconds: 300
   nim:
-    # One NIM instance per GPU for parallel scoring
-    # GPU 0 → port 8000, GPU 1 → port 8001
+    # One NIM instance per GPU for parallel scoring.
+    # URLs are auto-generated: localhost:{base_port + gpu_idx} for each detected GPU.
+    # E.g. 1 GPU → [localhost:8000], 2 GPUs → [localhost:8000, localhost:8001].
     base_port: 8000
-    urls:
-      - "http://localhost:8000"   # GPU 0
-      - "http://localhost:8001"   # GPU 1

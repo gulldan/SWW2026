@@ -82,7 +82,8 @@ for gpu_id in $(seq 0 $((N_GPUS - 1))); do
         --gpus "\"device=$gpu_id\"" \
         --shm-size=16G \
         -e NGC_API_KEY="${NGC_API_KEY:-}" \
-        -e NIM_BOLTZ_STRUCTURE_OPTIMIZED_BACKEND=trt \
+        -e NIM_BOLTZ_STRUCTURE_OPTIMIZED_BACKEND="${NIM_BACKEND:-torch}" \
+        -e NIM_BOLTZ_AFFINITY_OPTIMIZED_BACKEND="${NIM_BACKEND:-torch}" \
         -v "$NIM_CACHE":/opt/nim/.cache \
         -p "${port}:8000" \
         "$NIM_IMAGE"
