@@ -57,7 +57,7 @@ def _detect_gpu_count() -> int:
     # 2. nvidia-smi (shows physical GPUs, unaffected by env vars)
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],  # noqa: S603, S607
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],  # noqa: S607
             capture_output=True,
             text=True,
             check=False,
@@ -68,7 +68,7 @@ def _detect_gpu_count() -> int:
             if lines:
                 logger.debug("GPU count via nvidia-smi: {}", len(lines))
                 return len(lines)
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     # 3. Fallback: torch
@@ -80,7 +80,7 @@ def _detect_gpu_count() -> int:
             if n >= 1:
                 logger.debug("GPU count via torch: {}", n)
                 return n
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     logger.debug("GPU detection failed, assuming 1 GPU")
@@ -295,7 +295,7 @@ def _canonical_scorer_engine(name: str) -> str:
     return name.strip()
 
 
-def _run_cmd(cmd: list[str], log_path: Path, gpu_id: int | None = None) -> None:
+def _run_cmd(cmd: list[str], log_path: Path, gpu_id: int | None = None, *, allow_inprocess: bool = True) -> None:
     """Execute a subprocess command, logging output and enforcing success.
 
     Sets ``FREEDPP_CUDA_DEVICE``, ``SCORER_CUDA_DEVICE``, and scorer-specific
@@ -305,6 +305,9 @@ def _run_cmd(cmd: list[str], log_path: Path, gpu_id: int | None = None) -> None:
         cmd: Command tokens to execute.
         log_path: Path to the experiment log file.
         gpu_id: CUDA device index to pin execution to, or ``None`` for default.
+        allow_inprocess: Allow in-process dispatch.  Must be ``False`` when
+            multiple tasks run concurrently because in-process dispatch patches
+            the shared ``os.environ`` and is not thread-safe.
 
     Raises:
         RuntimeError: If the subprocess exits with a non-zero return code.
@@ -338,7 +341,7 @@ def _run_cmd(cmd: list[str], log_path: Path, gpu_id: int | None = None) -> None:
         env=env,
         stdout_pipe=True,
         stderr_to_parent=True,
-        allow_inprocess=True,
+        allow_inprocess=allow_inprocess,
     )
     if result.returncode != 0:
         _log_to_file(log_path, f"[{_ts()}] ERROR (rc={result.returncode}):\n{(result.stdout or '')[-4000:]}")
@@ -348,7 +351,15 @@ def _run_cmd(cmd: list[str], log_path: Path, gpu_id: int | None = None) -> None:
 
 
 def _run_one(
-    pair: str, mode: str, seed: int, log_path: Path, resume: bool, mf_path: Path | None = None, gpu_id: int | None = None
+    pair: str,
+    mode: str,
+    seed: int,
+    log_path: Path,
+    resume: bool,
+    mf_path: Path | None = None,
+    gpu_id: int | None = None,
+    *,
+    allow_inprocess: bool = True,
 ) -> None:
     """Run the generate + score pipeline for a single (pair, mode, seed) task.
 
@@ -363,6 +374,7 @@ def _run_one(
         resume: If ``True``, skip generation when ``generated`` already exists (Parquet or CSV).
         mf_path: Path to the run manifest file, or ``None`` to skip tracking.
         gpu_id: CUDA device index for this task, or ``None`` for default.
+        allow_inprocess: Allow in-process dispatch (must be ``False`` in parallel).
 
     Raises:
         RuntimeError: If either the generate or score subprocess fails.
@@ -393,7 +405,7 @@ def _run_one(
             update_task(mf_path, task_id=tid, stage="generate", status="running")
         t0 = time.monotonic()
         try:
-            _run_cmd(_command_generate(pair, mode, seed), log_path, gpu_id=gpu_id)
+            _run_cmd(_command_generate(pair, mode, seed), log_path, gpu_id=gpu_id, allow_inprocess=allow_inprocess)
         except RuntimeError as exc:
             logger.error("[GENERATE]{} {} {} seed_{} — FAILED ({:.0f}s)", gpu_tag, pair, mode, seed, time.monotonic() - t0)
             if mf_path:
@@ -410,7 +422,7 @@ def _run_one(
         update_task(mf_path, task_id=tid, stage="score", status="running")
     t0 = time.monotonic()
     try:
-        _run_cmd(_command_score(pair, mode, seed), log_path, gpu_id=gpu_id)
+        _run_cmd(_command_score(pair, mode, seed), log_path, gpu_id=gpu_id, allow_inprocess=allow_inprocess)
     except RuntimeError as exc:
         logger.error("[SCORE]{} {} {} seed_{} — FAILED ({:.0f}s)", gpu_tag, pair, mode, seed, time.monotonic() - t0)
         if mf_path:
@@ -655,7 +667,7 @@ def main(
             ) -> None:
                 gid = gpu_pool.get()
                 try:
-                    _run_one(pair_id, mode, seed, log_path, resume, mf_path, gpu_id=gid)
+                    _run_one(pair_id, mode, seed, log_path, resume, mf_path, gpu_id=gid, allow_inprocess=False)
                 finally:
                     gpu_pool.put(gid)
 
