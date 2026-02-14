@@ -230,7 +230,7 @@ Re-docking of the co-crystallized ligand is performed for each target:
 - Ligand is extracted from PDB; SMILES is obtained from RCSB
 - Docking uses the same parameters as the main experiment
 - RMSD ≤ 2.0 Å between the docked and crystal pose = PASS
-- Script: `scripts/s2_calibrate/validate_redocking.py`
+- Script: `cli/s2_calibrate/validate_redocking.py`
 
 > An identical preparation protocol for all targets is a critical guarantee
 > that differences in results between pairs are not artifacts
@@ -242,7 +242,7 @@ Re-docking of the co-crystallized ligand is performed for each target:
 - Extensive activity data in ChEMBL
 - Manageable protein sizes (< 600 residues per target)
 
-> ¹ **1HCL (CDK2)** — apo structure (no ligand). The binding box is determined from ATP-binding pocket coordinates of PDB 4GCJ (CDK2 with ligand) or via fallback (protein center of mass + 30×30×30 Å cube). Impact on docking quality is minimal: the CDK2 ATP pocket is well-defined structurally, confirmed by re-docking validation (RMSD ≤ 2.0 Å, see `scripts/s2_calibrate/validate_redocking.py`).
+> ¹ **1HCL (CDK2)** — apo structure (no ligand). The binding box is determined from ATP-binding pocket coordinates of PDB 4GCJ (CDK2 with ligand) or via fallback (protein center of mass + 30×30×30 Å cube). Impact on docking quality is minimal: the CDK2 ATP pocket is well-defined structurally, confirmed by re-docking validation (RMSD ≤ 2.0 Å, see `cli/s2_calibrate/validate_redocking.py`).
 
 ## Key References
 

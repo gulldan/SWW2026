@@ -1,6 +1,6 @@
-"""In-process dispatcher for Click-based project scripts.
+"""In-process dispatcher for Click-based project CLI entry points.
 
-This module lets pipeline orchestrators execute internal scripts without
+This module lets pipeline orchestrators execute internal CLI modules without
 spawning a new Python process. It keeps the CLI contract intact while also
 enabling direct programmatic execution from Python code.
 """
@@ -22,32 +22,32 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # script path (relative to repo root) -> module path containing click `main`
 _SCRIPT_TO_MODULE: dict[str, str] = {
-    "scripts/pipeline/run_full_experiment.py": "scripts.pipeline.run_full_experiment",
-    "scripts/pipeline/run_post_pipeline.py": "scripts.pipeline.run_post_pipeline",
-    "scripts/pipeline/run_pilot.py": "scripts.pipeline.run_pilot",
-    "scripts/pipeline/run_stages.py": "scripts.pipeline.run_stages",
-    "scripts/s0_fetch/fetch_all.py": "scripts.s0_fetch.fetch_all",
-    "scripts/s0_fetch/fetch_freed_fragments.py": "scripts.s0_fetch.fetch_freed_fragments",
-    "scripts/s0_fetch/fetch_zinc_baseline.py": "scripts.s0_fetch.fetch_zinc_baseline",
-    "scripts/s0_fetch/fetch_calibration_smiles.py": "scripts.s0_fetch.fetch_calibration_smiles",
-    "scripts/s0_fetch/fetch_chembl_actives.py": "scripts.s0_fetch.fetch_chembl_actives",
-    "scripts/s1_prepare/prepare_all.py": "scripts.s1_prepare.prepare_all",
-    "scripts/s1_prepare/prepare_targets.py": "scripts.s1_prepare.prepare_targets",
-    "scripts/s1_prepare/convert_baseline_parquet.py": "scripts.s1_prepare.convert_baseline_parquet",
-    "scripts/s1_prepare/sample_baseline.py": "scripts.s1_prepare.sample_baseline",
-    "scripts/s2_calibrate/dock_calibration.py": "scripts.s2_calibrate.dock_calibration",
-    "scripts/s2_calibrate/compute_normalization.py": "scripts.s2_calibrate.compute_normalization",
-    "scripts/s3_generate/generate.py": "scripts.s3_generate.generate",
-    "scripts/s4_score/score.py": "scripts.s4_score.score",
-    "scripts/s5_analyze/aggregate.py": "scripts.s5_analyze.aggregate",
-    "scripts/s5_analyze/compute_metrics.py": "scripts.s5_analyze.compute_metrics",
-    "scripts/s5_analyze/threshold_sensitivity.py": "scripts.s5_analyze.threshold_sensitivity",
-    "scripts/s5_analyze/proxy_correlation.py": "scripts.s5_analyze.proxy_correlation",
-    "scripts/s5_analyze/summarize.py": "scripts.s5_analyze.summarize",
-    "scripts/s6_report/plot_results.py": "scripts.s6_report.plot_results",
-    "scripts/s6_report/render_molecules.py": "scripts.s6_report.render_molecules",
-    "scripts/s6_report/generate_latex_report.py": "scripts.s6_report.generate_latex_report",
-    "scripts/s7_audit/claim_audit.py": "scripts.s7_audit.claim_audit",
+    "cli/pipeline/run_full_experiment.py": "cli.pipeline.run_full_experiment",
+    "cli/pipeline/run_post_pipeline.py": "cli.pipeline.run_post_pipeline",
+    "cli/pipeline/run_pilot.py": "cli.pipeline.run_pilot",
+    "cli/pipeline/run_stages.py": "cli.pipeline.run_stages",
+    "cli/s0_fetch/fetch_all.py": "cli.s0_fetch.fetch_all",
+    "cli/s0_fetch/fetch_freed_fragments.py": "cli.s0_fetch.fetch_freed_fragments",
+    "cli/s0_fetch/fetch_zinc_baseline.py": "cli.s0_fetch.fetch_zinc_baseline",
+    "cli/s0_fetch/fetch_calibration_smiles.py": "cli.s0_fetch.fetch_calibration_smiles",
+    "cli/s0_fetch/fetch_chembl_actives.py": "cli.s0_fetch.fetch_chembl_actives",
+    "cli/s1_prepare/prepare_all.py": "cli.s1_prepare.prepare_all",
+    "cli/s1_prepare/prepare_targets.py": "cli.s1_prepare.prepare_targets",
+    "cli/s1_prepare/convert_baseline_parquet.py": "cli.s1_prepare.convert_baseline_parquet",
+    "cli/s1_prepare/sample_baseline.py": "cli.s1_prepare.sample_baseline",
+    "cli/s2_calibrate/dock_calibration.py": "cli.s2_calibrate.dock_calibration",
+    "cli/s2_calibrate/compute_normalization.py": "cli.s2_calibrate.compute_normalization",
+    "cli/s3_generate/generate.py": "cli.s3_generate.generate",
+    "cli/s4_score/score.py": "cli.s4_score.score",
+    "cli/s5_analyze/aggregate.py": "cli.s5_analyze.aggregate",
+    "cli/s5_analyze/compute_metrics.py": "cli.s5_analyze.compute_metrics",
+    "cli/s5_analyze/threshold_sensitivity.py": "cli.s5_analyze.threshold_sensitivity",
+    "cli/s5_analyze/proxy_correlation.py": "cli.s5_analyze.proxy_correlation",
+    "cli/s5_analyze/summarize.py": "cli.s5_analyze.summarize",
+    "cli/s6_report/plot_results.py": "cli.s6_report.plot_results",
+    "cli/s6_report/render_molecules.py": "cli.s6_report.render_molecules",
+    "cli/s6_report/generate_latex_report.py": "cli.s6_report.generate_latex_report",
+    "cli/s7_audit/claim_audit.py": "cli.s7_audit.claim_audit",
 }
 
 
@@ -66,8 +66,8 @@ def parse_script_invocation(cmd: list[str], project_root: Path = PROJECT_ROOT) -
     """Parse a command if it points to an internal Python script.
 
     Supported forms:
-        - ``uv run python scripts/...``
-        - ``python scripts/...`` (absolute python path also supported)
+        - ``uv run python cli/...``
+        - ``python cli/...`` (absolute python path also supported)
 
     Returns:
         Tuple ``(module_path, args, script_rel_path)`` or ``None`` if not

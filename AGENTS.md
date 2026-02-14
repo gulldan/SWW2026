@@ -75,13 +75,13 @@ uv run pytest tests/ -v
 uv run pytest tests/test_objectives.py -v
 
 # Linting (must pass with zero warnings)
-uv run ruff check dualdocking/ scripts/ docker/
+uv run ruff check dualdocking/ cli/ docker/
 
 # Type checking (must pass with zero errors)
 uv run ty check dualdocking/
 
 # Auto-format
-uv run ruff format dualdocking/ scripts/
+uv run ruff format dualdocking/ cli/
 
 # Docker build (FREED++ generator)
 docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
@@ -111,7 +111,7 @@ dualdocking/                  # Core library (at project root, no src/ wrapper)
   reporting/                  #   Reporting subpackage
     run_manifest.py           #     Lifecycle tracking for experiment runs
     latex_report.py           #     LaTeX report generation
-scripts/                      # CLI entry points (organized by pipeline stage)
+cli/                      # CLI entry points (organized by pipeline stage)
   s0_fetch/                   #   Data download (PDB, FASTA, FREED fragments, ZINC, ChEMBL)
   s1_prepare/                 #   Target preparation (PDB -> PDBQT, binding box, MSA)
   s2_calibrate/               #   Calibration and validation
@@ -141,7 +141,7 @@ Stage 0 (fetch) → Generation (FREED++, 3 modes × 5 pairs × 5 seeds) → Scor
 
 - **Python 3.12**, package manager `uv`, build system `hatchling`
 - **Ruff**: `select = ["ALL"]` with curated ignores, line-length 130, Google docstrings, double quotes
-- **Type checker**: `ty` in strict mode (`dualdocking/` only; tests and scripts excluded)
+- **Type checker**: `ty` in strict mode (`dualdocking/` only; tests and cli excluded)
 - **lower_is_better = True everywhere** — docking scores are negative (more negative = better binding). Utility = −score.
 - All objective functions convert scores to utilities before aggregation
 - Tchebycheff is the exception: works directly in score-space (abs is symmetric)
@@ -192,7 +192,7 @@ NIM and CLI backends produce separate cache contexts (different context hashes) 
 - **Never commit** `output/`, `.env`, or credential files (all gitignored)
 - Docker container runs as non-root; GPU passthrough via `--gpus all`
 - `scoring/cache_io.py` uses `fcntl.flock` — safe for concurrent single-machine access, NOT for NFS
-- External API calls (ChEMBL, PDB) are only in `scripts/` and `dualdocking/data/chembl_validation.py`, never in core scoring/generation
+- External API calls (ChEMBL, PDB) are only in `cli/` and `dualdocking/data/chembl_validation.py`, never in core scoring/generation
 
 ## Experiment Design (Context for Changes)
 

@@ -1,4 +1,4 @@
-"""Tests for scripts/run_pilot.py (KVA-273 / SCI-09)."""
+"""Tests for cli/run_pilot.py (KVA-273 / SCI-09)."""
 
 import json
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from scripts.pipeline.run_pilot import verify_pilot_artifacts
+from cli.pipeline.run_pilot import verify_pilot_artifacts
 
 
 def _create_run_artifacts(

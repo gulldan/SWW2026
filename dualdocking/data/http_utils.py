@@ -13,6 +13,8 @@ from pathlib import Path
 import requests
 from loguru import logger
 
+from dualdocking.utils.hash_utils import sha256_file as _sha256_file
+
 _DEFAULT_RETRY_ATTEMPTS: int = 3
 _DEFAULT_RETRY_BACKOFF: int = 5  # seconds (multiplied by attempt number)
 _DEFAULT_TIMEOUT: int = 60
@@ -117,8 +119,4 @@ def sha256_file(path: Path) -> str:
     Returns:
         Hex-encoded SHA-256 digest.
     """
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(8192), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return _sha256_file(path)

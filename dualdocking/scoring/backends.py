@@ -12,9 +12,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
+from dualdocking.utils.naming import canonicalize_name
+
 
 class ScoringBackend(Protocol):
-    """Minimal interface required by scoring scripts."""
+    """Minimal interface required by scoring cli."""
 
     def score_batch(
         self,
@@ -70,10 +72,7 @@ def _as_mapping(value: object) -> Mapping[str, Any]:
 
 def _canonical_engine_name(name: str) -> str:
     """Normalize scorer engine names to canonical built-in keys."""
-    normalized = "".join(ch for ch in name.lower() if ch.isalnum())
-    if normalized in {"boltz", "boltz2"}:
-        return "boltz2"
-    return name.strip()
+    return canonicalize_name(name, {"boltz": "boltz2", "boltz2": "boltz2"})
 
 
 def _resolve_nim_urls(scorer_cfg: Mapping[str, Any]) -> list[str]:

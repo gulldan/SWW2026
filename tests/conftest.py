@@ -6,10 +6,9 @@ import pytest
 @pytest.fixture(autouse=True)
 def _fast_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
     """Reduce bootstrap iterations for fast tests (10K/5K -> 100)."""
-    import scripts.s5_analyze.compute_metrics as cm
-    import scripts.s5_analyze.proxy_correlation as pfc
-    import scripts.s5_analyze.threshold_sensitivity as ts
+    import dualdocking.analysis.metrics.computation as comp
+    import dualdocking.analysis.metrics.correlation as corr
+    import dualdocking.analysis.metrics.sensitivity as sens
 
-    monkeypatch.setattr(cm, "_N_BOOTSTRAP", 100)
-    monkeypatch.setattr(ts, "_N_BOOTSTRAP", 100)
-    monkeypatch.setattr(pfc, "_N_BOOTSTRAP", 100)
+    for mod in (comp, sens, corr):
+        monkeypatch.setattr(mod, "_N_BOOTSTRAP", 100)

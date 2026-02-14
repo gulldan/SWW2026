@@ -39,4 +39,12 @@ fairness
 
     - ``validate_fairness()``            -- check molecule count and duplication rate
     - ``validate_reward_quality()``      -- check reward signal quality
+
+metrics (subpackage)
+    Pipeline-stage metrics computation (extracted from ``cli/s5_analyze/``).
+
+    - ``metrics.aggregation``            -- aggregate scored results across runs
+    - ``metrics.computation``            -- summary metrics + bootstrap statistics
+    - ``metrics.sensitivity``            -- threshold sensitivity analysis
+    - ``metrics.correlation``            -- proxy vs final correlation analysis
 """

@@ -20,13 +20,13 @@ import contextlib
 import fcntl
 import json
 import os
-import tempfile
 import threading
-import time
 from pathlib import Path
 
 import numpy as np
 from loguru import logger
+
+from dualdocking.utils.io_atomic import acquire_flock, write_bytes_atomic
 
 # In-process lock avoids redundant flock syscalls when multiple threads
 # within the *same* process contend (e.g. ThreadPoolExecutor in tests).
@@ -48,18 +48,7 @@ def _acquire_flock(fd: int, timeout: float) -> bool:
     Returns:
         ``True`` if the lock was acquired, ``False`` on timeout.
     """
-    deadline = time.monotonic() + timeout
-    delay = _RETRY_INITIAL
-    while True:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return True
-        except (OSError, BlockingIOError):
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                return False
-            time.sleep(min(delay, remaining))
-            delay = min(delay * 2, _RETRY_CAP)
+    return acquire_flock(fd, timeout, retry_initial=_RETRY_INITIAL, retry_cap=_RETRY_CAP)
 
 
 def _parse_dict(data: object) -> dict[str, float]:
@@ -156,7 +145,6 @@ def save_cache(path: Path, cache: dict[str, float], *, timeout: float = LOCK_TIM
     lock_file = _lock_path(path)
     lock_file.touch(exist_ok=True)
     lock_fd: int | None = None
-    tmp_path: str | None = None
 
     with _thread_lock:
         try:
@@ -181,25 +169,11 @@ def save_cache(path: Path, cache: dict[str, float], *, timeout: float = LOCK_TIM
             payload = json.dumps(merged, indent=2, sort_keys=True).encode()
 
             # --- Atomic write: temp -> fsync -> replace ---
-            fd, tmp_path = tempfile.mkstemp(
-                dir=str(path.parent),
-                prefix=f".{path.stem}.",
-                suffix=".tmp",
-            )
-            os.write(fd, payload)
-            os.fsync(fd)
-            os.close(fd)
-
-            Path(tmp_path).replace(path)
-            tmp_path = None  # rename succeeded — nothing to clean up
+            write_bytes_atomic(path, payload, prefix=f".{path.stem}.", suffix=".tmp")
 
         except OSError as exc:
             logger.error("Failed to save cache {}: {}", path, exc)
         finally:
-            # Compensating action: clean up temp on failure
-            if tmp_path is not None:
-                with contextlib.suppress(OSError):
-                    Path(tmp_path).unlink()
             if lock_fd is not None:
                 with contextlib.suppress(OSError):
                     fcntl.flock(lock_fd, fcntl.LOCK_UN)

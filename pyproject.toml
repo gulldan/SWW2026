@@ -34,22 +34,22 @@ dev = [
 ]
 
 [project.scripts]
-dd-prepare = "scripts.s1_prepare.prepare_targets:main"
-dd-generate = "scripts.s3_generate.generate:main"
-dd-score = "scripts.s4_score.score:main"
-dd-aggregate = "scripts.s5_analyze.aggregate:main"
-dd-smoke = "scripts.smoke.boltz_smoke:main"
-dd-metrics = "scripts.s5_analyze.compute_metrics:main"
-dd-plot = "scripts.s6_report.plot_results:main"
-dd-render = "scripts.s6_report.render_molecules:main"
-dd-summarize = "scripts.s5_analyze.summarize:main"
+dd-prepare = "cli.s1_prepare.prepare_targets:main"
+dd-generate = "cli.s3_generate.generate:main"
+dd-score = "cli.s4_score.score:main"
+dd-aggregate = "cli.s5_analyze.aggregate:main"
+dd-smoke = "cli.smoke.boltz_smoke:main"
+dd-metrics = "cli.s5_analyze.compute_metrics:main"
+dd-plot = "cli.s6_report.plot_results:main"
+dd-render = "cli.s6_report.render_molecules:main"
+dd-summarize = "cli.s5_analyze.summarize:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["dualdocking"]
+packages = ["dualdocking", "cli"]
 
 [tool.ruff]
 lint.select = ["ALL"]
@@ -110,8 +110,8 @@ exclude = [
     "test.py",
 ]
 
-# Assume Python 3.13.
-target-version = "py313"
+# Assume Python 3.12.
+target-version = "py312"
 
 [tool.ruff.lint.mccabe]
 # Flag errors (`C901`) whenever the complexity level exceeds 5.
@@ -166,7 +166,7 @@ omit = ["tests/*", "*/__pycache__/*"]
 # ty type checker config (https://docs.astral.sh/ty/)
 # All other rules remain at ERROR level (default)
 environment = { root = ["."] }
-src = { include = ["dualdocking"], exclude = ["tests/", "scripts/", "alembic/"] }
+src = { include = ["dualdocking"], exclude = ["tests/", "cli/", "alembic/"] }
 
 [tool.ty.rules]
 # === External library issues (missing type stubs) ===
@@ -192,12 +192,6 @@ invalid-argument-type = "warn"       # **media_kwargs, FastAPI middleware
 # ty doesn't narrow types through all control flow patterns
 invalid-assignment = "warn"          # dict[str, Unknown] subscript access
 unsupported-operator = "warn"        # numpy with Optional types
-
-[tool.mypy]
-python_version = "3.13"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
 
 [tool.uv.sources]
 boltz = { git = "https://github.com/jwohlwend/boltz.git", rev = "cb04aeccdd480fd4db707f0bbafde538397fa2ac" }

@@ -1,4 +1,4 @@
-"""Tests for scripts/s2_calibrate/power_analysis.py."""
+"""Tests for power analysis (dualdocking.analysis.calibration.power)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from scripts.s2_calibrate.power_analysis import (
+from dualdocking.analysis.calibration.power import (
     cliffs_delta_to_cohens_d,
     mde_paired_ttest,
     power_at_effect,
@@ -107,7 +107,7 @@ class TestCliffsDeltaConversion:
         assert cliffs_delta_to_cohens_d(0.33) > 0
 
     def test_medium_delta_reasonable(self) -> None:
-        """Cliff's delta 0.33 should map to roughly d ≈ 0.35."""
+        """Cliff's delta 0.33 should map to roughly d ~ 0.35."""
         d = cliffs_delta_to_cohens_d(0.33)
         assert 0.3 < d < 0.4
 
@@ -122,11 +122,11 @@ class TestMainCLI:
     def test_main_writes_json(self, tmp_path) -> None:
         from click.testing import CliRunner
 
-        from scripts.s2_calibrate.power_analysis import main
+        from cli.s2_calibrate.power_analysis import main
 
         out_rel = "test_power.json"
         # Patch PROJECT_ROOT so output goes to tmp_path
-        import scripts.s2_calibrate.power_analysis as pa_mod
+        import cli.s2_calibrate.power_analysis as pa_mod
 
         original_root = pa_mod.PROJECT_ROOT
         pa_mod.PROJECT_ROOT = tmp_path

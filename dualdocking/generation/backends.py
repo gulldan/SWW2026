@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from dualdocking.utils.naming import canonicalize_name
+
 GenerationMode = Literal["single_a", "single_b", "double", "linear_equal", "biased_a", "selective_a"]
 
 
@@ -58,10 +60,7 @@ def _as_mapping(value: object) -> Mapping[str, Any]:
 
 def _canonical_backend_name(name: str) -> str:
     """Normalize backend names to canonical built-in keys."""
-    normalized = "".join(ch for ch in name.lower() if ch.isalnum())
-    if normalized in {"freed", "freedpp"}:
-        return "freedpp"
-    return name.strip()
+    return canonicalize_name(name, {"freed": "freedpp", "freedpp": "freedpp"})
 
 
 def _target_id(pair_config: Mapping[str, Any], role: str) -> str:

@@ -26,7 +26,7 @@ Full notation: see `docs/goal.md` (Notation section).
 
 ## Scoring Backends
 
-`scripts/s4_score/score.py` resolves scorer implementation via
+`cli/s4_score/score.py` resolves scorer implementation via
 `dualdocking.scoring.backends.resolve_scoring_backend`.
 
 - Built-in engine: `boltz2`
@@ -107,7 +107,7 @@ Disk cache segmented by target: `output/cache/boltz_scores/{target}.{ctx[:8]}.js
 
 ## Generation Backends
 
-`scripts/s3_generate/generate.py` resolves generator implementation via
+`cli/s3_generate/generate.py` resolves generator implementation via
 `dualdocking.generation.backends.resolve_generation_backend`.
 
 - Built-in backend: `freedpp`
@@ -121,7 +121,7 @@ Runs in Docker due to dependency conflicts (Python 3.10, PyTorch 1.12, DGL 0.9).
 ### Data Flow
 
 ```
-scripts/s3_generate/generate.py
+cli/s3_generate/generate.py
   -> generation.backends.resolve_generation_backend(...)
   -> builtin generation.freedpp.generate(config)  # default
       1. _ensure_docker_image()       # build if absent
@@ -173,7 +173,7 @@ task status, timestamps, and config hashes.
 
 ## Process Boundaries
 
-Internal pipeline entry points under `scripts/` are invoked in-process through
+Internal pipeline entry points under `cli/` are invoked in-process through
 `dualdocking.command_runner` + `dualdocking.script_dispatch` when possible.
 This avoids spawning extra Python interpreters between stages.
 
@@ -186,7 +186,7 @@ This avoids spawning extra Python interpreters between stages.
 
 ## Offline Principle
 
-All external data is fetched once during `scripts/s0_fetch/fetch_all.py`.
+All external data is fetched once during `cli/s0_fetch/fetch_all.py`.
 After that, the entire pipeline (generation, scoring, analysis) runs offline.
 
 | Data | Location | Source |

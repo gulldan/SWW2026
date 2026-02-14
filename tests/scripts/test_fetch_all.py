@@ -1,4 +1,4 @@
-"""Tests for scripts/s0_fetch/fetch_all.py and dualdocking/data/http_utils.py."""
+"""Tests for cli/s0_fetch/fetch_all.py and dualdocking/data/http_utils.py."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-import scripts.s0_fetch.fetch_all as mod
+import cli.s0_fetch.fetch_all as mod
 from dualdocking.data.http_utils import download_file, get_with_retry, sha256_file
 
 
@@ -273,7 +273,7 @@ def test_download_file_with_retry(tmp_path) -> None:
 
 def test_record_manifest_writes_sha256(monkeypatch, tmp_path) -> None:
     """_record_manifest writes SHA-256, URL, size, timestamp."""
-    import scripts.s1_prepare.prepare_targets as pt_mod
+    import cli.s1_prepare.prepare_targets as pt_mod
 
     monkeypatch.setattr(pt_mod, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(pt_mod, "MANIFEST_PATH", tmp_path / "manifest.json")

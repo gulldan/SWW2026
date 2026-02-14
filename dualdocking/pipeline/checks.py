@@ -6,11 +6,39 @@ providing clear error messages about missing dependencies.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dualdocking.pipeline.config import StageTask
+
+
+def _missing_paths(paths: list[Path]) -> list[str]:
+    """Return string paths for entries that do not exist."""
+    return [str(path) for path in paths if not path.exists()]
+
+
+def _check_task_stem_output(task: StageTask, project_root: Path, stem_name: str) -> list[str]:
+    """Check that a task run directory contains a specific stem output."""
+    from dualdocking.data.io_utils import stem_exists
+
+    run_dir = task.run_dir(project_root)
+    if stem_exists(run_dir / stem_name):
+        return []
+    return [f"{run_dir}/{stem_name}.parquet"]
+
+
+def _collect_missing_for_tasks(
+    tasks: list[StageTask],
+    project_root: Path,
+    checker: Callable[[StageTask, Path], list[str]],
+) -> list[str]:
+    """Collect missing outputs for all tasks using a checker callback."""
+    missing: list[str] = []
+    for task in tasks:
+        missing.extend(checker(task, project_root))
+    return missing
 
 
 def check_fetch_outputs(project_root: Path) -> list[str]:
@@ -22,14 +50,12 @@ def check_fetch_outputs(project_root: Path) -> list[str]:
     Returns:
         List of missing filesystem paths.
     """
-    missing: list[str] = []
-    targets_dir = project_root / "output" / "data" / "targets"
-    if not targets_dir.exists():
-        missing.append(str(targets_dir))
-    cal_dir = project_root / "output" / "data" / "calibration"
-    if not cal_dir.exists():
-        missing.append(str(cal_dir))
-    return missing
+    return _missing_paths(
+        [
+            project_root / "output" / "data" / "targets",
+            project_root / "output" / "data" / "calibration",
+        ]
+    )
 
 
 def check_calibration_outputs(project_root: Path) -> list[str]:
@@ -41,14 +67,12 @@ def check_calibration_outputs(project_root: Path) -> list[str]:
     Returns:
         List of missing filesystem paths.
     """
-    missing: list[str] = []
-    norm = project_root / "configs" / "normalization.yaml"
-    if not norm.exists():
-        missing.append(str(norm))
-    scores_dir = project_root / "output" / "data" / "calibration" / "scores"
-    if not scores_dir.exists():
-        missing.append(str(scores_dir))
-    return missing
+    return _missing_paths(
+        [
+            project_root / "configs" / "normalization.yaml",
+            project_root / "output" / "data" / "calibration" / "scores",
+        ]
+    )
 
 
 def check_generation_outputs(task: StageTask, project_root: Path) -> list[str]:
@@ -61,13 +85,7 @@ def check_generation_outputs(task: StageTask, project_root: Path) -> list[str]:
     Returns:
         List of missing filesystem paths.
     """
-    from dualdocking.data.io_utils import stem_exists
-
-    missing: list[str] = []
-    run_dir = task.run_dir(project_root)
-    if not stem_exists(run_dir / "generated"):
-        missing.append(f"{run_dir}/generated.parquet")
-    return missing
+    return _check_task_stem_output(task, project_root, "generated")
 
 
 def check_score_outputs(task: StageTask, project_root: Path) -> list[str]:
@@ -80,13 +98,7 @@ def check_score_outputs(task: StageTask, project_root: Path) -> list[str]:
     Returns:
         List of missing filesystem paths.
     """
-    from dualdocking.data.io_utils import stem_exists
-
-    missing: list[str] = []
-    run_dir = task.run_dir(project_root)
-    if not stem_exists(run_dir / "scored_joined"):
-        missing.append(f"{run_dir}/scored_joined.parquet")
-    return missing
+    return _check_task_stem_output(task, project_root, "scored_joined")
 
 
 def check_analyze_outputs(project_root: Path) -> list[str]:
@@ -122,11 +134,7 @@ def check_report_outputs(project_root: Path) -> list[str]:
     Returns:
         List of missing filesystem paths.
     """
-    missing: list[str] = []
-    figs = project_root / "report" / "figures"
-    if not figs.exists():
-        missing.append(str(figs))
-    return missing
+    return _missing_paths([project_root / "report" / "figures"])
 
 
 def check_score_prerequisites(tasks: list[StageTask], project_root: Path) -> list[str]:
@@ -139,10 +147,7 @@ def check_score_prerequisites(tasks: list[StageTask], project_root: Path) -> lis
     Returns:
         List of missing generation output paths.
     """
-    missing: list[str] = []
-    for task in tasks:
-        missing.extend(check_generation_outputs(task, project_root))
-    return missing
+    return _collect_missing_for_tasks(tasks, project_root, check_generation_outputs)
 
 
 def check_analyze_prerequisites(tasks: list[StageTask], project_root: Path) -> list[str]:
@@ -155,10 +160,7 @@ def check_analyze_prerequisites(tasks: list[StageTask], project_root: Path) -> l
     Returns:
         List of missing scored output paths.
     """
-    missing: list[str] = []
-    for task in tasks:
-        missing.extend(check_score_outputs(task, project_root))
-    return missing
+    return _collect_missing_for_tasks(tasks, project_root, check_score_outputs)
 
 
 def preflight_check(

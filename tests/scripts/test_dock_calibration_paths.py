@@ -17,7 +17,7 @@ class _FakeRunner:
 
 
 def test_write_sdf_uses_correct_rdkit_embed_path_in_container(tmp_path) -> None:
-    """Container command must point to scripts/s1_prepare/rdkit_embed.py."""
+    """Container command must point to cli/s1_prepare/rdkit_embed.py."""
     runner = _FakeRunner()
     sdf_path = tmp_path / "output" / "data" / "calibration" / "ligands" / "ligand_00000.sdf"
 
@@ -33,4 +33,4 @@ def test_write_sdf_uses_correct_rdkit_embed_path_in_container(tmp_path) -> None:
     assert ok is True
     assert err == ""
     assert runner.commands
-    assert runner.commands[0][1] == "/workspace/scripts/s1_prepare/rdkit_embed.py"
+    assert runner.commands[0][1] == "/workspace/cli/s1_prepare/rdkit_embed.py"

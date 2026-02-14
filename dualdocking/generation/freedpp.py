@@ -30,6 +30,7 @@ from tqdm import tqdm
 
 from dualdocking.command_runner import run_project_command
 from dualdocking.scoring.binding_box import extract_binding_box
+from dualdocking.utils.hardware import detect_primary_gpu_vram_gb
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -131,31 +132,7 @@ def _auto_num_sub_proc() -> int:
     if env is not None:
         return int(env)
 
-    vram_gb: float | None = None
-
-    # Attempt 1: torch.cuda (fast, in-process)
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            vram_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
-    except Exception:  # noqa: S110
-        pass
-
-    # Attempt 2: nvidia-smi (works even without CUDA-enabled torch)
-    if vram_gb is None:
-        try:
-            result = subprocess.run(
-                ["/usr/bin/nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits", "--id=0"],
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=10,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                vram_gb = float(result.stdout.strip().split("\n")[0]) / 1024
-        except Exception:  # noqa: S110
-            pass
+    vram_gb = detect_primary_gpu_vram_gb()
 
     if vram_gb is None:
         logger.debug("GPU VRAM detection failed for num_sub_proc, using default=8")
@@ -205,7 +182,7 @@ def _ensure_docker_image(image: str = DEFAULT_DOCKER_IMAGE) -> None:
     if missing_files:
         logger.info("Missing FREED data files, downloading: {}", ", ".join(str(p) for p in missing_files))
         result = run_project_command(
-            ["python", "scripts/s0_fetch/fetch_freed_fragments.py"],
+            ["python", "cli/s0_fetch/fetch_freed_fragments.py"],
             project_root=PROJECT_ROOT,
             capture_output=True,
             allow_inprocess=True,

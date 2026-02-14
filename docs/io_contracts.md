@@ -11,7 +11,7 @@ Tabular data uses **Parquet** as the primary format with CSV fallback
 
 ## Stage 0 — Fetch
 
-**Script**: `scripts/s0_fetch/fetch_all.py`
+**Script**: `cli/s0_fetch/fetch_all.py`
 
 Downloads all external data needed for offline operation.
 After completion, no internet access is required.
@@ -54,8 +54,8 @@ After completion, no internet access is required.
 
 ## Stage 1 — Calibration
 
-**Scripts**: `scripts/s2_calibrate/dock_calibration.py` →
-`scripts/s2_calibrate/compute_normalization.py`
+**Scripts**: `cli/s2_calibrate/dock_calibration.py` →
+`cli/s2_calibrate/compute_normalization.py`
 
 Docks the calibration SMILES set against every target, then computes
 z-score normalization parameters for FREED++ reward.
@@ -100,7 +100,7 @@ z-score normalization parameters for FREED++ reward.
 
 ## Stage 2 — Generation
 
-**Scripts**: `scripts/s3_generate/generate.py` →
+**Scripts**: `cli/s3_generate/generate.py` →
 `dualdocking/generation/backends.py` (resolver) →
 built-in `dualdocking/generation/freedpp.py` or external generator backend.
 
@@ -156,7 +156,7 @@ or both targets. Default backend is FREED++ (Docker).
 
 ## Stage 3 — Scoring
 
-**Script**: `scripts/s4_score/score.py`
+**Script**: `cli/s4_score/score.py`
 
 Scores generated molecules against both targets using the configured scorer
 engine (default built-in Boltz-2). Supports checkpoint recovery, parallel GPU
@@ -225,11 +225,11 @@ contract; such paths must be documented by the backend implementation.
 ## Stage 4 — Analysis
 
 **Scripts** (run in order):
-1. `scripts/s5_analyze/aggregate.py`
-2. `scripts/s5_analyze/compute_metrics.py`
-3. `scripts/s5_analyze/threshold_sensitivity.py`
-4. `scripts/s5_analyze/proxy_correlation.py`
-5. `scripts/s5_analyze/summarize.py`
+1. `cli/s5_analyze/aggregate.py`
+2. `cli/s5_analyze/compute_metrics.py`
+3. `cli/s5_analyze/threshold_sensitivity.py`
+4. `cli/s5_analyze/proxy_correlation.py`
+5. `cli/s5_analyze/summarize.py`
 
 ### 4.1 aggregate.py
 
@@ -310,9 +310,9 @@ Significance: `p_adj < 0.05 AND |Cliff's δ| ≥ 0.33 AND CI excludes zero`.
 ## Stage 5 — Report
 
 **Scripts**:
-1. `scripts/s6_report/plot_results.py`
-2. `scripts/s6_report/render_molecules.py`
-3. `scripts/s6_report/generate_latex_report.py`
+1. `cli/s6_report/plot_results.py`
+2. `cli/s6_report/render_molecules.py`
+3. `cli/s6_report/generate_latex_report.py`
 
 ### 5.1 plot_results.py
 
@@ -348,9 +348,9 @@ Score columns: `affinity_a`, `affinity_b`, `combined_min`, + configured objectiv
 
 ---
 
-## Stage 5b — GNINA Cross-Validation (planned)
+## Stage 5b — GNINA Cross-Validation
 
-**Script**: `scripts/s6_report/score_gnina.py` (not yet implemented)
+**Script**: `cli/s6_report/score_gnina.py`
 
 Scores generated molecules with GNINA CNN-based scoring as a third
 independent scorer alongside Boltz-2 and UniDock.
@@ -372,9 +372,9 @@ independent scorer alongside Boltz-2 and UniDock.
 
 ---
 
-## Stage 5c — MD Validation (planned)
+## Stage 5c — MD Validation
 
-**Script**: `scripts/s6_md/run_md.py` (not yet implemented)
+**Script**: `cli/s6_md/run_md.py`
 
 Runs molecular dynamics simulations for top candidate molecules from
 each generation mode.  Validates binding stability over 50 ns.
@@ -413,7 +413,7 @@ Stability criterion: ligand RMSD < 3.0 Å over last 25 ns of 50 ns trajectory.
 
 ## Stage 6 — Audit
 
-**Script**: `scripts/s7_audit/claim_audit.py`
+**Script**: `cli/s7_audit/claim_audit.py`
 
 Verifies claim traceability per SAP Section 6.
 

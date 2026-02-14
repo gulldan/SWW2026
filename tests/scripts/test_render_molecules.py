@@ -1,4 +1,4 @@
-"""Tests for scripts/render_molecules.py."""
+"""Tests for cli/render_molecules.py."""
 
 from pathlib import Path
 
@@ -6,7 +6,7 @@ import pandas as pd
 import yaml
 from click.testing import CliRunner
 
-from scripts.s6_report.render_molecules import _is_hit, _load_target_names, _load_thresholds, _render_grid, main
+from cli.s6_report.render_molecules import _is_hit, _load_target_names, _load_thresholds, _render_grid, main
 
 
 def _pairs_yaml(path: Path) -> Path:
@@ -116,7 +116,7 @@ def test_main_cli(tmp_path, monkeypatch):
     }
     (tmp_path / "configs" / "experiment.yaml").write_text(yaml.dump(exp))
 
-    import scripts.s6_report.render_molecules as mod
+    import cli.s6_report.render_molecules as mod
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
 

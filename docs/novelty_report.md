@@ -378,7 +378,7 @@ As confirmed by HuggingFace search: **"NO single work combines all three claims.
 | Enrichment metrics (`analysis/enrichment.py`) | Production | Yes | AUROC, BEDROC, EF |
 | Diversity metrics (`analysis/diversity.py`) | Production | Yes | Tanimoto, scaffold, uniqueness |
 | Fairness validation (`analysis/fairness.py`) | Production | Yes | Budget + quality gates |
-| Pipeline orchestration (`scripts/pipeline/`) | Production | Smoke tests | End-to-end automation |
+| Pipeline orchestration (`cli/pipeline/`) | Production | Smoke tests | End-to-end automation |
 | Configuration (`configs/`) | Complete | Schema validation | Pre-registered design |
 | Reporting (`report/templates/`) | Production | Via pipeline | LaTeX + plots |
 

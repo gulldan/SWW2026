@@ -1,6 +1,6 @@
 """Programmatic API for running DualDocking workflows without CLI shells.
 
-These helpers call the same Click commands used by ``scripts/`` but execute
+These helpers call the same Click commands used by ``cli/`` but execute
 them in-process. This enables notebook/service usage while preserving the
 existing command behavior.
 """
@@ -40,7 +40,7 @@ def run_generate(
         args.extend(["--epochs", str(epochs)])
     if steps_per_epoch is not None:
         args.extend(["--steps-per-epoch", str(steps_per_epoch)])
-    _run("scripts/s3_generate/generate.py", args)
+    _run("cli/s3_generate/generate.py", args)
 
 
 def run_score(
@@ -70,7 +70,7 @@ def run_score(
         args.append("--prune-cache")
     if molecules is not None:
         args.extend(["--molecules", molecules])
-    _run("scripts/s4_score/score.py", args)
+    _run("cli/s4_score/score.py", args)
 
 
 def run_full_experiment(
@@ -109,7 +109,7 @@ def run_full_experiment(
             args.extend(["--pair", pair])
     if seeds:
         args.extend(["--seeds", ",".join(str(s) for s in seeds)])
-    _run("scripts/pipeline/run_full_experiment.py", args)
+    _run("cli/pipeline/run_full_experiment.py", args)
 
 
 def run_post_pipeline(*, dry_run: bool = False, latex_mode: str = "draft") -> None:
@@ -117,7 +117,7 @@ def run_post_pipeline(*, dry_run: bool = False, latex_mode: str = "draft") -> No
     args = ["--latex-mode", latex_mode]
     if dry_run:
         args.append("--dry-run")
-    _run("scripts/pipeline/run_post_pipeline.py", args)
+    _run("cli/pipeline/run_post_pipeline.py", args)
 
 
 def run_stages(
@@ -142,4 +142,4 @@ def run_stages(
         args.append("--dry-run")
     if skip_preflight:
         args.append("--skip-preflight")
-    _run("scripts/pipeline/run_stages.py", args)
+    _run("cli/pipeline/run_stages.py", args)

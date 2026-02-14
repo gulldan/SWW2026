@@ -271,7 +271,7 @@ class TestRunFreedppBranching:
 
 
 def test_ensure_docker_image_uses_stage0_fetch_script(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Missing FREED data should trigger fetch via scripts/s0_fetch/fetch_freed_fragments.py."""
+    """Missing FREED data should trigger fetch via cli/s0_fetch/fetch_freed_fragments.py."""
     import dualdocking.generation.freedpp as mod
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
@@ -303,7 +303,7 @@ def test_ensure_docker_image_uses_stage0_fetch_script(tmp_path: Path, monkeypatc
     _ensure_docker_image("dualdocking/freedpp:test")
 
     assert fetch_calls, "Expected fetch script call for missing FREED data files"
-    assert fetch_calls[0] == ["python", "scripts/s0_fetch/fetch_freed_fragments.py"]
+    assert fetch_calls[0] == ["python", "cli/s0_fetch/fetch_freed_fragments.py"]
 
 
 # --- parse_training_log ---

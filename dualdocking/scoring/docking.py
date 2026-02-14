@@ -2,7 +2,7 @@
 
 Provides :class:`DockerRunner` (persistent Docker container manager),
 :class:`DockingParams`, receptor/ligand PDBQT preparation, and batch
-docking helpers.  Extracted from ``scripts/s2_calibrate/dock_calibration.py``
+docking helpers.  Extracted from ``cli/s2_calibrate/dock_calibration.py``
 so that ``validate_redocking.py`` and ``enrichment_benchmark.py`` can import
 these without fragile ``sys.path`` hacks.
 """
@@ -399,7 +399,7 @@ def write_sdf_from_smiles(
         _pr = project_root
         cmd = [
             "python",
-            "/workspace/scripts/s1_prepare/rdkit_embed.py",
+            "/workspace/cli/s1_prepare/rdkit_embed.py",
             "--smiles",
             smiles,
             "--sdf",

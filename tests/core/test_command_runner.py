@@ -8,7 +8,7 @@ from dualdocking.command_runner import PROJECT_ROOT, run_project_command
 def test_run_project_command_inprocess_internal_script() -> None:
     """Internal Click script should run successfully via in-process dispatch."""
     result = run_project_command(
-        ["python", "scripts/pipeline/run_stages.py", "--list-stages"],
+        ["python", "cli/pipeline/run_stages.py", "--list-stages"],
         project_root=PROJECT_ROOT,
         capture_output=True,
         allow_inprocess=True,

@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from dualdocking.utils.naming import canonicalize_name
+
 ModeType = Literal["single_a", "single_b", "double"]
 LatexModeType = Literal["off", "draft", "full"]
 BoltzBackendType = Literal["cli", "nim"]
@@ -97,10 +99,7 @@ class ScorerConfig:
         Returns:
             Canonical engine name (e.g., ``"boltz2"``).
         """
-        normalized = "".join(ch for ch in name.lower() if ch.isalnum())
-        if normalized in {"boltz", "boltz2"}:
-            return "boltz2"
-        return name.strip()
+        return canonicalize_name(name, {"boltz": "boltz2", "boltz2": "boltz2"})
 
 
 @dataclass

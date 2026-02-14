@@ -27,6 +27,7 @@ import numpy as np
 from loguru import logger
 
 from dualdocking.scoring.cache_io import load_cache, save_cache
+from dualdocking.utils.hardware import detect_primary_gpu_vram_gb
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -56,31 +57,7 @@ def _auto_batch_size() -> int:
     if env is not None:
         return int(env)
 
-    vram_gb: float | None = None
-
-    # Attempt 1: torch.cuda (fast, in-process)
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            vram_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
-    except Exception:  # noqa: S110
-        pass
-
-    # Attempt 2: nvidia-smi (works even without CUDA-enabled torch)
-    if vram_gb is None:
-        try:
-            result = subprocess.run(
-                ["/usr/bin/nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits", "--id=0"],
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=10,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                vram_gb = float(result.stdout.strip().split("\n")[0]) / 1024
-        except Exception:  # noqa: S110
-            pass
+    vram_gb = detect_primary_gpu_vram_gb()
 
     if vram_gb is None:
         logger.debug("GPU detection failed for batch size, using default={}", _DEFAULT_BATCH_SIZE)
@@ -568,7 +545,7 @@ def _load_sequence(target_id: str) -> str:
 
     fasta_path = DATA_DIR / f"{target_id}.fasta"
     if not fasta_path.exists():
-        msg = f"FASTA not found: {fasta_path}. Run: uv run python scripts/s1_prepare/prepare_targets.py --prepare-all"
+        msg = f"FASTA not found: {fasta_path}. Run: uv run python cli/s1_prepare/prepare_targets.py --prepare-all"
         raise FileNotFoundError(msg)
 
     lines = fasta_path.read_text().strip().splitlines()
@@ -1337,7 +1314,7 @@ def score_single(target_id: str, smiles: str) -> float:
     if msa_path is None:
         msg = (
             f"Pre-computed MSA not found for {target_id}. "
-            f"Run: uv run python scripts/s1_prepare/prepare_targets.py --pair <pair> --prepare-all"
+            f"Run: uv run python cli/s1_prepare/prepare_targets.py --pair <pair> --prepare-all"
         )
         raise FileNotFoundError(msg)
 
@@ -1416,7 +1393,7 @@ def score_batch(
     if msa_path is None and _BOLTZ_BACKEND != "nim":
         msg = (
             f"Pre-computed MSA not found for {target_id}. "
-            f"Run: uv run python scripts/s1_prepare/prepare_targets.py --pair <pair> --prepare-all"
+            f"Run: uv run python cli/s1_prepare/prepare_targets.py --pair <pair> --prepare-all"
         )
         raise FileNotFoundError(msg)
 

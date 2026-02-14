@@ -1,4 +1,4 @@
-"""Tests for scripts/compute_metrics.py (new pipeline)."""
+"""Tests for cli/compute_metrics.py (new pipeline)."""
 
 import json
 from pathlib import Path
@@ -10,16 +10,16 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-import scripts.s5_analyze.compute_metrics as mod
-from scripts.s5_analyze.compute_metrics import main
+import dualdocking.analysis.metrics.computation as comp_mod
+from cli.s5_analyze.compute_metrics import main
 
 
 @pytest.fixture(autouse=True)
 def _mock_expensive_analyses():
     """Stub out sensitivity analyses that are too slow for unit tests."""
     with (
-        patch.object(mod, "_compute_sensitivity_analyses", return_value={}),
-        patch.object(mod, "_compute_gnina_cross_validation", return_value={}),
+        patch.object(comp_mod, "compute_sensitivity_analyses", return_value={}),
+        patch.object(comp_mod, "compute_gnina_cross_validation", return_value={}),
     ):
         yield
 
@@ -126,13 +126,14 @@ class TestDefaultFullSetup:
         _setup_full(tmp_path)
 
         import dualdocking.analysis.fairness as fairness_mod
+        import cli.s5_analyze.compute_metrics as script_mod
 
         with (
-            patch.object(mod, "PROJECT_ROOT", tmp_path),
+            patch.object(script_mod, "PROJECT_ROOT", tmp_path),
             patch.object(fairness_mod, "validate_fairness", return_value={"budget_consistent": True, "issues": []}),
             patch.object(fairness_mod, "validate_reward_quality", return_value={"run_valid": True, "issues": []}),
-            patch.object(mod, "_compute_sensitivity_analyses", return_value={}),
-            patch.object(mod, "_compute_gnina_cross_validation", return_value={}),
+            patch.object(comp_mod, "compute_sensitivity_analyses", return_value={}),
+            patch.object(comp_mod, "compute_gnina_cross_validation", return_value={}),
         ):
             result = _invoke()
 
@@ -190,12 +191,12 @@ class TestDefaultFullSetup:
             assert isinstance(check["degraded"], bool)
 
     def test_is_hit_a_b_columns_created(self):
-        """_load_scored adds is_hit_a and is_hit_b columns."""
+        """load_scored adds is_hit_a and is_hit_b columns."""
         assert self.result.exit_code == 0, self.result.output
 
         # Verify by reading scored data and checking the load function
         run_dir = self.tmp_path / "output" / "results" / "pair1" / "double" / "seed_1"
-        df = mod._load_scored(run_dir / "scored_joined.csv", 0.0, 0.0)
+        df = comp_mod.load_scored(run_dir / "scored_joined.csv", 0.0, 0.0)
         assert "is_hit_a" in df.columns
         assert "is_hit_b" in df.columns
         assert "is_hit_both" in df.columns
@@ -208,7 +209,9 @@ class TestDefaultFullSetup:
 
 def test_quality_gate_skips_invalid_run(tmp_path, monkeypatch):
     """One seed fails quality gate -> skipped, metrics computed from remaining."""
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
     _setup_full(tmp_path)
 
     import dualdocking.analysis.fairness as fairness_mod
@@ -241,7 +244,9 @@ def test_quality_gate_skips_invalid_run(tmp_path, monkeypatch):
 
 
 def test_main_missing_input(tmp_path, monkeypatch):
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
 
     (tmp_path / "configs").mkdir()
     (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(_pairs_cfg()))
@@ -268,7 +273,9 @@ def test_main_missing_input(tmp_path, monkeypatch):
 
 def test_objective_means_in_metrics(tmp_path, monkeypatch):
     """Verify combined_*_mean and combined_*_sem keys in metrics output."""
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
 
     (tmp_path / "configs").mkdir()
     (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(_pairs_cfg()))
@@ -303,7 +310,9 @@ def test_objective_means_in_metrics(tmp_path, monkeypatch):
 
 def test_completeness_gate_fails_on_missing(tmp_path, monkeypatch):
     """Missing 1 seed + --no-allow-incomplete -> exit code 1."""
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
     _setup_full(tmp_path, missing_seeds=[5])
 
     import dualdocking.analysis.fairness as fairness_mod
@@ -321,7 +330,9 @@ def test_completeness_gate_fails_on_missing(tmp_path, monkeypatch):
 
 def test_completeness_gate_allows_with_flag(tmp_path, monkeypatch):
     """Missing 1 seed + --allow-incomplete (default) -> exit code 0."""
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
     _setup_full(tmp_path, missing_seeds=[5])
 
     import dualdocking.analysis.fairness as fairness_mod
@@ -339,7 +350,9 @@ def test_completeness_gate_allows_with_flag(tmp_path, monkeypatch):
 
 def test_n_valid_runs_in_output(tmp_path, monkeypatch):
     """n_valid_runs, n_expected_runs, missing_rate in metrics; _completeness in stats."""
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
     _setup_full(tmp_path, missing_seeds=[5])
 
     import dualdocking.analysis.fairness as fairness_mod
@@ -373,7 +386,9 @@ def test_n_valid_runs_in_output(tmp_path, monkeypatch):
 
 def test_fdr_scope_primary_only(tmp_path, monkeypatch):
     """FDR correction only applies to primary family (H1a/H1b core pairs, SAP 4.2)."""
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
 
     # Two pairs: one core, one auxiliary
     pairs_cfg = {
@@ -446,7 +461,9 @@ def test_fdr_scope_primary_only(tmp_path, monkeypatch):
 
 def test_blocked_pairs_excluded(tmp_path, monkeypatch):
     """Blocked pairs (set=blocked) must not appear in metrics or completeness count."""
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
 
     pairs_cfg = {
         "pairs": {
@@ -518,7 +535,9 @@ def test_blocked_pairs_excluded(tmp_path, monkeypatch):
 
 def test_all_seeds_fail_quality_gate(tmp_path, monkeypatch):
     """If every seed fails quality gate, pair should have no metrics but not crash."""
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
     _setup_full(tmp_path)
 
     import dualdocking.analysis.fairness as fairness_mod
@@ -544,7 +563,9 @@ def test_all_seeds_fail_quality_gate(tmp_path, monkeypatch):
 
 def test_all_nan_affinities(tmp_path, monkeypatch):
     """DataFrames with all-NaN affinities should produce empty metrics (skipped)."""
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    import cli.s5_analyze.compute_metrics as script_mod
+
+    monkeypatch.setattr(script_mod, "PROJECT_ROOT", tmp_path)
 
     (tmp_path / "configs").mkdir(exist_ok=True)
     (tmp_path / "configs" / "pairs.yaml").write_text(yaml.dump(_pairs_cfg()))
@@ -597,12 +618,12 @@ def test_degradation_boundary_exactly_minus_047():
 
 
 def test_sem_with_empty_values():
-    """_sem with 0 or 1 values should return 0.0."""
-    assert mod._sem([]) == 0.0
-    assert mod._sem([42.0]) == 0.0
-    assert mod._sem([float("nan")]) == 0.0
+    """sem with 0 or 1 values should return 0.0."""
+    assert comp_mod.sem([]) == 0.0
+    assert comp_mod.sem([42.0]) == 0.0
+    assert comp_mod.sem([float("nan")]) == 0.0
 
 
 def test_sem_with_all_nan():
-    """_sem with all NaN values should return 0.0 (after filtering, len<=1)."""
-    assert mod._sem([float("nan"), float("nan"), float("nan")]) == 0.0
+    """sem with all NaN values should return 0.0 (after filtering, len<=1)."""
+    assert comp_mod.sem([float("nan"), float("nan"), float("nan")]) == 0.0

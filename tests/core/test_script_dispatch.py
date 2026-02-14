@@ -8,36 +8,36 @@ from dualdocking.script_dispatch import PROJECT_ROOT, parse_script_invocation, r
 
 
 def test_parse_uv_run_python() -> None:
-    """Dispatcher should parse `uv run python scripts/...` commands."""
+    """Dispatcher should parse `uv run python cli/...` commands."""
     parsed = parse_script_invocation(
-        ["uv", "run", "python", "scripts/pipeline/run_stages.py", "--list-stages"],
+        ["uv", "run", "python", "cli/pipeline/run_stages.py", "--list-stages"],
         project_root=PROJECT_ROOT,
     )
     assert parsed is not None
     module, args, script_rel = parsed
-    assert module == "scripts.pipeline.run_stages"
+    assert module == "cli.pipeline.run_stages"
     assert args == ["--list-stages"]
-    assert script_rel == "scripts/pipeline/run_stages.py"
+    assert script_rel == "cli/pipeline/run_stages.py"
 
 
 def test_parse_python_absolute_path() -> None:
     """Dispatcher should parse absolute script path with python executable."""
-    script = PROJECT_ROOT / "scripts" / "pipeline" / "run_stages.py"
+    script = PROJECT_ROOT / "cli" / "pipeline" / "run_stages.py"
     parsed = parse_script_invocation(
         ["python", str(script), "--list-stages"],
         project_root=PROJECT_ROOT,
     )
     assert parsed is not None
     module, args, script_rel = parsed
-    assert module == "scripts.pipeline.run_stages"
+    assert module == "cli.pipeline.run_stages"
     assert args == ["--list-stages"]
-    assert script_rel == "scripts/pipeline/run_stages.py"
+    assert script_rel == "cli/pipeline/run_stages.py"
 
 
 def test_run_script_inprocess_list_stages() -> None:
     """run_script_inprocess should execute lightweight stage-list command."""
     ok = run_script_inprocess(
-        ["python", "scripts/pipeline/run_stages.py", "--list-stages"],
+        ["python", "cli/pipeline/run_stages.py", "--list-stages"],
         project_root=PROJECT_ROOT,
         cwd=PROJECT_ROOT,
     )

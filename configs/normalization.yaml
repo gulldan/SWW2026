@@ -4,7 +4,7 @@ subset_name: zinc_druglike_calibration_1000_v2024
 n: 1000
 seed: 137
 checksum: ee4f11d1f9d56aeeadaf8a23a47dc40787225c745c880b42396a87096662a19b
-date: '2026-02-08'
+date: '2026-02-14'
 boltz_version: 2.2.1
 docking_program: unidock_gpu
 docking_version: Uni-Dock v1.1.3

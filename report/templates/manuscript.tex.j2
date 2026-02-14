@@ -76,7 +76,7 @@ Pair & Mode & HR\_A (mean $\pm$ SEM) & HR\_B (mean $\pm$ SEM) & HR\_both (mean $
 \bottomrule
 \end{longtable}
 {% else %}
-No metric table available. Run \texttt{scripts/s5\_analyze/compute\_metrics.py} first.
+No metric table available. Run \texttt{cli/s5\_analyze/compute\_metrics.py} first.
 {% endif %}
 
 {% if objective_columns is defined and objective_columns %}
@@ -114,7 +114,7 @@ Pair & Test & Comparison & Metric & $\Delta$ & p\_adj & Significant \\
 \bottomrule
 \end{longtable}
 {% else %}
-No statistical table available. Run \texttt{scripts/s5\_analyze/compute\_metrics.py} first.
+No statistical table available. Run \texttt{cli/s5\_analyze/compute\_metrics.py} first.
 {% endif %}
 
 \section{Figures}
@@ -127,7 +127,7 @@ No statistical table available. Run \texttt{scripts/s5\_analyze/compute\_metrics
 \end{figure}
 {% endfor %}
 {% else %}
-No figures available. Run \texttt{scripts/s6\_report/plot\_results.py} and \texttt{scripts/s6\_report/render\_molecules.py}.
+No figures available. Run \texttt{cli/s6\_report/plot\_results.py} and \texttt{cli/s6\_report/render\_molecules.py}.
 {% endif %}
 
 \section{Reproducibility and Artifact Traceability}
@@ -154,7 +154,7 @@ No figures available. Run \texttt{scripts/s6\_report/plot\_results.py} and \text
 {{ summary_excerpt }}
 \end{verbatim}
 {% else %}
-No summary excerpt available. Run \texttt{scripts/s5\_analyze/summarize.py}.
+No summary excerpt available. Run \texttt{cli/s5\_analyze/summarize.py}.
 {% endif %}
 
 \bibliography{references}

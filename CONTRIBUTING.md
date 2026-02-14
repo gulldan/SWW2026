@@ -23,7 +23,7 @@ uv sync --group dev
 pre-commit install
 
 # FREED++ Docker image
-uv run python scripts/s0_fetch/fetch_freed_fragments.py
+uv run python cli/s0_fetch/fetch_freed_fragments.py
 docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 ```
 
@@ -31,7 +31,7 @@ docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 
 ```bash
 uv run pytest tests/ -v
-uv run ruff check dualdocking/ scripts/ docker/
+uv run ruff check dualdocking/ cli/ docker/
 uv run ty check dualdocking/
 ```
 
@@ -46,9 +46,9 @@ uv run ty check dualdocking/
 | Integration only | `uv run pytest -m integration` |
 | Benchmarks (GPU) | `uv run pytest -m benchmark` |
 | Coverage | `uv run pytest --cov=dualdocking tests/` |
-| Lint | `uv run ruff check dualdocking/ scripts/ docker/` |
+| Lint | `uv run ruff check dualdocking/ cli/ docker/` |
 | Type check | `uv run ty check dualdocking/` |
-| Auto-format | `uv run ruff format dualdocking/ scripts/` |
+| Auto-format | `uv run ruff format dualdocking/ cli/` |
 
 Tests run in parallel by default (`-n auto` in `pyproject.toml`). Override with `-n0` for serial execution during debugging.
 
@@ -72,7 +72,7 @@ Tests run in parallel by default (`-n auto` in `pyproject.toml`). Override with 
 ### Type Checking
 
 - `ty` in strict mode on `dualdocking/` only
-- `tests/` and `scripts/` are excluded from type checking
+- `tests/` and `cli/` are excluded from type checking
 - External library stubs are `warn` level (see `[tool.ty.rules]` in `pyproject.toml`)
 
 ### Conventions
@@ -102,26 +102,26 @@ Target pairs are named `{TARGET_A}_{TARGET_B}`, e.g., `CDK2_ERK2`. Pairs belong 
 2. **Prepare receptor structures.**
    Download PDB files into `output/data/targets/{pair}/{A,B}/`. Convert to PDBQT:
    ```bash
-   uv run python scripts/s1_prepare/prepare_targets.py --pair YOUR_PAIR
+   uv run python cli/s1_prepare/prepare_targets.py --pair YOUR_PAIR
    ```
    This downloads the PDB, removes heterogens, adds hydrogens, and produces the PDBQT. It also downloads the full UniProt FASTA -- if your target uses a domain construct (not full-length), you must manually truncate the FASTA to the relevant residues.
 
 3. **Generate MSA for Boltz-2.**
    ```bash
-   uv run python scripts/s1_prepare/prepare_targets.py --pair YOUR_PAIR --prepare-all
+   uv run python cli/s1_prepare/prepare_targets.py --pair YOUR_PAIR --prepare-all
    ```
    MSA output goes to `output/cache/boltz_msa/{target_id}.csv`. If you change the FASTA sequence, regenerate the MSA.
 
 4. **Run calibration docking.**
    ```bash
-   uv run python scripts/s2_calibrate/dock_calibration.py --pair YOUR_PAIR
-   uv run python scripts/s2_calibrate/compute_normalization.py
+   uv run python cli/s2_calibrate/dock_calibration.py --pair YOUR_PAIR
+   uv run python cli/s2_calibrate/compute_normalization.py
    ```
    This docks a reference SMILES set (MOSES) against both targets and computes z-score normalization parameters (mean/std) for the reward function.
 
 5. **Validate redocking.**
    ```bash
-   uv run python scripts/s2_calibrate/validate_redocking.py --pair YOUR_PAIR
+   uv run python cli/s2_calibrate/validate_redocking.py --pair YOUR_PAIR
    ```
    Confirms that the binding box and receptor preparation are reasonable.
 
@@ -193,7 +193,7 @@ Objective functions live in `dualdocking/scoring/objectives.py`. They combine tw
 
 **Cause**: Missing data files that get copied into the image.
 
-**Fix**: Run `uv run python scripts/s0_fetch/fetch_freed_fragments.py` before building. Then:
+**Fix**: Run `uv run python cli/s0_fetch/fetch_freed_fragments.py` before building. Then:
 ```bash
 docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 ```
@@ -245,16 +245,16 @@ Set environment variables: `BOLTZ_BACKEND=nim` and `BOLTZ_NIM_URL=http://localho
 | Set up from scratch | `uv sync --group dev && pre-commit install` |
 | Run all tests | `uv run pytest tests/ -v` |
 | Run tests for one module | `uv run pytest tests/scoring/test_boltz2.py -v` |
-| Check code style | `uv run ruff check dualdocking/ scripts/ docker/` |
-| Auto-fix lint issues | `uv run ruff check --fix dualdocking/ scripts/ docker/` |
-| Format code | `uv run ruff format dualdocking/ scripts/` |
+| Check code style | `uv run ruff check dualdocking/ cli/ docker/` |
+| Auto-fix lint issues | `uv run ruff check --fix dualdocking/ cli/ docker/` |
+| Format code | `uv run ruff format dualdocking/ cli/` |
 | Type check | `uv run ty check dualdocking/` |
 | Build FREED++ Docker image | `docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .` |
-| Prepare a new target pair | `uv run python scripts/s1_prepare/prepare_targets.py --pair PAIR_NAME --prepare-all` |
-| Run calibration | `uv run python scripts/s2_calibrate/dock_calibration.py && uv run python scripts/s2_calibrate/compute_normalization.py` |
-| Validate redocking | `uv run python scripts/s2_calibrate/validate_redocking.py --pair PAIR_NAME` |
-| Run a smoke test | `uv run python scripts/smoke/boltz_smoke.py` |
-| Run the full experiment | `uv run python scripts/pipeline/run_full_experiment.py` |
+| Prepare a new target pair | `uv run python cli/s1_prepare/prepare_targets.py --pair PAIR_NAME --prepare-all` |
+| Run calibration | `uv run python cli/s2_calibrate/dock_calibration.py && uv run python cli/s2_calibrate/compute_normalization.py` |
+| Validate redocking | `uv run python cli/s2_calibrate/validate_redocking.py --pair PAIR_NAME` |
+| Run a smoke test | `uv run python cli/smoke/boltz_smoke.py` |
+| Run the full experiment | `uv run python cli/pipeline/run_full_experiment.py` |
 | Score molecules with Boltz-2 | `uv run dd-score --pair CDK2_ERK2 --input generated.csv` |
 | Compute metrics | `uv run dd-metrics` |
 | Generate plots | `uv run dd-plot` |

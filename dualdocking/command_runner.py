@@ -27,7 +27,7 @@ def run_project_command(
     stderr_to_parent: bool = False,
     allow_inprocess: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a command with in-process optimization for internal scripts.
+    """Run a command with in-process optimization for internal cli.
 
     Args:
         cmd: Command tokens to execute.

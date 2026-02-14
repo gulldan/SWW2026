@@ -1,4 +1,4 @@
-"""Tests for scripts/threshold_sensitivity.py (KVA-270 / SCI-06)."""
+"""Tests for cli/threshold_sensitivity.py (KVA-270 / SCI-06)."""
 
 import json
 from pathlib import Path
@@ -10,8 +10,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-import scripts.s5_analyze.threshold_sensitivity as mod
-from scripts.s5_analyze.threshold_sensitivity import main
+import cli.s5_analyze.threshold_sensitivity as mod
+from cli.s5_analyze.threshold_sensitivity import main
 
 
 def _pairs_cfg():

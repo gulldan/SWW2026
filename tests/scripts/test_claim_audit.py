@@ -1,12 +1,17 @@
-"""Tests for scripts/claim_audit.py (KVA-274 / SCI-10)."""
+"""Tests for claim_audit (KVA-274 / SCI-10).
+
+CLI tests exercise the thin wrapper in ``cli/s7_audit/claim_audit.py``.
+Unit tests exercise ``dualdocking.validation.audit`` directly.
+"""
 
 import json
 
 import yaml
 from click.testing import CliRunner
 
-import scripts.s7_audit.claim_audit as mod
-from scripts.s7_audit.claim_audit import main
+import cli.s7_audit.claim_audit as mod
+from dualdocking.validation.audit import check_significance, load_core_pairs
+from cli.s7_audit.claim_audit import main
 
 _CORE_PAIRS = ["CDK2_ERK2", "AChE_BChE", "BACE1_GSK3B", "AChE_BACE1", "GSK3B_CDK5"]
 
@@ -362,9 +367,7 @@ def test_evidence_map_populated(tmp_path, monkeypatch):
 
 
 def test_check_significance_with_none_p_value_adjusted():
-    """_check_significance must handle p_value_adjusted=None (auxiliary pairs)."""
-    from scripts.s7_audit.claim_audit import _check_significance
-
+    """check_significance must handle p_value_adjusted=None (auxiliary pairs)."""
     # Auxiliary pair entry: p_value_adjusted is None, should fall back to p_value_raw
     entry = {
         "p_value_adjusted": None,
@@ -375,7 +378,7 @@ def test_check_significance_with_none_p_value_adjusted():
         "significant": False,
     }
     # Should not raise TypeError
-    derived, issues = _check_significance(entry)
+    derived, issues = check_significance(entry)
     # With p_adj=None, code should fall back to p_value_raw=0.01
     # derived should be True (p<0.05, |delta|>=0.33, CI excludes 0)
     assert derived is True
@@ -444,9 +447,7 @@ def test_core_pair_with_set_blocked_excluded(tmp_path, monkeypatch):
     configs.mkdir(parents=True, exist_ok=True)
     (configs / "pairs.yaml").write_text(yaml.dump({"pairs": pairs}))
 
-    from scripts.s7_audit.claim_audit import _load_core_pairs
-
-    core = _load_core_pairs(configs / "pairs.yaml")
+    core = load_core_pairs(configs / "pairs.yaml")
     assert "CDK2_ERK2" not in core
     assert len(core) == 4
 

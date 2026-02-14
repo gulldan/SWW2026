@@ -3,6 +3,16 @@
 Handles molecular data ingestion and cleaning for the pipeline. Used by fetch
 and preparation stages (s0, s1) and by scoring/analysis stages for validation.
 
+Subpackages
+-----------
+fetch
+    Data fetching: PDB/FASTA downloads, MSA computation, SMILES sources,
+    Docker image builds.
+
+prep
+    Target preparation: PDB-to-PDBQT conversion, baseline sampling,
+    archive-to-Parquet conversion.
+
 Modules
 -------
 chem_sanitize

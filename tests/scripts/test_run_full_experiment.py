@@ -1,4 +1,4 @@
-"""Tests for scripts/pipeline/run_full_experiment.py."""
+"""Tests for cli/pipeline/run_full_experiment.py."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from click.testing import CliRunner
 
-from scripts.pipeline.run_full_experiment import main
+from cli.pipeline.run_full_experiment import main
 
 
 def _exp_cfg() -> dict:

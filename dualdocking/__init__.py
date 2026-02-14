@@ -1,6 +1,6 @@
 """DualDocking: single-target vs dual-target RL molecule generation.
 
-Core library for the dual-target docking experiment. Scripts in ``scripts/``
+Core library for the dual-target docking experiment. Scripts in ``cli/``
 use this library to run the pipeline.
 
 Subpackages

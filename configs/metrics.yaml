@@ -47,7 +47,7 @@ enrichment:
   k_values: [10, 50, 100, 500]
 
 # Docking enrichment quality thresholds (SCI-05: enrichment benchmark).
-# Used by scripts/validation/enrichment_benchmark.py to flag targets where UniDock
+# Used by cli/validation/enrichment_benchmark.py to flag targets where UniDock
 # cannot separate ChEMBL actives from MOSES druglike decoys.
 #
 # Threshold rationale (project-specific — no literature consensus):
@@ -63,7 +63,7 @@ enrichment_quality:
   active_sampling_seed: 137
 
 # Pre-registered sensitivity thresholds (SCI-06 / KVA-270).
-# Used by scripts/analysis/threshold_sensitivity.py to sweep T_A = T_B = T.
+# Used by cli/analysis/threshold_sensitivity.py to sweep T_A = T_B = T.
 # Values: log10(IC50-like, μM).  -1.0 = 100 nM, 0.0 = 1 μM, 1.0 = 10 μM.
 sensitivity_thresholds: [-1.0, 0.0, 1.0]
 

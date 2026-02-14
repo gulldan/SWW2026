@@ -58,7 +58,7 @@ SWW2026/
 |       |-- run_manifest.py     Run lifecycle tracking (JSON manifest with atomic I/O)
 |       +-- latex_report.py     Jinja2-to-LaTeX rendering and PDF compilation
 |
-|-- scripts/                    CLI entry points (organized by pipeline stage)
+|-- cli/                    CLI entry points (organized by pipeline stage)
 |   |-- s0_fetch/               Data download (PDB, FASTA, FREED fragments, ZINC, ChEMBL)
 |   |-- s1_prepare/             Target preparation (PDB -> PDBQT, binding box, MSA)
 |   |-- s2_calibrate/           Calibration and validation (dock calibration, normalization, redocking)
@@ -103,18 +103,18 @@ git clone <repo-url> && cd SWW2026
 uv sync --group dev
 
 # 2. Build FREED++ Docker image
-uv run python scripts/s0_fetch/fetch_freed_fragments.py
+uv run python cli/s0_fetch/fetch_freed_fragments.py
 docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 
 # 3. Fetch all external data (internet required only for this step)
-uv run python scripts/s0_fetch/fetch_all.py
+uv run python cli/s0_fetch/fetch_all.py
 
 # 4. Calibrate normalization (per-target z-score parameters)
-uv run python scripts/s2_calibrate/dock_calibration.py
-uv run python scripts/s2_calibrate/compute_normalization.py
+uv run python cli/s2_calibrate/dock_calibration.py
+uv run python cli/s2_calibrate/compute_normalization.py
 
 # 5. Run full experiment (offline from here)
-EXPERIMENT_RUN_ID=run01 uv run python scripts/pipeline/run_full_experiment.py \
+EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py \
   --resume --parallel 1 --with-post --latex-mode draft
 ```
 
@@ -126,7 +126,7 @@ Verify the setup works end-to-end with a minimal run:
 
 ```bash
 # Generate 10 molecules for one pair, 2 epochs (takes ~2 minutes with GPU)
-uv run python scripts/s3_generate/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
+uv run python cli/s3_generate/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
 
 # Boltz-2 health check
 uv run dd-smoke
@@ -272,13 +272,13 @@ uv run pytest tests/ -v
 uv run pytest tests/scoring/test_objectives.py -v
 
 # Linting (must pass with zero warnings)
-uv run ruff check dualdocking/ scripts/ docker/
+uv run ruff check dualdocking/ cli/ docker/
 
 # Type checking (must pass with zero errors)
 uv run ty check dualdocking/
 
 # Auto-format
-uv run ruff format dualdocking/ scripts/
+uv run ruff format dualdocking/ cli/
 ```
 
 ---

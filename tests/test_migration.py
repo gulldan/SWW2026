@@ -1,4 +1,4 @@
-"""Tests for scripts/migrate_csv_to_parquet.py."""
+"""Tests for cli/migrate_csv_to_parquet.py."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 from click.testing import CliRunner
 
-from scripts.migrate_csv_to_parquet import _find_csvs, _migrate_one, _should_exclude, main
+from cli.migrate_csv_to_parquet import _find_csvs, _migrate_one, _should_exclude, main
 
 
 def _make_csv(path: Path, n: int = 3) -> None:

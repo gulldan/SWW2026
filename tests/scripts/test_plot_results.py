@@ -1,11 +1,11 @@
-"""Tests for scripts/plot_results.py."""
+"""Tests for cli/plot_results.py."""
 
 import numpy as np
 import pandas as pd
 from click.testing import CliRunner
 
-import scripts.s6_report.plot_results as mod
-from scripts.s6_report.plot_results import main, plot_score_comparison
+import cli.s6_report.plot_results as mod
+from cli.s6_report.plot_results import main, plot_score_comparison
 
 
 def _make_df(n=5):

@@ -1,11 +1,11 @@
-"""Tests for scripts/aggregate.py."""
+"""Tests for cli/aggregate.py."""
 
 import pandas as pd
 import yaml
 from click.testing import CliRunner
 
-import scripts.s5_analyze.aggregate as mod
-from scripts.s5_analyze.aggregate import main
+import cli.s5_analyze.aggregate as mod
+from cli.s5_analyze.aggregate import main
 
 
 def _pairs_cfg():

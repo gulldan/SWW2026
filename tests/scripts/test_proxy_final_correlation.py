@@ -1,4 +1,4 @@
-"""Tests for scripts/proxy_final_correlation.py (KVA-271 / SCI-07)."""
+"""Tests for cli/proxy_final_correlation.py (KVA-271 / SCI-07)."""
 
 import json
 from pathlib import Path
@@ -10,8 +10,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-import scripts.s5_analyze.proxy_correlation as mod
-from scripts.s5_analyze.proxy_correlation import main
+import cli.s5_analyze.proxy_correlation as mod
+from cli.s5_analyze.proxy_correlation import main
 
 
 def _pairs_cfg():

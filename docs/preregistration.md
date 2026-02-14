@@ -128,7 +128,7 @@ Effect size: Cohen's d (secondary).
 - **95% CI:** Percentile method (2.5th, 97.5th percentiles).
 - **p-value:** Fraction of replicates where `diff <= 0` (one-sided; H1 is double > single).
 
-Implementation: `dualdocking/statistical.py: hierarchical_bootstrap_test()`
+Implementation: `dualdocking/analysis/statistical.py: hierarchical_bootstrap_test()`
 
 ### 7.2 Multiple Testing Correction
 
@@ -136,7 +136,7 @@ Implementation: `dualdocking/statistical.py: hierarchical_bootstrap_test()`
 - **Alpha:** 0.05.
 - **Scope:** Across the 5 core pairs (up to 10 contrasts: 5 pairs x 2 single baselines).
 
-Implementation: `dualdocking/statistical.py: fdr_correction()`
+Implementation: `dualdocking/analysis/statistical.py: fdr_correction()`
 
 ### 7.3 Effect Sizes
 
@@ -180,7 +180,7 @@ Source: `configs/experiment.yaml: objectives.alternatives`, `docs/goal.md` lines
 | `configs/experiment.yaml` | Budget (n=1000), seeds, epochs, objectives, quality gate |
 | `docs/goal.md` | Full hypothesis, notation, endpoint hierarchy, success criteria |
 | `docs/selection_criteria.md` | Pair rationale, factorial design, core vs auxiliary split |
-| `dualdocking/statistical.py` | Bootstrap test, FDR correction, Cliff's delta, Cohen's d |
+| `dualdocking/analysis/statistical.py` | Bootstrap test, FDR correction, Cliff's delta, Cohen's d |
 
 ## 11. Amendment Log
 

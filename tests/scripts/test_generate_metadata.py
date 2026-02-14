@@ -1,4 +1,4 @@
-"""Tests for metadata helpers in scripts/s3_generate/generate.py."""
+"""Tests for metadata helpers in cli/s3_generate/generate.py."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-import scripts.s3_generate.generate as mod
+import cli.s3_generate.generate as mod
 
 
 def test_git_commit_reads_head_ref(tmp_path: Path, monkeypatch) -> None:

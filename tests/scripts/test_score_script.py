@@ -1,4 +1,4 @@
-"""Tests for scripts/score.py hit-threshold logic and objective columns."""
+"""Tests for cli/score.py hit-threshold logic and objective columns."""
 
 import numpy as np
 import pandas as pd

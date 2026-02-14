@@ -27,6 +27,14 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def _load_named_yaml(config_dir: str | Path, filename: str) -> dict[str, Any]:
+    """Load a named YAML file from a config directory or a direct file path."""
+    path = Path(config_dir)
+    if path.is_dir():
+        path = path / filename
+    return load_yaml(path)
+
+
 def load_pairs(config_dir: str | Path = "configs") -> dict[str, Any]:
     """Load pairs.yaml with schema validation.
 
@@ -86,10 +94,7 @@ def load_metrics(config_dir: str | Path = "configs") -> dict[str, Any]:
     Returns:
         Parsed metrics configuration dict.
     """
-    path = Path(config_dir)
-    if path.is_dir():
-        path = path / "metrics.yaml"
-    return load_yaml(path)
+    return _load_named_yaml(config_dir, "metrics.yaml")
 
 
 def collect_blocked_target_ids(pairs: dict[str, Any]) -> set[str]:
@@ -151,7 +156,4 @@ def load_experiment(config_dir: str | Path = "configs") -> dict[str, Any]:
     Returns:
         Parsed experiment configuration dict.
     """
-    path = Path(config_dir)
-    if path.is_dir():
-        path = path / "experiment.yaml"
-    return load_yaml(path)
+    return _load_named_yaml(config_dir, "experiment.yaml")

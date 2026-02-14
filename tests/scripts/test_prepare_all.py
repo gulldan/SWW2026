@@ -1,4 +1,4 @@
-"""Tests for scripts/s1_prepare/prepare_all.py."""
+"""Tests for cli/s1_prepare/prepare_all.py."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import click
 import pytest
 
-import scripts.s1_prepare.prepare_all as mod
+import cli.s1_prepare.prepare_all as mod
 
 
 def test_run_uses_inprocess_project_runner(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -23,9 +23,9 @@ def test_run_uses_inprocess_project_runner(monkeypatch: pytest.MonkeyPatch) -> N
 
     monkeypatch.setattr(mod, "run_project_command", _fake_run_project_command)
 
-    mod._run(["python", "scripts/s0_fetch/fetch_freed_fragments.py"], dry_run=False)
+    mod._run(["python", "cli/s0_fetch/fetch_freed_fragments.py"], dry_run=False)
 
-    assert captured["cmd"] == ["python", "scripts/s0_fetch/fetch_freed_fragments.py"]
+    assert captured["cmd"] == ["python", "cli/s0_fetch/fetch_freed_fragments.py"]
     assert captured["kwargs"]["project_root"] == Path("/repo")
     assert captured["kwargs"]["capture_output"] is True
     assert captured["kwargs"]["allow_inprocess"] is True
@@ -41,4 +41,4 @@ def test_run_converts_inprocess_runtime_error_to_click_exception(monkeypatch: py
     monkeypatch.setattr(mod, "run_project_command", _boom)
 
     with pytest.raises(click.ClickException, match="dispatch failed"):
-        mod._run(["python", "scripts/s0_fetch/fetch_freed_fragments.py"], dry_run=False)
+        mod._run(["python", "cli/s0_fetch/fetch_freed_fragments.py"], dry_run=False)

@@ -1,11 +1,11 @@
-"""Tests for scripts/pipeline/run_stages.py."""
+"""Tests for cli/pipeline/run_stages.py."""
 
 from __future__ import annotations
 
 import yaml
 from click.testing import CliRunner
 
-from scripts.pipeline.run_stages import main
+from cli.pipeline.run_stages import main
 
 
 def _pairs_cfg():

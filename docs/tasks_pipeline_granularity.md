@@ -1,6 +1,7 @@
 # Pipeline Granularity Refactoring: 9 → 17 Stages
 
 > Approved 2026-02-13. See plan `1802d8f5` for full context.
+> Status note: this is a refactoring backlog; entries under **Tasks** may reference planned files/stages not yet present in `main`.
 
 ## Goal
 
@@ -275,26 +276,26 @@ endpoint, но критична для credibility в Q1.
 
 ## Tasks
 
-- [ ] **T1** Create `scripts/s5_filter/__init__.py` + `apply_filters.py`
+- [ ] **T1** Create new `s5_filter` package in `cli/` with `apply_filters.py` entrypoint
   - Standalone filter: reads `scored_joined.parquet`, applies `configs/filters.yaml`,
     writes filter columns back + `filter_stats.json`
   - Register in `script_dispatch.py`
 
-- [ ] **T2** Add `--skip-filters` flag to `scripts/s4_score/score.py`
+- [ ] **T2** Add `--skip-filters` flag to `cli/s4_score/score.py`
   - Extract filter block (lines 282–304) into reusable utility
   - Default: still apply filters (backward compat)
   - `--skip-filters`: defer to standalone `filter` stage
 
-- [ ] **T3** Rewrite `scripts/pipeline/run_stages.py`
+- [ ] **T3** Rewrite `cli/pipeline/run_stages.py`
   - `STAGE_ORDER`: 17 entries
   - `STAGE_DEPS`: dependency DAG per table above
   - `STAGE_DESCRIPTIONS`: one-line per stage
   - New `_run_*()` + preflight functions for each new stage
 
-- [ ] **T4** Update `scripts/pipeline/run_post_pipeline.py`
+- [ ] **T4** Update `cli/pipeline/run_post_pipeline.py`
   - Split `_commands()` into: aggregate → metrics → sensitivity → summarize → plots → render → latex
 
-- [ ] **T5** Update `scripts/pipeline/run_full_experiment.py`
+- [ ] **T5** Update `cli/pipeline/run_full_experiment.py`
   - Split `_post_commands()` to match new stages
   - Add `--with-gnina` flag
   - Add `--with-filter` / `--skip-filter` flag
@@ -306,8 +307,8 @@ endpoint, но критична для credibility в Q1.
 
 - [ ] **T7** Update `docs/pipeline.md`
   - Rewrite stage table and CLI examples for 17 stages
-  - Remove `(planned)` from gnina and md
+  - Keep gnina/md stage status synchronized with actual `run_stages` support
 
 - [ ] **T8** Run linter + tests
-  - `uv run ruff check scripts/ dualdocking/`
+  - `uv run ruff check cli/ dualdocking/`
   - `uv run pytest tests/ -x -q`

@@ -13,17 +13,17 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
-import hashlib
 import json
 import os
 import subprocess
-import tempfile
-import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
+
+from dualdocking.utils.hash_utils import sha256_file
+from dualdocking.utils.io_atomic import acquire_flock, write_bytes_atomic
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -50,7 +50,7 @@ def _sha256_file(path: Path) -> str:
     """
     if not path.exists():
         return ""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return sha256_file(path)
 
 
 def _git_info() -> dict[str, Any]:
@@ -105,17 +105,7 @@ def _acquire_flock(fd: int, timeout: float) -> bool:
     Returns:
         ``True`` if the lock was acquired, ``False`` on timeout.
     """
-    deadline = time.monotonic() + timeout
-    delay = _RETRY_INITIAL
-    while True:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return True
-        except (OSError, BlockingIOError):
-            if time.monotonic() >= deadline:
-                return False
-            time.sleep(min(delay, deadline - time.monotonic()))
-            delay = min(delay * 2, _RETRY_CAP)
+    return acquire_flock(fd, timeout, retry_initial=_RETRY_INITIAL, retry_cap=_RETRY_CAP)
 
 
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
@@ -129,29 +119,16 @@ def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     lock_path = path.with_suffix(".lock")
     lock_path.touch(exist_ok=True)
     lock_fd: int | None = None
-    tmp_path: str | None = None
     try:
         lock_fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT, 0o644)
         if not _acquire_flock(lock_fd, _LOCK_TIMEOUT):
             logger.warning("Lock timeout writing manifest: {}", path)
             return
         payload = json.dumps(data, indent=2, ensure_ascii=False).encode()
-        fd, tmp_path = tempfile.mkstemp(
-            dir=str(path.parent),
-            prefix=f".{path.stem}.",
-            suffix=".tmp",
-        )
-        os.write(fd, payload)
-        os.fsync(fd)
-        os.close(fd)
-        Path(tmp_path).replace(path)
-        tmp_path = None
+        write_bytes_atomic(path, payload, prefix=f".{path.stem}.", suffix=".tmp")
     except OSError as exc:
         logger.error("Failed to write manifest {}: {}", path, exc)
     finally:
-        if tmp_path is not None:
-            with contextlib.suppress(OSError):
-                Path(tmp_path).unlink()
         if lock_fd is not None:
             with contextlib.suppress(OSError):
                 fcntl.flock(lock_fd, fcntl.LOCK_UN)

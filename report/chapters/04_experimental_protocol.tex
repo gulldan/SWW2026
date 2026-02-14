@@ -1,11 +1,11 @@
 All experiments are executed under a two-stage orchestration model.
 
-\textbf{Stage 1} (\texttt{scripts/run\_full\_experiment.py}) performs
+\textbf{Stage 1} (\texttt{cli/run\_full\_experiment.py}) performs
 FREED++~\citep{telepov2023freedpp} molecule generation (UniDock
 GPU~\citep{yu2023unidock} reward) and Boltz-2~\citep{passaro2025boltz2}
 scoring for each pair, mode, and seed.
 
-\textbf{Stage 2} (\texttt{scripts/run\_post\_pipeline.py}) performs aggregation,
+\textbf{Stage 2} (\texttt{cli/run\_post\_pipeline.py}) performs aggregation,
 metric computation, statistical testing, figure generation, and manuscript assembly.
 
 Fairness controls:
