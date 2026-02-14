@@ -41,6 +41,12 @@ _GPU_BATCH_ENABLED = os.environ.get("GPU_BATCH_DOCK", "1") != "0"
 _gpu_dock_cache: dict[tuple[str, str], float] = {}  # (receptor_path, smiles) → score
 _gpu_batch_log_count = 0
 
+# Ligand complexity gates — molecules exceeding these limits are rejected
+# at preparation time because large / highly flexible molecules cause
+# UniDock GPU numerical overflow (scores in millions) and batch timeouts.
+_MAX_HEAVY_ATOMS = int(os.environ.get("MAX_HEAVY_ATOMS", "70"))
+_MAX_ROTATABLE_BONDS = int(os.environ.get("MAX_ROTATABLE_BONDS", "12"))
+
 
 def _prepare_pdbqt_worker(args: tuple[str, int, str]) -> bool:
     """Worker for parallel ligand preparation via multiprocessing.Pool.map."""
@@ -329,6 +335,22 @@ def _prepare_ligand_rdkit(smiles: str, out_pdbqt: str, seed: int) -> bool:
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return False
+
+    # Reject molecules too large or flexible for UniDock GPU — these cause
+    # numerical overflow (corrupt scores in millions) and batch timeouts.
+    from rdkit.Chem import Descriptors
+
+    n_heavy = mol.GetNumHeavyAtoms()
+    n_rot = Descriptors.NumRotatableBonds(mol)
+    if n_heavy > _MAX_HEAVY_ATOMS or n_rot > _MAX_ROTATABLE_BONDS:
+        logger.debug(
+            "dual_reward_patch: rejecting oversized ligand (%d heavy, %d rot): %s",
+            n_heavy,
+            n_rot,
+            smiles,
+        )
+        return False
+
     mol = Chem.AddHs(mol)
 
     params = AllChem.ETKDGv3()
