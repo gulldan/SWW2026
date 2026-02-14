@@ -5,7 +5,6 @@ from __future__ import annotations
 import yaml
 from click.testing import CliRunner
 
-import scripts.pipeline.run_stages as mod
 from scripts.pipeline.run_stages import main
 
 
@@ -51,8 +50,22 @@ def test_no_stages_gives_error():
 
 
 def test_unknown_stage_gives_error(tmp_path, monkeypatch):
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
-    _setup_configs(tmp_path)
+    """Unknown stage name should fail with error message."""
+    from dualdocking.pipeline import config as config_mod
+
+    # Mock config loading to use tmp_path
+    def _mock_from_config_dir(config_dir):
+        from dualdocking.pipeline.config import PipelineConfig
+
+        return PipelineConfig(
+            project_root=tmp_path,
+            pairs=_pairs_cfg()["pairs"],
+            modes=["single_a"],
+            seeds=[42],
+        )
+
+    monkeypatch.setattr(config_mod.PipelineConfig, "from_config_dir", staticmethod(_mock_from_config_dir))
+
     runner = CliRunner()
     result = runner.invoke(main, ["--stages", "nonexistent"])
     assert result.exit_code == 1
@@ -60,8 +73,23 @@ def test_unknown_stage_gives_error(tmp_path, monkeypatch):
 
 
 def test_dry_run_analyze(tmp_path, monkeypatch):
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    """Dry-run should work without actual files."""
+    from dualdocking.pipeline import config as config_mod
+
     _setup_configs(tmp_path)
+
+    # Mock config loading to use tmp_path
+    def _mock_from_config_dir(config_dir):
+        from dualdocking.pipeline.config import PipelineConfig
+
+        return PipelineConfig(
+            project_root=tmp_path,
+            pairs=_pairs_cfg()["pairs"],
+            modes=["single_a", "single_b", "double"],
+            seeds=[42],
+        )
+
+    monkeypatch.setattr(config_mod.PipelineConfig, "from_config_dir", staticmethod(_mock_from_config_dir))
 
     # Create prereqs for analyze stage
     import pandas as pd
@@ -78,8 +106,23 @@ def test_dry_run_analyze(tmp_path, monkeypatch):
 
 
 def test_preflight_fails_on_missing_inputs(tmp_path, monkeypatch):
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    """Preflight check should fail if required inputs are missing."""
+    from dualdocking.pipeline import config as config_mod
+
     _setup_configs(tmp_path)
+
+    # Mock config loading to use tmp_path
+    def _mock_from_config_dir(config_dir):
+        from dualdocking.pipeline.config import PipelineConfig
+
+        return PipelineConfig(
+            project_root=tmp_path,
+            pairs=_pairs_cfg()["pairs"],
+            modes=["single_a", "single_b", "double"],
+            seeds=[42],
+        )
+
+    monkeypatch.setattr(config_mod.PipelineConfig, "from_config_dir", staticmethod(_mock_from_config_dir))
 
     # Don't create any scored files -> preflight should fail for analyze
     runner = CliRunner()
@@ -88,8 +131,23 @@ def test_preflight_fails_on_missing_inputs(tmp_path, monkeypatch):
 
 
 def test_skip_preflight(tmp_path, monkeypatch):
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    """Skip-preflight flag should bypass input validation."""
+    from dualdocking.pipeline import config as config_mod
+
     _setup_configs(tmp_path)
+
+    # Mock config loading to use tmp_path
+    def _mock_from_config_dir(config_dir):
+        from dualdocking.pipeline.config import PipelineConfig
+
+        return PipelineConfig(
+            project_root=tmp_path,
+            pairs=_pairs_cfg()["pairs"],
+            modes=["single_a"],
+            seeds=[42],
+        )
+
+    monkeypatch.setattr(config_mod.PipelineConfig, "from_config_dir", staticmethod(_mock_from_config_dir))
 
     runner = CliRunner()
     # analyze with --skip-preflight --dry-run should not fail preflight

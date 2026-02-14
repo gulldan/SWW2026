@@ -1,118 +1,62 @@
 """Run post-processing stage: analytics and report generation.
 
-Executes the Stage 2 pipeline steps in order: aggregation, metrics
-computation, result plotting, molecule rendering, summarization, and
-optionally LaTeX report generation. Each step is logged to a timestamped
-log file under ``report/``.
+Thin CLI wrapper around ``dualdocking.pipeline.PipelineRunner.run_post_pipeline``.
+
+Usage::
+
+    # Run post-processing with draft LaTeX report
+    uv run python scripts/pipeline/run_post_pipeline.py
+
+    # Skip LaTeX generation
+    uv run python scripts/pipeline/run_post_pipeline.py --latex-mode off
+
+    # Full LaTeX compilation
+    uv run python scripts/pipeline/run_post_pipeline.py --latex-mode full
 """
 
 from __future__ import annotations
 
-import os
-from datetime import UTC, datetime
 from pathlib import Path
 
 import click
 
-from dualdocking.command_runner import run_project_command
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-
-
-def _ts() -> str:
-    """Return the current UTC time as an ISO-8601 string with ``Z`` suffix."""
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _log_to_file(log_path: Path, message: str) -> None:
-    """Append a message line to the post-pipeline log file.
-
-    Args:
-        log_path: Path to the log file (parent dirs created if needed).
-        message: Line to append.
-    """
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_path.open("a") as f:
-        f.write(message + "\n")
-
-
-def _commands(latex_mode: str) -> list[list[str]]:
-    """Build the ordered list of post-pipeline commands.
-
-    Args:
-        latex_mode: LaTeX generation mode (``"off"``, ``"draft"``, or ``"full"``).
-
-    Returns:
-        List of command token lists for each pipeline step.
-    """
-    cmds = [
-        ["uv", "run", "python", "scripts/s5_analyze/aggregate.py"],
-        ["uv", "run", "python", "scripts/s5_analyze/compute_metrics.py"],
-        ["uv", "run", "python", "scripts/s6_report/plot_results.py"],
-        ["uv", "run", "python", "scripts/s6_report/render_molecules.py"],
-        ["uv", "run", "python", "scripts/s5_analyze/summarize.py"],
-    ]
-    if latex_mode != "off":
-        cmds.append(["uv", "run", "python", "scripts/s6_report/generate_latex_report.py", "--mode", latex_mode])
-    return cmds
-
-
-def _run_cmd(cmd: list[str], log_path: Path) -> None:
-    """Execute a subprocess command, logging output and enforcing success.
-
-    Args:
-        cmd: Command tokens to execute.
-        log_path: Path to the post-pipeline log file.
-
-    Raises:
-        RuntimeError: If the subprocess exits with a non-zero return code.
-    """
-    _log_to_file(log_path, f"[{_ts()}] RUN: {' '.join(cmd)}")
-    result = run_project_command(
-        cmd,
-        project_root=PROJECT_ROOT,
-        capture_output=True,
-        allow_inprocess=True,
-    )
-    if result.returncode != 0:
-        combined = (result.stdout or "") + (result.stderr or "")
-        _log_to_file(log_path, f"[{_ts()}] ERROR (rc={result.returncode}):\n{combined[-4000:]}")
-        raise RuntimeError(f"Command failed (rc={result.returncode}): {' '.join(cmd)}")
-    if result.stdout:
-        _log_to_file(log_path, f"[{_ts()}] OUT: {result.stdout[-2000:]}")
+from dualdocking.pipeline import PipelineRunner
 
 
 @click.command()
-@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--dry-run", is_flag=True, default=False, help="Print commands without executing.")
 @click.option(
     "--latex-mode",
     type=click.Choice(["off", "draft", "full"]),
     default="draft",
     show_default=True,
-    help="LaTeX report generation mode."
+    help="LaTeX report generation mode.",
 )
 def main(dry_run: bool, latex_mode: str) -> None:
     """Run the post-processing pipeline (aggregate, metrics, plots, report).
 
+    Executes the full analysis and reporting pipeline: aggregation, metrics
+    computation, result plotting, molecule rendering, summarization, and
+    optional LaTeX report generation.
+
     Args:
-        dry_run: Print commands without executing.
+        dry_run: Print pipeline steps without executing.
         latex_mode: LaTeX report mode (``"off"``, ``"draft"``, or ``"full"``).
     """
-    run_id = os.environ.get("EXPERIMENT_RUN_ID", "adhoc")
-    log_ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    log_path = PROJECT_ROOT / "report" / f"post_{run_id}_{log_ts}.log"
-    _log_to_file(log_path, f"[{_ts()}] START run_id={run_id} latex_mode={latex_mode}")
-
-    commands = _commands(latex_mode)
     if dry_run:
-        for cmd in commands:
-            click.echo(" ".join(cmd))
+        click.echo("DRY RUN — Post-processing pipeline steps:")
+        click.echo("  1. Aggregate results")
+        click.echo("  2. Compute metrics")
+        click.echo("  3. Plot results")
+        click.echo("  4. Render molecules")
+        click.echo("  5. Summarize")
+        if latex_mode != "off":
+            click.echo(f"  6. Generate LaTeX report (mode: {latex_mode})")
         return
 
-    for cmd in commands:
-        _run_cmd(cmd, log_path)
-
-    _log_to_file(log_path, f"[{_ts()}] DONE")
+    config_dir = Path(__file__).resolve().parent.parent.parent / "configs"
+    runner = PipelineRunner.from_config_dir(config_dir)
+    runner.run_post_pipeline(latex_mode=latex_mode)  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":

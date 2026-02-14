@@ -6,21 +6,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from scripts.pipeline.run_pilot import _verify_pilot_artifacts
-
-PROJECT_ROOT_MARKER = "PROJECT_ROOT"
+from scripts.pipeline.run_pilot import verify_pilot_artifacts
 
 
 def _create_run_artifacts(
     root: Path,
     pair: str,
     seeds: list[int],
+    modes: list[str],
     *,
     skip_scored: str | None = None,
 ) -> None:
     """Create minimal pilot artifacts for verification testing."""
     rng = np.random.default_rng(42)
-    for mode in ("single_a", "single_b", "double"):
+    for mode in modes:
         for seed in seeds:
             run_dir = root / "output" / "results" / pair / mode / f"seed_{seed}"
             run_dir.mkdir(parents=True, exist_ok=True)
@@ -48,48 +47,40 @@ def _create_run_artifacts(
     (report / "stats.json").write_text(json.dumps({"CDK2_ERK2": {"H1a": {"p_value_raw": 0.05}}}))
 
 
-def test_verify_all_present(tmp_path, monkeypatch):
+def test_verify_all_present(tmp_path):
     """All artifacts present → no issues."""
-    import scripts.pipeline.run_pilot as mod
+    modes = ["single_a", "single_b", "double"]
+    _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137], modes)
 
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
-    _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137])
-
-    issues = _verify_pilot_artifacts("CDK2_ERK2", [42, 137])
+    issues = verify_pilot_artifacts(tmp_path, "CDK2_ERK2", [42, 137], modes)
     assert issues == []
 
 
-def test_verify_missing_scored(tmp_path, monkeypatch):
+def test_verify_missing_scored(tmp_path):
     """Missing scored_joined → reported."""
-    import scripts.pipeline.run_pilot as mod
+    modes = ["single_a", "single_b", "double"]
+    _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137], modes, skip_scored="double/seed_137")
 
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
-    _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137], skip_scored="double/seed_137")
-
-    issues = _verify_pilot_artifacts("CDK2_ERK2", [42, 137])
+    issues = verify_pilot_artifacts(tmp_path, "CDK2_ERK2", [42, 137], modes)
     assert len(issues) == 1
     assert "scored_joined" in issues[0]
 
 
-def test_verify_missing_metrics(tmp_path, monkeypatch):
+def test_verify_missing_metrics(tmp_path):
     """Missing metrics.json → reported."""
-    import scripts.pipeline.run_pilot as mod
-
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
-    _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137])
+    modes = ["single_a", "single_b", "double"]
+    _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137], modes)
     (tmp_path / "report" / "metrics.json").unlink()
 
-    issues = _verify_pilot_artifacts("CDK2_ERK2", [42, 137])
+    issues = verify_pilot_artifacts(tmp_path, "CDK2_ERK2", [42, 137], modes)
     assert any("metrics.json" in i for i in issues)
 
 
-def test_verify_empty_stats(tmp_path, monkeypatch):
+def test_verify_empty_stats(tmp_path):
     """Empty stats.json → reported."""
-    import scripts.pipeline.run_pilot as mod
-
-    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
-    _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137])
+    modes = ["single_a", "single_b", "double"]
+    _create_run_artifacts(tmp_path, "CDK2_ERK2", [42, 137], modes)
     (tmp_path / "report" / "stats.json").write_text("{}")
 
-    issues = _verify_pilot_artifacts("CDK2_ERK2", [42, 137])
+    issues = verify_pilot_artifacts(tmp_path, "CDK2_ERK2", [42, 137], modes)
     assert any("stats.json" in i for i in issues)
