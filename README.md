@@ -54,9 +54,15 @@ SWW2026/
 |   |   |-- chem_sanitize.py    SMILES validation, canonicalization & deduplication
 |   |   |-- baseline.py         ZINC calibration baseline stability checks
 |   |   +-- chembl_validation.py ChEMBL active retrieval, dual-active overlap, enrichment
-|   +-- reporting/              Experiment provenance and manuscript
-|       |-- run_manifest.py     Run lifecycle tracking (JSON manifest with atomic I/O)
-|       +-- latex_report.py     Jinja2-to-LaTeX rendering and PDF compilation
+|   |-- reporting/              Experiment provenance and manuscript
+|   |   |-- run_manifest.py     Run lifecycle tracking (JSON manifest with atomic I/O)
+|   |   +-- latex_report.py     Jinja2-to-LaTeX rendering and PDF compilation
+|   +-- validation/             Post-hoc validation
+|       |-- md_config.py        MD configuration dataclasses, constants, GPU detection
+|       |-- md_mdp.py           MDP file writers (EM, NVT, NPT, production)
+|       |-- md_setup.py         System preparation (PDB repair, ligand parameterization, topology)
+|       |-- md_analysis.py      Trajectory analysis (RMSD, RMSF, Rg, H-bonds, convergence)
+|       +-- md_pipeline.py      Orchestration (22 GROMACS commands, convergence assessment)
 |
 |-- cli/                    CLI entry points (organized by pipeline stage)
 |   |-- s0_fetch/               Data download (PDB, FASTA, FREED fragments, ZINC, ChEMBL)
@@ -66,12 +72,13 @@ SWW2026/
 |   |-- s4_score/               Affinity scoring (configured engine; default Boltz-2)
 |   |-- s5_analyze/             Statistical analysis (aggregate, metrics, correlation)
 |   |-- s6_report/              Visualization and manuscript (plots, molecules, LaTeX)
+|   |-- s6_md/                  MD validation (GROMACS, post-hoc binding stability)
 |   |-- s7_audit/               Post-hoc verification (claim traceability)
 |   |-- pipeline/               End-to-end orchestrators (full experiment, pilot, post)
 |   +-- smoke/                  Smoke tests (Boltz-2 health check, reward capping)
 |
 |-- configs/                    YAML configuration (pairs, metrics, experiment, normalization)
-|-- tests/                      pytest suite (~400 tests)
+|-- tests/                      pytest suite (~960 tests)
 |-- docker/freedpp/             FREED++ Docker image + dual_reward_patch.py
 |-- docs/                       Project documentation (see Documentation Map below)
 |-- report/                     LaTeX manuscript (chapters/, figures/, templates/)
@@ -119,6 +126,17 @@ EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py \
 ```
 
 Results land in `output/results/` and `report/`. See [Pipeline](docs/pipeline.md) for stage-by-stage details.
+
+### MD Validation (Optional)
+
+Post-hoc molecular dynamics validation of top candidates. Requires
+GROMACS, AmberTools, acpype, and OpenBabel — see [Setup](docs/setup.md)
+for installation.
+
+```bash
+uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --dry-run   # preview
+uv run python cli/s6_md/run_md.py --pair CDK2_ERK2              # run (50 ns, auto-GPU)
+```
 
 ### Smoke Test
 
@@ -265,7 +283,7 @@ Read in the order shown for fastest onboarding.
 ## Testing
 
 ```bash
-# Full test suite (~400 tests, parallelized)
+# Full test suite (~960 tests, parallelized)
 uv run pytest tests/ -v
 
 # Single test file

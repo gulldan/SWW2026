@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Modern De Novo Molecular Generation Methods (2023-2026)</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 1200px; margin: 20px auto; padding: 0 20px; font-size: 11pt; }
+  h1 { font-size: 16pt; }
+  h2 { font-size: 13pt; margin-top: 28px; border-bottom: 2px solid #333; padding-bottom: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 20px 0; }
+  th, td { border: 1px solid #999; padding: 5px 8px; text-align: left; vertical-align: top; font-size: 10pt; }
+  th { background-color: #e8e8e8; font-weight: bold; }
+  tr:nth-child(even) { background-color: #f9f9f9; }
+  a { color: #1a0dab; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .yes { color: #137333; font-weight: bold; }
+  .no { color: #888; }
+  .note { font-size: 9pt; color: #555; }
+</style>
+</head>
+<body>
+
+<h1>Современные методы de novo молекулярной генерации (2023-2026)</h1>
+<p class="note">Каталог альтернатив FREED++ для dual-target drug design. Составлен 2026-02-14.</p>
+
+<h2>1. RL-based генераторы</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>REINVENT 4</b></td>
+  <td>2024, J.&nbsp;Cheminformatics</td>
+  <td>LSTM/Transformer + RL (DAP, AHC, BAR); multi-component scoring</td>
+  <td class="yes">Да</td>
+  <td class="no">Нет (SMILES + external docking)</td>
+  <td><a href="https://doi.org/10.1186/s13321-024-00812-5">DOI</a>, <a href="https://github.com/MolecularAI/REINVENT4">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>FREED++</b></td>
+  <td>2024, TMLR</td>
+  <td>Fragment-based RL + prioritized experience replay</td>
+  <td class="no">Ограничено</td>
+  <td class="yes">Да (docking reward)</td>
+  <td><a href="https://arxiv.org/abs/2401.09840">arXiv</a>, <a href="https://github.com/AIRI-Institute/FFREED">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>DrugEx v3</b></td>
+  <td>2023, J.&nbsp;Cheminformatics</td>
+  <td>Graph Transformer + Pareto RL; scaffold-constrained</td>
+  <td class="yes">Да (Pareto MO)</td>
+  <td class="no">Нет (predictor-based)</td>
+  <td><a href="https://doi.org/10.1186/s13321-023-00694-z">DOI</a>, <a href="https://github.com/CDDLeiden/DrugEx">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>Augmented Memory</b></td>
+  <td>2024, JACS Au</td>
+  <td>REINVENT LSTM + experience replay + SMILES augmentation</td>
+  <td class="yes">Да</td>
+  <td class="no">Нет</td>
+  <td><a href="https://doi.org/10.1021/jacsau.4c00066">DOI</a></td>
+</tr>
+<tr>
+  <td><b>Saturn</b></td>
+  <td>2024, preprint</td>
+  <td>LSTM/Mamba + Augmented Memory RL</td>
+  <td class="yes">Да</td>
+  <td class="no">Нет</td>
+  <td><a href="https://arxiv.org/abs/2405.17066">arXiv</a>, <a href="https://github.com/schwallergroup/saturn">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>ChemRLformer</b></td>
+  <td>2024, OpenReview</td>
+  <td>Transformer + REINFORCE; 25 задач</td>
+  <td class="yes">Да</td>
+  <td class="no">Нет (docking as oracle)</td>
+  <td><a href="https://arxiv.org/abs/2310.02902">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>Mol-AIR</b></td>
+  <td>2025, JCIM</td>
+  <td>RL + adaptive intrinsic rewards (random distillation)</td>
+  <td class="no">Нет</td>
+  <td class="no">Нет</td>
+  <td><a href="https://doi.org/10.1021/acs.jcim.4c01669">DOI</a>, <a href="https://github.com/DevSlem/Mol-AIR">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>MolDPO</b></td>
+  <td>2025, ECML PKDD</td>
+  <td>Direct Preference Optimization + curriculum learning</td>
+  <td class="yes">Да</td>
+  <td class="no">Нет</td>
+  <td><a href="https://arxiv.org/abs/2504.01389">arXiv</a>, <a href="https://github.com/SiliconMangrove/MolDPO">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>TRACER</b></td>
+  <td>2025, Comm.&nbsp;Chemistry</td>
+  <td>Conditional Transformer + RL; reaction-aware optimization</td>
+  <td class="yes">Да (property + synthesis)</td>
+  <td class="no">Нет</td>
+  <td><a href="https://doi.org/10.1038/s42004-025-01437-x">DOI</a></td>
+</tr>
+</table>
+
+<h2>2. Diffusion-based</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>TargetDiff</b></td>
+  <td>2023, ICLR</td>
+  <td>SE(3)-equivariant diffusion на atom types + coordinates</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://arxiv.org/abs/2303.03543">arXiv</a>, <a href="https://github.com/guanjq/targetdiff">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>DecompDiff</b></td>
+  <td>2023, ICML</td>
+  <td>Diffusion с decomposed priors (arms + scaffold)</td>
+  <td class="no">Нет (guidance)</td>
+  <td class="yes">Да</td>
+  <td><a href="https://arxiv.org/abs/2403.07902">arXiv</a>, <a href="https://github.com/bytedance/DecompDiff">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>DiffSBDD</b></td>
+  <td>2024, Nat. Comp. Sci.</td>
+  <td>SE(3)-equivariant; negative design, inpainting, property guidance</td>
+  <td class="yes">Да (guidance)</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1038/s43588-024-00737-x">DOI</a>, <a href="https://github.com/arneschneuing/DiffSBDD">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>PMDM</b></td>
+  <td>2024, Nat. Comms</td>
+  <td>Dual diffusion (local + global molecular dynamics)</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1038/s41467-024-46569-1">DOI</a>, <a href="https://github.com/Layne-Huang/PMDM">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>PILOT</b></td>
+  <td>2024, Chem.&nbsp;Sci.</td>
+  <td>Equivariant diffusion + pretrain + importance sampling guidance</td>
+  <td class="yes">Да (affinity + QED + SA)</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1039/D4SC03523B">DOI</a>, <a href="https://github.com/pfizer-opensource/e3moldiffusion">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>DiffGui</b></td>
+  <td>2025, Nat. Comms</td>
+  <td>E(3)-equivariant + bond diffusion + guidance; wet-lab validated</td>
+  <td class="yes">Да</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1038/s41467-025-63245-0">DOI</a></td>
+</tr>
+<tr>
+  <td><b>DiffDTM</b></td>
+  <td>2024, IEEE TPAMI</td>
+  <td>Diffusion на графах, dual-sequence conditioning (ESM2)</td>
+  <td class="yes"><b>Да (dual-target by design)</b></td>
+  <td class="no">Нет (sequence-based)</td>
+  <td><a href="https://arxiv.org/abs/2306.13957">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>MDRL</b></td>
+  <td>2025, J.&nbsp;Cheminformatics</td>
+  <td>3D diffusion + RL для multi-target binding + properties</td>
+  <td class="yes"><b>Да (multi-target)</b></td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1186/s13321-025-01035-y">DOI</a></td>
+</tr>
+<tr>
+  <td><b>SGEDiff</b></td>
+  <td>2025, J.&nbsp;Cheminformatics</td>
+  <td>Subgraph-enriched diffusion</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1186/s13321-025-01123-z">DOI</a></td>
+</tr>
+<tr>
+  <td><b>Apo2Mol</b></td>
+  <td>2025, preprint</td>
+  <td>Hierarchical graph diffusion; apo&rarr;holo transitions</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да (dynamic pocket)</td>
+  <td><a href="https://arxiv.org/abs/2511.14559">arXiv</a>, <a href="https://github.com/AIDD-LiLab/Apo2Mol">GitHub</a></td>
+</tr>
+</table>
+
+<h2>3. Flow Matching</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>FlowMol</b></td>
+  <td>2024-2025</td>
+  <td>Mixed continuous/categorical flow matching</td>
+  <td class="no">Нет</td>
+  <td class="no">Нет (VoxBind &mdash; Да)</td>
+  <td><a href="https://github.com/Dunni3/FlowMol">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>SemlaFlow</b></td>
+  <td>2025, AISTATS</td>
+  <td>Scalable E(3)-equivariant attention + flow matching</td>
+  <td class="no">Нет</td>
+  <td class="no">Нет</td>
+  <td><a href="https://arxiv.org/abs/2406.07266">arXiv</a>, <a href="https://github.com/rssrwn/semla-flow">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>FlexSBDD</b></td>
+  <td>2024, NeurIPS</td>
+  <td>Flow matching + flexible protein backbone/sidechain</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да (protein flexibility)</td>
+  <td><a href="https://proceedings.neurips.cc/paper_files/paper/2024/file/60fb8cf8000f0386063fb24ead366330-Paper-Conference.pdf">PDF</a></td>
+</tr>
+<tr>
+  <td><b>MolFORM</b></td>
+  <td>2025, preprint</td>
+  <td>Multi-modal flow matching для SBDD</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://arxiv.org/abs/2507.05503">arXiv</a></td>
+</tr>
+</table>
+
+<h2>4. Autoregressive 3D</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>Pocket2Mol</b></td>
+  <td>2022, ICML</td>
+  <td>E(3)-equivariant GNN, atom-by-atom</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://arxiv.org/abs/2205.07249">arXiv</a>, <a href="https://github.com/pengxingang/Pocket2Mol">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>Pocket2Mol-RL</b></td>
+  <td>2024, OpenReview</td>
+  <td>RL fine-tuning Pocket2Mol для drug-likeness + affinity</td>
+  <td class="yes">Да (multi-property)</td>
+  <td class="yes">Да</td>
+  <td><a href="https://github.com/deargen/Pocket2Mol_RL_public">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>ResGen</b></td>
+  <td>2023, Nat. Mach. Intel.</td>
+  <td>Parallel multiscale autoregressive</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1038/s42256-023-00712-7">DOI</a></td>
+</tr>
+<tr>
+  <td><b>FLAG</b></td>
+  <td>2023, NeurIPS workshop</td>
+  <td>Fragment-based autoregressive diffusion</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>NeurIPS 2022 workshop</td>
+</tr>
+</table>
+
+<h2>5. GFlowNet-based</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>SynFlowNet</b></td>
+  <td>2025, ICLR (Spotlight)</td>
+  <td>GFlowNet + synthesis-constrained actions; guaranteed synthesis</td>
+  <td class="yes">Да (diversity + properties)</td>
+  <td class="no">Нет (docking reward)</td>
+  <td><a href="https://arxiv.org/abs/2405.01155">arXiv</a>, <a href="https://github.com/mirunacrt/synflownet">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>RxnFlow</b></td>
+  <td>2025, ICLR</td>
+  <td>GFlowNet, 1M+ building blocks, 100 reaction templates</td>
+  <td class="yes">Да (MOGFN)</td>
+  <td class="yes">Да (docking reward)</td>
+  <td><a href="https://github.com/SeonghwanSeo/RxnFlow">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>MOGFN-PC</b></td>
+  <td>2023, ICML</td>
+  <td>GFlowNet + Pareto conditioning</td>
+  <td class="yes">Да (by design)</td>
+  <td class="no">Нет (property rewards)</td>
+  <td><a href="https://arxiv.org/abs/2210.12765">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>RGFN</b></td>
+  <td>2024, NeurIPS</td>
+  <td>Reaction-GFlowNet; все молекулы синтезируемы</td>
+  <td class="yes">Да (diversity)</td>
+  <td class="yes">Да (GPU docking)</td>
+  <td><a href="https://arxiv.org/abs/2406.08506">arXiv</a>, <a href="https://github.com/koziarskilab/RGFN">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>Genetic-guided GFN</b></td>
+  <td>2024, NeurIPS</td>
+  <td>GFlowNet + GA guidance</td>
+  <td class="yes">Да</td>
+  <td class="no">Нет</td>
+  <td><a href="https://arxiv.org/abs/2402.05961">arXiv</a>, <a href="https://github.com/hyeonahkimm/genetic_gfn">GitHub</a></td>
+</tr>
+</table>
+
+<h2>6. Transformer / LLM-based</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>BindGPT</b></td>
+  <td>2025, AAAI</td>
+  <td>Decoder-only LLM; SMILES + XYZ tokens; pretrain + SFT + RL</td>
+  <td class="yes">Да (RL)</td>
+  <td class="yes">Да (3D pocket tokens)</td>
+  <td><a href="https://arxiv.org/abs/2406.03686">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>3DSMILES-GPT</b></td>
+  <td>2025, Chem. Sci.</td>
+  <td>Token-only LLM для pocket-based 3D generation + RL</td>
+  <td class="yes">Да (RL)</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1039/D4SC06864E">DOI</a>, <a href="https://github.com/ashipiling/GPT_3DSMILES">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>Lingo3DMol</b></td>
+  <td>2024, Nat. Mach. Intel.</td>
+  <td>Language model + geometric DL; fragment-based SMILES</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1038/s42256-023-00775-6">DOI</a>, <a href="https://github.com/stonewiseAIDrugDesign/Lingo3DMol">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>MTMol-GPT</b></td>
+  <td>2024, PLoS Comp. Bio.</td>
+  <td>GPT + generative adversarial imitation learning; multi-target</td>
+  <td class="yes"><b>Да (multi-target by design)</b></td>
+  <td class="no">Нет</td>
+  <td><a href="https://doi.org/10.1371/journal.pcbi.1012229">DOI</a>, <a href="https://github.com/guofei-tju/MTMol-GPT">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>Token-Mol</b></td>
+  <td>2025</td>
+  <td>Transformer; 2D/3D + properties в discrete tokens</td>
+  <td class="yes">Да (multi-property)</td>
+  <td class="yes">Да</td>
+  <td><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12075800/">PMC</a></td>
+</tr>
+</table>
+
+<h2>7. Joint 2D+3D (Bayesian Flow Networks)</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>MolCRAFT</b></td>
+  <td>2024, ICML</td>
+  <td>Bayesian Flow Network; continuous parameter space</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://arxiv.org/abs/2404.12141">arXiv</a>, <a href="https://github.com/GenSI-THUAIR/MolCRAFT">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>MolJO</b></td>
+  <td>2025, ICML</td>
+  <td>BFN + gradient guidance; backward correction; SOTA CrossDocked2020</td>
+  <td class="yes">Да (multi-obj opt)</td>
+  <td class="yes">Да</td>
+  <td><a href="https://huggingface.co/GenSI/MolJO">HuggingFace</a>, <a href="https://github.com/GenSI-THUAIR/MolCRAFT">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>MolPilot</b></td>
+  <td>2025, ICML</td>
+  <td>VLB-Optimal Scheduling; 95.9% PB-Valid rate</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>Same repo as MolCRAFT</td>
+</tr>
+<tr>
+  <td><b>JODO</b></td>
+  <td>2023, preprint</td>
+  <td>Joint 2D+3D diffusion (types + bonds + coords)</td>
+  <td class="no">Нет</td>
+  <td class="no">Нет</td>
+  <td><a href="https://arxiv.org/abs/2305.12347">arXiv</a>, <a href="https://github.com/GRAPH-0/JODO">GitHub</a></td>
+</tr>
+</table>
+
+<h2>8. VAE-based</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>POLYGON</b></td>
+  <td>2024, Nat. Comms</td>
+  <td>VAE + iterative RL; polypharmacology; 32 молекулы синтезированы</td>
+  <td class="yes"><b>Да (dual-target)</b></td>
+  <td class="no">Нет (predictor-based)</td>
+  <td><a href="https://doi.org/10.1038/s41467-024-47120-y">DOI</a>, <a href="https://github.com/bpmunson/polygon">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>DrugHIVE</b></td>
+  <td>2024, JCIM</td>
+  <td>Hierarchical VAE; 3D voxel grids</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1021/acs.jcim.4c01193">DOI</a>, <a href="https://github.com/jssweller/DrugHIVE">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>VoxMol / VoxBind</b></td>
+  <td>2023-2024</td>
+  <td>Score-based denoising на 3D voxels; atoms as Gaussian densities</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да (VoxBind)</td>
+  <td><a href="https://arxiv.org/abs/2306.07473">arXiv</a>, <a href="https://github.com/Genentech/voxmol">GitHub</a></td>
+</tr>
+</table>
+
+<h2>9. Dual / Multi-target специализированные</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>AIxFuse</b></td>
+  <td>2024, Chem. Sci.</td>
+  <td>Self-play RL + pharmacophore fusion + dual-pocket docking</td>
+  <td class="yes">Да (dual-pocket)</td>
+  <td><a href="https://doi.org/10.1039/d4sc00094c">DOI</a>, <a href="https://github.com/biomed-AI/AIxFuse">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>Isigkeit CLM</b></td>
+  <td>2024, Nat. Comms</td>
+  <td>Chemical Language Model fine-tuning; <b>7/12 wet-lab confirmed</b></td>
+  <td class="no">Нет (ligand-based)</td>
+  <td><a href="https://doi.org/10.1038/s41467-024-52060-8">DOI</a></td>
+</tr>
+<tr>
+  <td><b>DiffDTM</b></td>
+  <td>2024, IEEE TPAMI</td>
+  <td>Diffusion + dual sequence conditioning (ESM2 encoder)</td>
+  <td class="no">Нет (sequence-based)</td>
+  <td><a href="https://arxiv.org/abs/2306.13957">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>MDRL</b></td>
+  <td>2025, J. Cheminformatics</td>
+  <td>3D Diffusion + RL для multi-target binding + properties</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1186/s13321-025-01035-y">DOI</a></td>
+</tr>
+<tr>
+  <td><b>MTMol-GPT</b></td>
+  <td>2024, PLoS Comp. Bio.</td>
+  <td>GPT + imitation learning для multi-target</td>
+  <td class="no">Нет (activity-based)</td>
+  <td><a href="https://doi.org/10.1371/journal.pcbi.1012229">DOI</a>, <a href="https://github.com/guofei-tju/MTMol-GPT">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>SFG-Drug</b></td>
+  <td>2025, MDPI Inventions</td>
+  <td>MCTS + GRU для dual-target (MEK1 + mTOR)</td>
+  <td class="no">Нет (SMILES-based)</td>
+  <td><a href="https://doi.org/10.3390/inventions11010012">DOI</a></td>
+</tr>
+</table>
+
+<h2>10. MCTS / Genetic</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>PMMG</b></td>
+  <td>2025, Adv. Sci.</td>
+  <td>RNN + Pareto MCTS; &gt;4 objectives; тест на EGFR/HER2</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1002/advs.202410640">DOI</a></td>
+</tr>
+<tr>
+  <td><b>ParetoDrug</b></td>
+  <td>2024, Comm. Bio.</td>
+  <td>Pareto MCTS на chemical space graphs</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1038/s42003-024-06746-w">DOI</a></td>
+</tr>
+<tr>
+  <td><b>MNopt</b></td>
+  <td>2025, JCIM</td>
+  <td>MCTS + NSGA-II genetic algorithm</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1021/acs.jcim.5c00584">DOI</a></td>
+</tr>
+</table>
+
+<h2>11. Foundation / Unified модели</h2>
+<table>
+<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>UniMoMo</b></td>
+  <td>2025, PMLR</td>
+  <td>Unified generative для small molecules, peptides, antibodies</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://arxiv.org/abs/2503.19300">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>MolSnapper</b></td>
+  <td>2025, JCIM</td>
+  <td>Diffusion conditioned на 3D pharmacophores</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td><a href="https://doi.org/10.1021/acs.jcim.4c02008">DOI</a></td>
+</tr>
+</table>
+
+<h2>12. Бенчмарки</h2>
+<table>
+<tr><th>Ресурс</th><th>Описание</th><th>Ссылки</th></tr>
+<tr>
+  <td><b>POKMOL-3D</b></td>
+  <td>32 targets, 2D/3D evaluation metrics для pocket-based генераторов</td>
+  <td><a href="https://doi.org/10.1021/acs.jcim.4c01598">DOI</a></td>
+</tr>
+<tr>
+  <td><b>Awesome-SBDD</b></td>
+  <td>Curated list всех SBDD papers (обновляется)</td>
+  <td><a href="https://github.com/zaixizhang/Awesome-SBDD">GitHub</a></td>
+</tr>
+<tr>
+  <td><b>Diffusion Models Survey</b></td>
+  <td>18 diffusion моделей на 3 benchmarks</td>
+  <td><a href="https://doi.org/10.1021/acs.jcim.4c01107">DOI</a></td>
+</tr>
+</table>
+
+<hr>
+<h2>Топ-6 наиболее релевантных альтернатив FREED++ для dual-target</h2>
+<table>
+<tr><th>#</th><th>Метод</th><th>Почему релевантен</th></tr>
+<tr><td>1</td><td><b>REINVENT 4</b></td><td>Промышленный стандарт, multi-component scoring, легко интегрировать dual-target docking</td></tr>
+<tr><td>2</td><td><b>MDRL</b></td><td>3D diffusion + RL для multi-target; прямой конкурент, 2025</td></tr>
+<tr><td>3</td><td><b>AIxFuse</b></td><td>Dual-pocket structure-aware RL; ближайший по задаче</td></tr>
+<tr><td>4</td><td><b>DiffDTM</b></td><td>Diffusion с dual-sequence; не требует 3D структур</td></tr>
+<tr><td>5</td><td><b>MTMol-GPT</b></td><td>GPT для multi-target; ligand-based</td></tr>
+<tr><td>6</td><td><b>PMMG</b></td><td>MCTS для Pareto front с docking; тестирован на EGFR/HER2</td></tr>
+</table>
+
+</body>
+</html>

@@ -1,5 +1,5 @@
 # FREED++ Docker image
-# Environment: Python 3.12, PyTorch 2.4, DGL 2.4, CUDA 12.1, RDKit (H100/sm_90 native).
+# Environment: Python 3.12, PyTorch 2.4, DGL 2.4, CUDA 12.4, RDKit (H100/sm_90 native).
 # Build (from repo root): docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
 # Requires: NVIDIA Container Toolkit for --gpus all
 
@@ -23,13 +23,13 @@ RUN uv venv --python 3.12 /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# ── PyTorch 2.4 + CUDA 12.1 (sm_90 / H100 native) ─────────────────
+# ── PyTorch 2.4 + CUDA 12.4 (sm_90 / H100 native) ─────────────────
 RUN uv pip install --no-cache \
         torch==2.4.0 \
         torchvision==0.19.0 \
         --index-url https://download.pytorch.org/whl/cu124
 
-# ── DGL 0.9.1 + CUDA 11.3 ──────────────────────────────────────────────
+# ── DGL 0.9.1 + CUDA 12.4 ──────────────────────────────────────────────
 RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache dgl -f https://data.dgl.ai/wheels/torch-2.4/cu124/repo.html
 
 # ── Remaining dependencies ───────────────────────────────────────────
@@ -45,8 +45,6 @@ RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache \
         crem \
         "meeko==0.5.1"
 
-# moses (molsets) for metrics – skip pomegranate (Cython build fails on 3.10,
-# and FREED never calls ScaffoldConstrainedGenerator which needs it).
 RUN UV_HTTP_TIMEOUT=1200 uv pip install --no-cache --no-deps molsets==0.3.1 \
     && UV_HTTP_TIMEOUT=1200 uv pip install --no-cache fcd_torch>=1.0.5 matplotlib seaborn \
     && UV_HTTP_TIMEOUT=1200 uv pip install --no-cache tensorboardX

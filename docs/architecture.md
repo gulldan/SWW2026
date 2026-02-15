@@ -159,6 +159,64 @@ Trained models saved in `output/cache/freedpp_models/{hash}/`.
 Hash includes: reward mode, targets, epochs, steps_per_epoch, seed, etc.
 Rerun with same params uses `--commands "sample"` (minutes vs hours).
 
+## MD Validation Backend
+
+`dualdocking/validation/` implements a complete GROMACS MD pipeline for
+post-hoc binding stability validation of top candidate molecules. The code
+is split into focused modules:
+
+- `md_config.py` — dataclasses (`MDConfig`, `MDResult`), constants, `_run()` helper, GPU detection
+- `md_mdp.py` — MDP file writers for all simulation phases
+- `md_setup.py` — system preparation (PDB repair, ligand parameterization, topology, solvation)
+- `md_analysis.py` — trajectory analysis (RMSD, RMSF, Rg, H-bonds, convergence, MM-GBSA)
+- `md_pipeline.py` — orchestration (`run_md_validation`, `run_single_molecule_md`, `select_top_molecules`)
+
+### Pipeline Architecture
+
+22 GROMACS commands in 3 phases:
+
+1. **Setup (14 commands)**: pdb2gmx → editconf → solvate → grompp/genion →
+   EM → make_ndx → NVT equilibration → NPT equilibration → production MD
+2. **Trajectory preprocessing (3 commands)**: PBC fix → center → least-squares fit
+3. **Analysis (5 commands)**: backbone RMSD, ligand RMSD, per-residue RMSF,
+   radius of gyration, H-bonds
+
+### MDP Strategy (Modern Protocol)
+
+| Phase | Barostat | Thermostat | Key Parameters |
+|-------|----------|------------|----------------|
+| NPT equilibration | **C-rescale** (τ=1.0 ps) | V-rescale (τ=0.1 ps) | Correct NPT ensemble (Bernetti & Bussi 2020) |
+| Production | **Parrinello-Rahman** (τ=2.0 ps) | V-rescale (τ=1.0 ps) | Correct pressure fluctuations |
+
+Force field: **amber14sb** (Maier et al. 2015, built into GROMACS 2026).
+All MDPs use Verlet cutoff scheme, PME electrostatics (fourierspacing=0.12),
+**1.0 nm** cutoffs (AMBER standard), LINCS constraints (order 4),
+EnerPres dispersion correction. Thermostat coupling groups:
+`Protein_LIG` / `Water_and_ions`. Equilibration uses position restraints
+for both protein (`-DPOSRES`) and ligand (`-DPOSRES_LIG`).
+
+### Stdin Handling
+
+All interactive GROMACS tools (`genion`, `rms`, `hbond`, `trjconv`,
+`make_ndx`) receive proper stdin via `subprocess.run(input=...)`. This
+prevents the commands from hanging waiting for user input.
+
+### GPU Auto-Detection
+
+When `MDConfig.gpu_auto=True` (default), `nvidia-smi` is probed. If an NVIDIA
+GPU is found, all `mdrun` calls get `-nb gpu -pme gpu -bonded gpu -update gpu`.
+
+### Convergence Assessment
+
+Backbone RMSD is split into halves; a 2-sample KS test determines if the
+simulation has equilibrated. Converged = `p > 0.05 AND |mean_diff| < 0.5 Å`.
+
+### Ligand Parameterization
+
+RDKit (ETKDGv3 + MMFF) → OpenBabel (SDF→MOL2) → Antechamber (AM1-BCC/GAFF2) →
+Parmchk2 → Acpype (AMBER→GROMACS) → `gmx genrestr` (ligand position restraints →
+`posre_lig.itp`). No `--gen3d` in obabel (RDKit already did 3D).
+
 ## Organism Gate
 
 `load_pairs()` blocks non-human targets (`organism != "Homo sapiens"`).

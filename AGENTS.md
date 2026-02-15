@@ -68,7 +68,7 @@ All other documents (`report/`, `docs/selection_criteria.md`, `README.md`, `conf
 # Install all dependencies (boltz is a pinned git dep, included automatically)
 uv sync --group dev
 
-# Run full test suite (396 tests, ~7 min)
+# Run full test suite (~960 tests)
 uv run pytest tests/ -v
 
 # Run a single test file
@@ -111,6 +111,12 @@ dualdocking/                  # Core library (at project root, no src/ wrapper)
   reporting/                  #   Reporting subpackage
     run_manifest.py           #     Lifecycle tracking for experiment runs
     latex_report.py           #     LaTeX report generation
+  validation/                 #   Post-hoc validation subpackage
+    md_config.py              #     MD configuration dataclasses, constants, GPU detection
+    md_mdp.py                 #     MDP file writers (EM, NVT, NPT, production)
+    md_setup.py               #     System preparation (PDB repair, ligand parameterization, topology)
+    md_analysis.py            #     Trajectory analysis (RMSD, RMSF, Rg, H-bonds, convergence)
+    md_pipeline.py            #     Orchestration (22 GROMACS commands, convergence KS test)
 cli/                      # CLI entry points (organized by pipeline stage)
   s0_fetch/                   #   Data download (PDB, FASTA, FREED fragments, ZINC, ChEMBL)
   s1_prepare/                 #   Target preparation (PDB -> PDBQT, binding box, MSA)
@@ -119,6 +125,7 @@ cli/                      # CLI entry points (organized by pipeline stage)
   s4_score/                   #   Affinity scoring (Boltz-2)
   s5_analyze/                 #   Statistical analysis (aggregate, metrics, correlation)
   s6_report/                  #   Visualization and manuscript (plots, molecules, LaTeX)
+  s6_md/                      #   MD validation (GROMACS, post-hoc binding stability)
   s7_audit/                   #   Post-hoc verification (claim traceability)
   pipeline/                   #   End-to-end orchestrators (full experiment, pilot, post)
   smoke/                      #   Smoke tests (Boltz-2 health check, reward capping)

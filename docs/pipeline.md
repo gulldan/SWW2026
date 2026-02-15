@@ -124,7 +124,7 @@ Stages and dependencies:
 | `report` | analysis outputs | Figures, LaTeX report |
 | `audit` | analysis outputs | `claim_audit.json` |
 | `gnina` | scored results, GNINA binary | GNINA score Parquet per run |
-| `md` | scored results, PDB structures | MD trajectories, RMSD/stability CSVs |
+| `md` | scored results, PDB structures | MD trajectories, RMSD/RMSF/Rg/energy CSVs, convergence assessment |
 
 ### Backend Selection
 
@@ -233,6 +233,180 @@ uv run python cli/s5_analyze/summarize.py
 | `s5_analyze/threshold_sensitivity.py` | SCI-06 | Robustness at T = -1, 0, +1 (Parquet output) |
 | `s5_analyze/proxy_correlation.py` | SCI-07 | Spearman rho (docking vs Boltz-2) (Parquet output) |
 | `s7_audit/claim_audit.py` | SCI-10 | Claim traceability (8 checks) |
+
+## MD Validation (Optional, Post-Hoc)
+
+> **Status: NOT YET VERIFIED.** The Docker image builds and the CLI runs, but
+> no end-to-end MD run has completed successfully yet. The container has been
+> observed to exit silently without producing output. Treat this stage as
+> work-in-progress until the first successful `md_result.json` is produced.
+
+Molecular dynamics validation for top candidate molecules. Not part of the
+primary endpoint — used to strengthen Q1 publication credibility.
+
+Requires GROMACS 2026.0, AmberTools, acpype, and OpenBabel. The recommended
+approach is `--docker`, which bundles all tools in a container.
+See [setup.md](setup.md) for full installation options.
+
+### Prerequisites
+
+1. **Docker image** `dualdocking/md:latest` must be built (one-time, ~20-30 min):
+   ```bash
+   docker build -f docker/md/Dockerfile -t dualdocking/md:latest .
+   ```
+   Check if already built: `docker images dualdocking/md`
+
+2. **Scored results** must exist in `output/results/{pair}/{mode}/seed_{N}/scored_joined.parquet`.
+   These are produced by Stage 1+2 (generate + score).
+
+3. **PDB structures** must exist in `output/data/targets/{pair}/{A,B}/{pdb_id}.pdb`.
+   Produced by Stage 0 (fetch).
+
+### Docker Mode — Step by Step
+
+```bash
+# 1. Check what molecules would be selected (no Docker needed)
+uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --dry-run
+
+# 2. Quick smoke test: 1 molecule, 1 target mode, 1 ns simulation
+#    (~5-10 min on RTX 4090 with GPU acceleration)
+uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker \
+  --mode single_a --top-n 1 --simulation-time 1
+
+# 3. Full run: top-3 molecules, all modes, default 50 ns
+#    (~2-4 hours per molecule×target on RTX 4090)
+uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker
+
+# 4. Shorter simulation (10 ns) for faster turnaround
+uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker --simulation-time 10
+
+# 5. With MM-GBSA binding free energy (requires gmx_MMPBSA in image)
+uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker --mmpbsa
+
+# 6. Disable GPU (CPU-only GROMACS)
+uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker --no-gpu
+
+# 7. Local mode (requires all tools in PATH — see setup.md Option B)
+uv run python cli/s6_md/run_md.py --pair CDK2_ERK2
+```
+
+### What `--docker` Does Under the Hood
+
+The CLI (`cli/s6_md/run_md.py --docker`) calls `dualdocking.validation.md_docker`:
+
+1. **Builds image** if missing (`docker build -f docker/md/Dockerfile ...`)
+2. **Runs container** with bind mounts:
+
+   | Host | Container | Access |
+   |------|-----------|--------|
+   | `output/` | `/workspace/output` | read-write (results written here) |
+   | `configs/` | `/workspace/configs` | read-only |
+   | `dualdocking/` | `/workspace/dualdocking` | read-only |
+   | `cli/` | `/workspace/cli` | read-only |
+   | `pyproject.toml` | `/workspace/pyproject.toml` | read-only |
+
+3. **Entrypoint** (`docker/md/entrypoint.sh`) sources GMXRC, sets up AmberTools/conda
+   paths, then runs `python /workspace/cli/s6_md/run_md.py <args>` (without `--docker`).
+
+The actual `docker run` command generated:
+```bash
+docker run --rm --gpus all \
+  -v /mnt/data/SWW2026/output:/workspace/output \
+  -v /mnt/data/SWW2026/configs:/workspace/configs:ro \
+  -v /mnt/data/SWW2026/dualdocking:/workspace/dualdocking:ro \
+  -v /mnt/data/SWW2026/cli:/workspace/cli:ro \
+  -v /mnt/data/SWW2026/pyproject.toml:/workspace/pyproject.toml:ro \
+  dualdocking/md:latest \
+  --pair CDK2_ERK2 --top-n 3 \
+  --config configs/pairs.yaml --experiment-config configs/experiment.yaml
+```
+
+### Running Docker Manually (for Debugging)
+
+If the Python wrapper fails silently, run the container interactively:
+
+```bash
+# Interactive shell inside the MD container
+docker run --rm -it --gpus all \
+  -v /mnt/data/SWW2026/output:/workspace/output \
+  -v /mnt/data/SWW2026/configs:/workspace/configs:ro \
+  -v /mnt/data/SWW2026/dualdocking:/workspace/dualdocking:ro \
+  -v /mnt/data/SWW2026/cli:/workspace/cli:ro \
+  -v /mnt/data/SWW2026/pyproject.toml:/workspace/pyproject.toml:ro \
+  dualdocking/md:latest bash
+
+# Inside container — verify tools work:
+gmx --version
+antechamber --help
+obabel --version
+python -c "from dualdocking.validation.md_config import MDConfig; print('OK')"
+
+# Run MD manually (see full output/errors):
+python /workspace/cli/s6_md/run_md.py --pair CDK2_ERK2 \
+  --mode single_a --top-n 1 --simulation-time 1
+
+# Or run with --dry-run to check molecule selection:
+python /workspace/cli/s6_md/run_md.py --pair CDK2_ERK2 --dry-run
+```
+
+### Pipeline Per Molecule×Target
+
+22 GROMACS commands per molecule×target:
+
+| Phase | Commands | What |
+|-------|----------|------|
+| **Setup** (14) | pdb2gmx, editconf, solvate, grompp×4, genion, mdrun×3, make_ndx | PDB repair → topology → solvation → ions → EM → NVT → NPT → production MD |
+| **Preprocessing** (3) | trjconv ×3 | PBC fix → center → least-squares fit |
+| **Analysis** (5) | rms ×2, rmsf, gyrate, hbond | Backbone RMSD, ligand RMSD, RMSF, Rg, H-bonds |
+
+MDP protocol: **amber14sb** (Maier et al. 2015) + TIP3P water, **C-rescale**
+(Bernetti & Bussi 2020, NPT equil) → Parrinello-Rahman (production),
+V-rescale thermostat at 310 K, PME electrostatics (**rcoulomb=1.0 nm**,
+AMBER standard), LINCS h-bonds constraints, dt=2 fs. Thermostat coupling:
+`Protein_LIG` / `Water_and_ions`. Position restraints on both protein and
+ligand during equilibration (`-DPOSRES -DPOSRES_LIG`).
+
+### Output
+
+Results go to `output/md/{pair}/{mode}/mol_{N}/target_{A,B}/`:
+
+| File | Content |
+|------|---------|
+| `rmsd_backbone.csv` | time_ns, rmsd_A |
+| `rmsd_ligand.csv` | time_ns, rmsd_A |
+| `rmsf.csv` | residue, rmsf_A |
+| `radius_gyration.csv` | time_ps, rg_A |
+| `hbonds.csv` | time_ns, n_hbonds |
+| `trajectory.xtc` | Fitted trajectory (PBC-corrected, centered) |
+| `md_result.json` | All summary metrics (21 fields) |
+| `mmpbsa.csv` | MM-GBSA output (only with `--mmpbsa`) |
+
+Global summary: `output/md/md_summary.parquet` (appended after each run).
+
+**Resumability**: If `md_result.json` exists for a molecule×target, that run is
+skipped. To re-run, delete the specific `target_{A,B}/` directory.
+
+### Timing Estimates (RTX 4090)
+
+| Simulation | Time/molecule×target | Total for top-3 × 3 modes × 2 targets |
+|------------|---------------------|---------------------------------------|
+| 1 ns (smoke) | ~5-10 min | ~1.5-3 hours |
+| 10 ns | ~30-60 min | ~9-18 hours |
+| 50 ns (default) | ~2-4 hours | ~36-72 hours |
+
+### Troubleshooting
+
+- **Container exits silently**: Run interactively with `docker run -it ... bash`
+  and execute `run_md.py` manually to see errors. Docker output now streams
+  to the terminal (no longer captured silently).
+- **`pdb2gmx` fails on missing atoms**: PDBFixer repairs are automatic but
+  require `pdbfixer` + `openmm` (bundled in Docker image via conda-forge).
+- **Docker output owned by root**: Container runs as root; output files in
+  `output/md/` will be owned by root. Fix with `sudo chown -R $(id -u):$(id -g) output/md/`.
+- **acpype/antechamber fails**: Some FREED++ molecules have unusual chemistry.
+  The pipeline logs the error and moves to the next molecule.
+
+See [io_contracts.md](io_contracts.md) (Stage 5c) for complete I/O specification.
 
 ## LaTeX Report
 

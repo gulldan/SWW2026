@@ -374,17 +374,32 @@ independent scorer alongside Boltz-2 and UniDock.
 
 **Script**: `cli/s6_md/run_md.py`
 
-Runs molecular dynamics simulations for top candidate molecules from
-each generation mode.  Validates binding stability over 50 ns.
+Runs publication-quality molecular dynamics simulations for top candidate
+molecules from each generation mode. Validates binding stability via
+backbone/ligand RMSD, RMSF, radius of gyration, H-bonds, and convergence
+assessment (KS test).
 
 ### Prerequisites
 
-- GROMACS >= 2024 with GPU support (CUDA)
+- GROMACS >= 2024 with GPU support (CUDA recommended, CPU fallback available)
 - AmberTools + acpype (ligand parameterization)
+- OpenBabel (`obabel`, SDF → MOL2 conversion)
 - gmx_MMPBSA (optional, for MM-GBSA rescoring)
 
-Installation: `conda install -c conda-forge -c bioconda gromacs ambertools acpype`
+Installation: `conda install -c conda-forge -c bioconda gromacs ambertools acpype openbabel`
 or via Docker image.
+
+### CLI Options
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--pair` | str | required | Pair ID from `configs/pairs.yaml` |
+| `--mode` | str | all | Generation mode (default: all configured modes) |
+| `--top-n` | int | 3 | Top-N molecules per mode |
+| `--mmpbsa` | flag | off | Run MM-GBSA via gmx_MMPBSA |
+| `--simulation-time` | float | 50.0 | Override simulation time (ns) |
+| `--no-gpu` | flag | off | Disable automatic GPU acceleration |
+| `--dry-run` | flag | off | Print plan without executing |
 
 ### Inputs
 
@@ -392,20 +407,98 @@ or via Docker image.
 |------|--------|--------|
 | Top-N molecules per mode (from `scored_joined.parquet`) | Parquet | Stage 3 |
 | `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | Stage 0 |
-| Boltz-2 predicted complex structures (`.cif`) | mmCIF | Stage 3 (Boltz-2 output) |
+
+### GROMACS Pipeline (22 commands)
+
+**Setup (14 commands):**
+pdb2gmx (`-ff amber14sb`) → editconf → solvate → grompp ions → genion (`stdin: SOL`) →
+grompp EM → mdrun EM → make_ndx (`stdin: Protein | r LIG / q`) →
+grompp NVT → mdrun NVT → grompp NPT → mdrun NPT → grompp prod → mdrun prod
+
+**Trajectory preprocessing (3 commands):**
+trjconv `-pbc whole` (`stdin: System`) →
+trjconv `-center -pbc mol` (`stdin: Protein / System`) →
+trjconv `-fit rot+trans` (`stdin: Backbone / System`)
+
+**Analysis (5 commands):**
+`gmx rms` backbone (`stdin: Backbone/Backbone`) →
+`gmx rms` ligand (`stdin: LIG/LIG`) →
+`gmx rmsf` per-residue (`stdin: Backbone`) →
+`gmx gyrate` (`stdin: Protein`) →
+`gmx hbond-legacy` (`stdin: Protein/LIG`, falls back to `gmx hbond`)
+
+### MDP Protocol (Modern: amber14sb + C-rescale)
+
+Force field: **amber14sb** (Maier et al. 2015, built into GROMACS 2026).
+All MDPs include: `cutoff-scheme=Verlet`, `rcoulomb=1.0`, `rvdw=1.0`
+(AMBER standard), `DispCorr=EnerPres`, `fourierspacing=0.12`, `pme_order=4`,
+`vdw-modifier=Potential-shift`, `constraint-algorithm=LINCS`, `lincs_order=4`.
+Thermostat coupling groups: `Protein_LIG` / `Water_and_ions`.
+
+| Phase | Duration | Barostat | Thermostat τ | Notes |
+|-------|----------|----------|--------------|-------|
+| EM | 50k steps | — | — | Steepest descent, emtol=1000 |
+| NVT | 200 ps (configurable) | none | V-rescale 0.1 ps | Position restraints (`-DPOSRES -DPOSRES_LIG`), velocity generation |
+| NPT | 200 ps (configurable) | **C-rescale** τ=1.0 ps | V-rescale 0.1 ps | Position restraints, correct NPT ensemble (Bernetti & Bussi 2020) |
+| Production | 50 ns (configurable) | **Parrinello-Rahman** τ=2.0 ps | V-rescale 1.0 ps | No position restraints, no energygrps |
+
+### GPU Acceleration
+
+When `gpu_auto=True` (default), `nvidia-smi` is probed at startup.
+If an NVIDIA GPU is found, all `mdrun` calls receive:
+`-nb gpu -pme gpu -bonded gpu -update gpu`. Disable with `--no-gpu`.
 
 ### Outputs
 
 | File | Format | Contents |
 |------|--------|----------|
-| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/rmsd_ligand.csv` | CSV | Per-frame RMSD of ligand heavy atoms (ns, Å) |
-| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/hbonds.csv` | CSV | Per-frame hydrogen bond count |
-| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/interaction_energy.csv` | CSV | Per-frame protein-ligand interaction energy (kJ/mol) |
-| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/trajectory.xtc` | XTC | Compressed trajectory (GROMACS format) |
-| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/mmpbsa.csv` | CSV | MM-GBSA binding free energy (optional, from gmx_MMPBSA) |
-| `output/md/md_summary.parquet` | Parquet | `pair`, `mode`, `mol_id`, `target`, `mean_rmsd`, `max_rmsd`, `stable` (bool, RMSD < 3 Å), `mean_hbonds`, `mean_energy` |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/rmsd_backbone.csv` | CSV | Per-frame backbone RMSD (ns, Å) |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/rmsd_ligand.csv` | CSV | Per-frame ligand RMSD (ns, Å) |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/rmsf.csv` | CSV | Per-residue backbone RMSF (residue, Å) |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/radius_gyration.csv` | CSV | Per-frame protein radius of gyration (ps, Å) |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/hbonds.csv` | CSV | Per-frame protein-ligand hydrogen bond count |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/trajectory.xtc` | XTC | PBC-corrected, centered, fitted trajectory |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/mmpbsa.csv` | CSV | MM-GBSA binding ΔG (optional, kcal/mol) |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/md_result.json` | JSON | All metrics for this molecule×target run |
+| `output/md/md_summary.parquet` | Parquet | See schema below |
 
-Stability criterion: ligand RMSD < 3.0 Å over last 25 ns of 50 ns trajectory.
+### `md_summary.parquet` schema
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `pair` | str | Pair ID |
+| `mode` | str | Generation mode |
+| `mol_id` | int | Molecule index |
+| `target` | str | Target ID |
+| `target_label` | str | `A` or `B` |
+| `smiles` | str | Molecule SMILES |
+| `mean_rmsd` | float64 | Mean ligand RMSD over stability window (Å) |
+| `max_rmsd` | float64 | Max ligand RMSD over stability window (Å) |
+| `stable` | bool | `mean_rmsd < 3.0` Å |
+| `mean_hbonds` | float64 | Mean protein-ligand H-bond count |
+| `mean_energy` | float64 | Mean total interaction energy (kJ/mol) |
+| `backbone_rmsd_mean` | float64 | Mean backbone RMSD (Å) |
+| `backbone_rmsd_final` | float64 | Final-frame backbone RMSD (Å) |
+| `rmsf_binding_pocket` | float64 | Mean per-residue backbone RMSF (Å) |
+| `rg_mean` | float64 | Mean protein radius of gyration (Å) |
+| `rg_std` | float64 | Std of radius of gyration (Å) |
+| `converged` | bool | KS test: p > 0.05 AND |mean_diff| < 0.5 Å |
+| `convergence_ks_pvalue` | float64 | 2-sample KS p-value (first vs second half of backbone RMSD) |
+| `coulomb_sr` | float64 | Mean short-range Coulomb interaction energy (kJ/mol) |
+| `lj_sr` | float64 | Mean short-range LJ interaction energy (kJ/mol) |
+| `mmpbsa_dg` | float64 | MM-GBSA binding ΔG (kcal/mol, NaN if not run) |
+
+### Convergence Assessment
+
+Backbone RMSD is split into two halves. A 2-sample Kolmogorov-Smirnov test
+determines whether the distributions differ significantly. The simulation
+is considered converged when `p > alpha` (default 0.05) AND
+`|mean_second_half - mean_first_half| < 0.5 Å`.
+
+### Stability Criterion
+
+Ligand RMSD < 3.0 Å (configurable) over the last 25 ns (configurable)
+of the production trajectory.
 
 ---
 

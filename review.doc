@@ -1,0 +1,596 @@
+LITERATURE REVIEW AND GAP ANALYSIS
+====================================
+
+Research Question:
+Can dual-pocket-conditioned de novo molecular generation produce more selective ligands
+for structurally similar binding sites compared to single-target generation with subsequent
+off-target filtering, without compromising drug-likeness properties?
+
+Date: 2026-02-14
+Sources: bioRxiv, ChEMBL, ClinicalTrials.gov, HuggingFace Hub, Web (academic literature)
+
+================================================================================
+I. WHAT ALREADY EXISTS IN THE LITERATURE
+================================================================================
+
+A. Dual/Multi-Target Generation (Polypharmacology -- Binding BOTH Targets)
+---------------------------------------------------------------------------
+
+These works generate molecules that bind BOTH targets simultaneously.
+This is NOT selectivity -- it is polypharmacology.
+
+1. DiffDTM (2024, IEEE)
+   - URL: https://arxiv.org/abs/2306.13957
+   - Architecture: Diffusion model, structure-free (protein sequences + molecular graphs)
+   - Targets: Dopamine D2R + Serotonin 5-HT1A (antipsychotics)
+   - Key: First deep generative model for dual-target molecule generation given
+     arbitrary dual targets without retraining. One-shot conditional generation.
+   - Validation: In silico (docking, drug-likeness metrics)
+   - Limitation: Designed for polypharmacology, NOT selectivity between similar targets.
+
+2. POLYGON (2024, Nature Communications)
+   - URL: https://www.nature.com/articles/s41467-024-47120-y
+   - Architecture: VAE + Reinforcement Learning
+   - Targets: MEK1 + mTOR
+   - Key: Embeds chemical space and iteratively samples to generate polypharmacology
+     compounds. 82.5% accuracy in recognizing polypharmacology interactions across
+     >100K compounds.
+   - Validation: 32 compounds synthesized, >50% reduction in both protein activities
+     and cell viability at 1-10 uM.
+   - Note: Authors state that "including IC50 predictions for a panel of off-target
+     proteins as a negative reward" is a FUTURE direction -- confirming selectivity
+     is not yet addressed.
+
+3. MTMol-GPT (2024, PLOS Computational Biology)
+   - URL: https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1012229
+   - Architecture: GPT + Generative Adversarial Imitation Learning
+   - Targets: DRD2 + HTR1A
+   - Key: Multi-target generation with transformer architecture.
+   - Validation: Docking, pharmacophore mapping.
+
+4. AIxFuse (2023, bioRxiv -> Chemical Science)
+   - DOI: 10.1101/2023.12.10.571029 (published: 10.1039/D4SC00094C)
+   - Architecture: Two self-play RL agents for pharmacophore selection + fusion
+   - Targets: GSK3-beta/JNK3, RORgamma-t/DHODH
+   - Key: First structure-aware dual-target drug design method. 5x outperformance
+     in success rate vs SOTA. Free energy perturbation calculations confirm promising
+     binding free energies.
+   - Relevance: DIRECTLY addresses dual-pocket structural constraints, but for
+     polypharmacology (binding BOTH pockets), not selectivity.
+
+5. EVOSYNTH (2025, bioRxiv)
+   - DOI: 10.1101/2025.11.04.686584
+   - Architecture: Latent evolution with synthesis-aware prioritization
+   - Targets: JNK3/GSK3-beta (Alzheimer's), PI3K/PARP1 (ovarian cancer)
+   - Key: Outperforms baseline generative models in predicted affinities, scaffold
+     diversity, and lower synthesis costs.
+
+6. DiffMC-Gen (2025, Advanced Science)
+   - URL: https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/advs.202417726
+   - Architecture: Dual diffusion 2D+3D
+   - Key: Multi-conditional molecular generation, but NOT dual-pocket selectivity.
+
+7. MDRL (2025, Journal of Cheminformatics)
+   - URL: https://link.springer.com/article/10.1186/s13321-025-01035-y
+   - Architecture: 3D diffusion + reinforcement learning
+   - Key: Joint optimization of multi-target binding and molecular properties.
+     Polypharmacology focus, not selectivity.
+
+
+B. Selectivity via Post-Hoc Optimization (Single-Target + Filtering/Optimization)
+----------------------------------------------------------------------------------
+
+1. DiffSBDD -- Negative Design (2024, Nature Computational Science)
+   - URL: https://www.nature.com/articles/s43588-024-00737-x
+   - PMC: https://pmc.ncbi.nlm.nih.gov/articles/PMC11659159/
+   - Architecture: SE(3)-equivariant diffusion model
+   - Strategy: Explicit negative design via modified SAMPLING (not retraining).
+     Iterative noising/denoising + simultaneous scoring against on-target and off-target.
+   - Targets: BIKE kinase (on-target, PDB 4w9w) vs MPSK1 kinase (off-target, PDB 2buj)
+   - Results:
+     * On-target docking score: -7.2 -> -13.9 (5 rounds of optimization)
+     * Off-target docking score: -10.8 -> -8.7
+     * "Substantially improved specificity"
+   - Key insight: A single pretrained diffusion model can perform property optimization,
+     explicit negative design, and partial molecular design (inpainting) by changing
+     only the sampling strategy.
+   - Limitation: Selectivity is achieved POST-HOC via iterative optimization, NOT
+     through a priori dual-pocket conditioning during generation.
+
+2. CMD-GEN -- Pharmacophore Matching (2025, Communications Biology)
+   - URL: https://www.nature.com/articles/s42003-025-07840-3
+   - Architecture: Coarse-grained pharmacophore diffusion model
+   - Strategy: Bridges ligand-protein complexes with drug-like molecules using
+     pharmacophore points. Compares pharmacophore clouds between target and anti-target.
+   - Targets: PARP1 vs PARP2
+   - Results: >787-fold selectivity for PARP1 over PARP2
+   - Validation: WET-LAB confirmed
+   - Key: Closest to structural comparison of two pockets, but selectivity through
+     pharmacophore DIFFERENCE analysis, not simultaneous conditioning.
+
+3. BInD -- NCI Pattern Guidance (2025, Advanced Science)
+   - URL: https://advanced.onlinelibrary.wiley.com/doi/10.1002/advs.202502702
+   - Architecture: Bond and Interaction-generating Diffusion model
+   - Strategy: Non-covalent interaction (NCI) patterns as knowledge-based guidance
+   - Targets: EGFR double-mutant vs wild-type
+   - Results: Median affinity difference 0.69 kcal/mol for mutant EGFR
+   - CRITICAL FINDING: Tested TargetDiff and Pocket2Mol -- BOTH FAILED to produce
+     selective molecules (no significant affinity differences between pockets).
+     This directly proves that current pocket-conditioned models lack selectivity.
+
+4. DrugHIVE -- Evolutionary Latent Space Search (2024, JCIM)
+   - URL: https://pubs.acs.org/doi/10.1021/acs.jcim.4c01193
+   - PMC: https://pmc.ncbi.nlm.nih.gov/articles/PMC11350878/
+   - Architecture: Deep hierarchical VAE
+   - Strategy: Evolutionary algorithm optimizing selectivity ratio in latent space.
+     Generate for target first, then optimize against anti-target.
+   - Targets: ATM kinase vs Vps34 kinase
+   - Results: Best molecule ATM -9.3 kcal/mol vs Vps34 -6.1 kcal/mol
+   - Metrics evaluated: Vina docking, QED, SA, ALogP, molecular diversity (Tanimoto)
+   - Limitation: Sequential optimization, not simultaneous dual-pocket conditioning.
+
+5. CogMol -- Multi-Attribute Sampling (2020, NeurIPS)
+   - URL: https://proceedings.neurips.cc/paper/2020/hash/2d16ad1968844a4300e9a490588ff9f8-Abstract.html
+   - Architecture: VAE + CLaSS (Controlled Latent attribute Space Sampling)
+   - Strategy: Multi-attribute controlled sampling including off-target selectivity
+     as an explicit attribute alongside QED and SA.
+   - Targets: Three SARS-CoV-2 targets (Mpro, spike RBD, NSP9)
+   - Results: 87-95% of high-affinity molecules showed docking <-6 kcal/mol.
+     Novel at molecular and scaffold levels.
+   - Key: Early work explicitly incorporating off-target selectivity as a
+     generation attribute, but NOT structure-based pocket conditioning.
+
+6. DRAGONFLY (2024, Nature Communications)
+   - URL: https://www.nature.com/articles/s41467-024-47613-w
+   - Architecture: Graph-to-sequence deep learning, interactome-based
+   - Strategy: Two scoring procedures: (1) selective single-target PPARgamma,
+     (2) dual PPARgamma+PPARdelta.
+   - Results: Potent PPARgamma partial agonists with desired selectivity profiles.
+     Crystal structure confirmed binding mode.
+   - Validation: WET-LAB (synthesis + crystal structure)
+
+7. REACTOR (2021, ACS Omega)
+   - Architecture: RL with chemical reactions as MDP transitions
+   - Strategy: Off-target penalty in multi-objective reward
+   - Targets: DRD2 vs D1/D3 receptors
+   - Key: Maintains higher number of desirable molecules on selectivity tasks.
+
+8. Entangled AAE (2020, cited in 2024 reviews)
+   - Architecture: Semi-supervised Adversarial Autoencoder
+   - Strategy: Conditional generation with low/high activity settings per target
+   - Targets: JAK2 vs JAK3
+   - Results: One molecule synthesized with confirmed in vitro selectivity for JAK3.
+
+9. Selective Kinase Design via MCTS (2022, JCIM)
+   - URL: https://pubs.acs.org/doi/10.1021/acs.jcim.2c00787
+   - Architecture: ChemTS (RNN + Monte Carlo Tree Search)
+   - Strategy: 18 simultaneous objectives including 9 tyrosine kinase activities +
+     pharmacokinetic + synthesizability + drug-likeness
+   - Key: Multi-objective optimization framing of selectivity.
+
+
+C. Pocket-Conditioned Generation for Selectivity (Experimental Validation)
+--------------------------------------------------------------------------
+
+1. ATOM-GMD -- Generative Molecular Design with Selectivity Validation (2023, bioRxiv)
+   - DOI: 10.1101/2023.02.14.528391
+   - From: Lawrence Livermore National Laboratory
+   - Targets: Histamine H1 (on-target) vs M2 receptor (off-target)
+   - Results: 6 compounds binding H1 with Ki 10-100 nM, at least 100-fold selective
+     over M2 receptors. 103 compounds synthesized and tested.
+   - Key: One of the few papers with WET-LAB selectivity confirmation.
+
+2. SE3-BiLingoMol (2025, bioRxiv)
+   - DOI: 10.1101/2025.09.23.678079
+   - Architecture: SE(3)-equivariant Transformer for pocket-based 3D generation
+   - Targets: HPK1 (selective inhibitor)
+   - Results: Potent and selective HPK1 inhibitor with IN VIVO efficacy
+   - Key: Very recent, demonstrating pocket-conditioned generation achieving
+     selectivity with in vivo validation.
+
+3. Multi-objective cGVAE (2018, Journal of Cheminformatics)
+   - URL: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-018-0287-6
+   - Strategy: Conditional generation with selectivity conditioning codes
+   - Targets: JNK3-selective, GSK3beta-selective, or dual inhibitors
+   - Key: Early foundational work on selectivity-conditioned generation.
+
+
+D. Single-Pocket Conditioned Models (Context -- No Selectivity)
+---------------------------------------------------------------
+
+All of these are single-pocket models without selectivity capabilities:
+
+- PMDM (2024, Nature Communications): Dual equivariant encoders (local+global dynamics).
+  URL: https://www.nature.com/articles/s41467-024-46569-1
+- PILOT (2024, Chemical Science): Equivariant diffusion + multi-objective importance sampling.
+  URL: https://pubs.rsc.org/en/content/articlehtml/2024/sc/d4sc03523b
+- DiffGui (2025, Nature Communications): Target-conditioned with property guidance.
+  URL: https://www.nature.com/articles/s41467-025-63245-0
+- MolCRAFT (2024): First SBDD in continuous parameter space. Vina -6.59 kcal/mol.
+- MolJO (2024): SOTA on CrossDocked2020 (Success Rate 51.3%, Vina Dock -9.05).
+- DrugFlow (2025): Flow matching + discrete Markov bridges.
+- DrugGPS (2023): Subpocket prototypes for generalizable SBDD.
+- DecompOpt (2024): Decomposed diffusion for structure-based optimization.
+- Apo2Mol (2025): Accounts for protein conformational flexibility.
+- 3DMolFormer (2025): Unified dual-channel transformer for docking and drug design.
+- FREED++ (2024): RL-based fragment generation. No selectivity component.
+- MolSnapper (2024): Conditioning diffusion for SBDD.
+  URL: https://pubs.acs.org/doi/10.1021/acs.jcim.4c02008
+
+
+E. Benchmarks and Evaluation Frameworks
+-----------------------------------------
+
+1. MolScore (2024, Journal of Cheminformatics) -- MOST RELEVANT
+   - URL: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-024-00861-w
+   - Includes 5-HT2A selectivity benchmarks with dual docking
+   - Three difficulty levels: PhysChem, QSAR, dual molecular docking
+   - Critical finding: Selectivity optimization is significantly harder than
+     single-target -- selectivity "barely improved" during optimization.
+   - Presets: '5HT2A_PhysChem', '5HT2A_Selectivity', '5HT2A_Docking'
+
+2. CrossDocked2020 -- Standard SBDD Benchmark
+   - ~22.5M poses, ~19,443 protein-ligand complexes
+   - NO selectivity evaluation metrics
+   - Used by: DiffSBDD, TargetDiff, Pocket2Mol, PMDM, MolCRAFT, MolJO, etc.
+
+3. DOCKSTRING -- Docking Score Benchmark
+   - Includes selectivity tasks: JAK2 vs LCK
+   - One of the few benchmarks with explicit selectivity objectives.
+
+4. POKMOL-3D (2024, JCIM)
+   - URL: https://pubs.acs.org/doi/10.1021/acs.jcim.4c01598
+   - 32 protein targets, new 2D/3D evaluation metrics
+   - Single-target only, no selectivity.
+
+5. SBDD Benchmark: Do 3D Methods Really Dominate? (2024, arXiv)
+   - URL: https://arxiv.org/abs/2406.03403
+   - Cross-algorithm comparison of 16 models
+
+6. 3D SBDD: Are We There Yet? (2024, bioRxiv)
+   - DOI: 10.1101/2024.12.27.629537
+   - Novel metrics for chemical plausibility
+   - Shows current algorithms generate chemically implausible structures
+
+7. "Is Structure-Based Drug Design Ready for Selectivity Optimization?" (2020, JCIM)
+   - URL: https://pmc.ncbi.nlm.nih.gov/articles/PMC8310368/
+   - FEP for selectivity CDK2/CDK9 and CDK2/ERK2
+   - Key insight: Binding site similarity may lead to cancellation of errors,
+     allowing selectivity to be predicted MORE accurately than affinity.
+
+8. Scoring Function Concern -- Boltz-2 (2025)
+   - URL: https://pmc.ncbi.nlm.nih.gov/articles/PMC12262699/
+   - Independent assessment found affinity predictions "insensitive to key
+     binding site mutations and even in some cases to target exchange"
+   - Raises concerns about using AI scoring for selectivity evaluation.
+
+
+================================================================================
+II. ChEMBL DATA: TARGET FAMILIES WITH SELECTIVITY DATA
+================================================================================
+
+A. Target Pairs with Rich Selectivity Data
+--------------------------------------------
+
+JAK Family (Gold Standard):
+- JAK1: CHEMBL2835 (7,342 IC50 with pChEMBL >= 7)
+- JAK2: CHEMBL2971 (8,030 IC50 with pChEMBL >= 7)
+- JAK3: CHEMBL2148
+- TYK2: CHEMBL3553
+- Total: >15,000 high-quality IC50 measurements across family
+- PDB coverage: JAK1 50+ structures, JAK2 130+ structures
+- Best selective drug: Upadacitinib (JAK1/JAK2: 3x biochemical, 75x cellular)
+
+CDK Family (Unmet Need):
+- CDK4: CHEMBL331 (13 PDB structures)
+- CDK6: CHEMBL2508 (19 PDB structures)
+- CDK4/CDK6 selectivity is practically UNACHIEVABLE with current approaches
+- Palbociclib is a dual CDK4/6 inhibitor (>100x selective over CDK2)
+- PERFECT test case for dual-pocket methods
+
+PI3K Family (Clinical Validation):
+- PI3Ka: CHEMBL4005 (90+ PDB structures)
+- PI3Kd: CHEMBL3130 (17 PDB structures)
+- Alpelisib: PI3Ka-selective (>10x)
+- Idelalisib: PI3Kd-selective (>50x)
+
+EGFR (Mutant Selectivity):
+- CHEMBL203 (extensive PDB coverage, 10,000+ IC50)
+- Mutant vs WT selectivity clinically validated
+
+B. Key Selectivity Ratios Achieved by Existing Drugs
+------------------------------------------------------
+
+Drug              | Target Pair      | Selectivity Ratio              | Notes
+Upadacitinib      | JAK1/JAK2        | 3x biochemical, 75x cellular   | Best-in-class JAK1
+Tofacitinib       | JAK3/JAK1        | ~100x                          | Poor JAK2 selectivity
+Alpelisib         | PI3Ka/other PI3K | >10x                           | Isoform-selective
+Idelalisib        | PI3Kd/other PI3K | >50x                           | Leukocyte-restricted
+Palbociclib       | CDK4,6/CDK2      | >100x                          | Dual, selective vs CDK2
+Imatinib          | ABL/broader kinome| Selective for defined set      | Multi-kinase
+
+C. Structural Insights
+------------------------
+- JAK family: All 4 members have ATP-binding sites with high structural conservation.
+  Selectivity exploits subtle differences in gatekeeper residues and glycine-rich loop.
+- PI3K family: Alpha and delta share lipid kinase fold but differ in loop conformations.
+- CDK family: CDK4 and CDK6 have NEARLY IDENTICAL binding sites -- exemplar case for
+  dual-pocket methods.
+
+
+================================================================================
+III. CLINICAL TRIALS: SELECTIVITY-DRIVEN DRUG CANDIDATES
+================================================================================
+
+A. Mutant-Selective PI3Ka Inhibitors -- Most Relevant Clinical Class
+---------------------------------------------------------------------
+
+Compound    | Sponsor             | Phase   | NCT ID         | Status         | N
+RLY-2608    | Relay Therapeutics  | Phase 3 | NCT06982521    | Recruiting     | 540
+RLY-2608    | Relay Therapeutics  | Phase 1 | NCT05216432    | Recruiting     | 930
+STX-478     | Eli Lilly           | Phase 1/2| NCT05768139   | Recruiting     | 720
+OKI-219     | OnKure              | Phase 1 | NCT06239467    | Recruiting     | 200
+CGT6297     | Cogent Biosciences  | Phase 1 | NCT07383506    | Not recruiting | 90
+ETX-636     | Ensem Therapeutics  | Phase 1/2| NCT06993844   | Recruiting     | 233
+RLY-5836    | Relay Therapeutics  | Phase 1 | NCT05759949    | Completed      | 41
+
+RLY-2608 is arguably the MOST ADVANCED computationally designed selectivity-optimized
+drug in clinical development. Designed using Relay's motion-based drug design platform
+(Dynamo). Selective for mutant PI3Ka over wild-type, reducing hyperglycemia/metabolic
+toxicities of first-gen inhibitors.
+
+B. AI Drug Discovery Companies -- Clinical Pipeline
+-----------------------------------------------------
+
+Insilico Medicine (9 trials):
+- INS018_055 (Rentosertib): First AI-discovered drug in Phase 2 (COMPLETED with results)
+  NCT05938920. Target, compound, and indication all identified by AI.
+- ISM3412, ISM8207, ISM6331, ISM5411, ISM5939: Phase 1 trials
+
+Recursion/Exscientia (8 trials):
+- GTAEXS617 (REC-617): AI-designed CDK7 inhibitor, Phase 1/2, n=230
+  NCT05985655. Selectivity as key design criterion.
+- EXS21546: AI-designed A2A receptor antagonist, Phase 1 (completed)
+- EXS73565, REC-4881, REC-1245: Phase 1-2
+
+Relay Therapeutics (5 trials): See mutant-selective PI3Ka above.
+
+C. Other Selective Inhibitors in Clinical Trials
+--------------------------------------------------
+- Avapritinib (BLU-285): Selective KIT D816V mutant TKI (NCT03731260)
+- Acalabrutinib: Selective BTK inhibitor (NCT03198650)
+- Abrocitinib + Ritlecitinib: JAK1/JAK3-selective for T1D (NCT05743244)
+- Selective CDK inhibitor P1446A-05: Phase 1 completed
+
+D. Key Clinical Insight
+-------------------------
+125+ trials explicitly reference selective inhibitors for cancer alone.
+64 involve selective kinase inhibitors in Phase 1-3.
+Mutant-selective PI3Ka inhibitors are the clearest proof that
+selectivity-by-design translates to improved therapeutic windows.
+ClinicalTrials.gov does NOT capture computational methods in structured fields --
+the computational origin is only discoverable by knowing sponsor companies.
+
+
+================================================================================
+IV. HUGGINGFACE HUB: ML/AI LANDSCAPE
+================================================================================
+
+A. Key SBDD Models (from HF Papers)
+--------------------------------------
+
+No models for multi-pocket/selectivity-aware generation exist on HuggingFace.
+The field's code primarily lives on GitHub.
+
+Established single-pocket-conditioned methods:
+- MolCRAFT (2024): First SBDD in continuous parameter space
+- MolJO (2024): SOTA on CrossDocked2020 (SR 51.3%, Vina -9.05)
+- DrugFlow (2025): Flow matching + discrete Markov bridges
+- DrugGPS (2023): Subpocket prototypes -- closest conceptual precursor to
+  dual-pocket methods
+- DecompOpt (2024): Decomposed diffusion for fine-grained control
+- Apo2Mol (2025): Protein flexibility-aware generation
+- 3DMolFormer (2025): Unified dual-channel transformer
+- FuncBind (2025): Neural fields for all-atom generation
+- SynCoGen (2025): Synthesizable 3D generation
+
+Docking and scoring:
+- DiffDock (2022): 38% top-1 success on PDBBind
+- FlowDock (2024): 51% blind docking success, Top-5 at CASP16
+- PoseX (2025): 22 methods compared, AI surpasses physics-based
+
+B. Key Gap
+-----------
+ALL current SBDD models condition on a SINGLE pocket. No model jointly conditions
+on two pockets (on-target + off-target) to optimize selectivity.
+
+Closest building blocks:
+- DrugGPS subpocket prototypes could contrast on-target vs off-target subpockets
+- DecompOpt decomposed approach enables fine-grained R-group control
+- MolJO multi-objective optimization could add selectivity objectives
+- Apo2Mol flexibility awareness relevant for induced-fit selectivity differences
+
+
+================================================================================
+V. CRITICAL GAP ANALYSIS
+================================================================================
+
+A. What NOBODY Has Done
+-------------------------
+
+1. NO HEAD-TO-HEAD COMPARISON of dual-pocket conditioning vs single-target +
+   off-target filtering on the same benchmark with the same metrics.
+
+2. NO MODEL WITH A PRIORI DUAL-POCKET CONDITIONING:
+   - DiffSBDD: negative design post-hoc (via modified sampling)
+   - DrugHIVE: sequential generate-then-optimize
+   - CMD-GEN: pharmacophore difference analysis
+   - BInD: NCI pattern guidance
+   - NONE conditions on both pockets simultaneously during generation
+
+3. NO STANDARDIZED SELECTIVITY BENCHMARK:
+   - CrossDocked2020 has no selectivity metrics
+   - MolScore has only 5-HT2A/D2
+   - No multi-family benchmark exists
+
+4. BInD PROVED THAT EXISTING MODELS FAIL AT SELECTIVITY:
+   - TargetDiff: no significant affinity differences between pockets
+   - Pocket2Mol: no significant affinity differences between pockets
+   - This is DIRECT MOTIVATION for new approaches
+
+5. DRUG-LIKENESS TRADE-OFF NOT STUDIED:
+   - Unknown how dual conditioning affects QED/SA/Lipinski
+   - Unknown if constraining to two pockets causes mode collapse or
+     reduces molecular diversity
+
+6. LIMITED WET-LAB VALIDATION:
+   - Only CMD-GEN (PARP1/2) and DRAGONFLY (PPARg) have prospective
+     selectivity validation
+   - Only ATOM-GMD has systematic selectivity measurement (H1 vs M2)
+
+
+================================================================================
+VI. VERDICT: CAN YOU WRITE THIS PAPER?
+================================================================================
+
+YES -- this is a strong, original, and publishable research question.
+
+Reasons:
+1. The question is PRECISELY NOT ANSWERED in existing literature.
+   Dual-pocket conditioning for selectivity (not polypharmacology) with
+   direct comparison vs single-target+filtering is a clear gap.
+
+2. Components EXIST but are NOT CONNECTED:
+   - DiffSBDD can do negative design
+   - DiffDTM can do dual-target conditioning
+   - POLYGON can do multi-target RL
+   - BInD proved existing models fail at selectivity
+   - Nobody has combined these insights into a head-to-head comparison
+
+3. The DualDocking project infrastructure (docking, scoring, analysis pipeline)
+   is directly applicable.
+
+4. Clinical relevance is high: RLY-2608 (Phase 3) proves selectivity-by-design
+   translates to better drugs.
+
+
+================================================================================
+VII. PROPOSED EXPERIMENTAL PLAN
+================================================================================
+
+A. Selectivity Benchmark (Novel Contribution)
+-----------------------------------------------
+
+Build a benchmark from 4-6 pairs of structurally similar targets:
+
+Target Pair     | ChEMBL IDs          | PDB Structures  | Clinical Relevance
+JAK1/JAK2       | CHEMBL2835/2971     | 50+/130+        | Upadacitinib (3x/75x)
+CDK4/CDK6       | CHEMBL331/2508      | 13/19           | Unmet need (no selective drugs)
+PI3Ka/PI3Kd     | CHEMBL4005/3130     | 90+/17          | Alpelisib/Idelalisib
+EGFR WT/mutant  | CHEMBL203           | Extensive        | BInD already tested
+PARP1/PARP2     | --                  | Available        | CMD-GEN already tested (787x)
+D2R/D3R         | --                  | Available        | Classic GPCR selectivity
+
+B. Methods to Compare (3 Paradigms)
+--------------------------------------
+
+Baseline A: Single-pocket generation (TargetDiff/DiffSBDD/MolCRAFT) +
+            post-hoc docking filter against off-target
+
+Baseline B: DiffSBDD negative design (iterative noising/denoising + dual scoring)
+
+Proposed:   True dual-pocket conditioned generation (conditioning on target +
+            anti-target pockets during generation process itself)
+
+C. Metrics (Comprehensive)
+----------------------------
+
+Category      | Metrics
+Selectivity   | Delta Vina score, selectivity ratio, hit rate (% > threshold)
+Drug-likeness | QED, SA, Lipinski compliance, logP
+Quality       | Validity, uniqueness, novelty, PoseBusters pass rate
+Diversity     | Tanimoto distance, scaffold diversity
+Efficiency    | Time per molecule, compute cost
+
+D. Wet-Lab Validation (for High-Impact Publication)
+------------------------------------------------------
+- Synthesize 10-20 top candidates for 1-2 target pairs
+- Binding assay on-target + off-target
+- Selectivity index measurement
+- Crystal structure (if possible) for top selective compound
+
+E. Ablation Studies
+---------------------
+- Dual conditioning vs single conditioning + filter
+- Effect of pocket similarity on dual conditioning performance
+- Drug-likeness distribution comparison across methods
+- Computational efficiency comparison
+
+
+================================================================================
+VIII. TARGET JOURNALS
+================================================================================
+
+1. Nature Computational Science (DiffSBDD published there)
+2. Nature Communications (POLYGON, PMDM, DRAGONFLY, CMD-GEN published there)
+3. Advanced Science (BInD published there)
+4. JCIM (DrugHIVE published there)
+5. NeurIPS/ICML (if ML methodology is the primary focus)
+
+
+================================================================================
+IX. KEY REFERENCES FOR RELATED WORK SECTION
+================================================================================
+
+Selectivity in SBDD:
+- Schneuing et al. "Structure-based drug design with equivariant diffusion models."
+  Nature Computational Science, 2024. https://doi.org/10.1038/s43588-024-00737-x
+- Lee et al. "BInD: Bond and Interaction-generating Diffusion Model."
+  Advanced Science, 2025. https://doi.org/10.1002/advs.202502702
+- CMD-GEN. Communications Biology, 2025.
+  https://doi.org/10.1038/s42003-025-07840-3
+- Weller & Rohs. "DrugHIVE." JCIM, 2024.
+  https://doi.org/10.1021/acs.jcim.4c01193
+
+Multi-target Generation:
+- Munson et al. "POLYGON." Nature Communications, 2024.
+  https://doi.org/10.1038/s41467-024-47120-y
+- DiffDTM. IEEE, 2024. https://arxiv.org/abs/2306.13957
+- AIxFuse. Chemical Science, 2024. https://doi.org/10.1039/D4SC00094C
+
+Benchmarks:
+- Thomas et al. "MolScore." J Cheminformatics, 2024.
+  https://doi.org/10.1186/s13321-024-00861-w
+- Cournia et al. "Is SBDD Ready for Selectivity Optimization?" JCIM, 2020.
+  https://doi.org/10.1021/acs.jcim.0c00815
+- ATOM-GMD. bioRxiv, 2023. https://doi.org/10.1101/2023.02.14.528391
+
+Clinical Translation:
+- RLY-2608 Phase 3: NCT06982521
+- INS018_055 Phase 2: NCT05938920
+
+Foundational:
+- CogMol. NeurIPS, 2020.
+  https://proceedings.neurips.cc/paper/2020/hash/2d16ad1968844a4300e9a490588ff9f8-Abstract.html
+- DRAGONFLY. Nature Communications, 2024.
+  https://doi.org/10.1038/s41467-024-47613-w
+- Multi-objective cGVAE. J Cheminformatics, 2018.
+  https://doi.org/10.1186/s13321-018-0287-6
+
+SBDD Models (Context):
+- PMDM. Nature Communications, 2024. https://doi.org/10.1038/s41467-024-46569-1
+- PILOT. Chemical Science, 2024. https://doi.org/10.1039/D4SC03523B
+- DiffGui. Nature Communications, 2025. https://doi.org/10.1038/s41467-025-63245-0
+
+Critical Assessment:
+- "3D SBDD: Are We There Yet?" bioRxiv, 2024.
+  https://doi.org/10.1101/2024.12.27.629537
+- "Do 3D Methods Really Dominate?" arXiv, 2024.
+  https://arxiv.org/abs/2406.03403
+- Boltz-2 limitations. PMC, 2025.
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC12262699/
+
+
+================================================================================
+END OF REVIEW
+================================================================================

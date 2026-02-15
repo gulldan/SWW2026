@@ -5,14 +5,30 @@ Used by pipeline stages s6_md and s7_audit.
 
 Modules
 -------
-md
-    Molecular dynamics validation with GROMACS.
+md_config
+    Configuration dataclasses and utility helpers for MD validation.
 
     - ``MDConfig``                   -- frozen dataclass of MD run parameters
     - ``MDResult``                   -- per-molecule MD analysis result
+
+md_mdp
+    MDP file writers for GROMACS simulations.
+
+md_setup
+    System preparation: PDB repair, ligand parameterization, topology assembly.
+
+md_analysis
+    Trajectory analysis and MM-GBSA.
+
+md_pipeline
+    Orchestration: molecule selection, single-molecule pipeline, summary.
+
     - ``run_md_validation()``        -- run full MD pipeline for a pair
     - ``run_single_molecule_md()``   -- run MD for one molecule x one target
     - ``select_top_molecules()``     -- select top-N by Boltz-2 affinity
+
+md_docker
+    Docker runner for the MD validation stage.
 
 audit
     Claim traceability audit (SAP Section 6).

@@ -2,7 +2,7 @@
 
 Navigation hub for the DualDocking project documentation.
 
-Updated: 2026-02-11
+Updated: 2026-02-15
 
 ---
 
@@ -127,6 +127,7 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 
 | Topic | Location |
 |-------|----------|
+| MD validation pipeline | `dualdocking/validation/md_*.py` (5 modules), `cli/s6_md/run_md.py`, [io_contracts.md](io_contracts.md) (Stage 5c) |
 | Generator/scorer backend selection | `configs/experiment.yaml` (`generator.backend`, `scorer.engine`) |
 | Binding box coordinates, grid sizes | `architecture.md` (Binding Box section) + `configs/pairs.yaml` |
 | Affinity thresholds (T_A, T_B) | `configs/metrics.yaml` (fixed at 0.0 = 1 uM) |
