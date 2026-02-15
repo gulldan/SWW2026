@@ -194,8 +194,6 @@ file (`.parquet`/`.csv` with `smiles` column, or `.smi` one-per-line).
 | `smiles_canonical` | str | RDKit canonical SMILES (empty string if fails) |
 | `affinity_a` | float64 | Scorer prediction for target A (built-in Boltz-2: log₁₀ IC₅₀ µM, lower=better) |
 | `affinity_b` | float64 | Scorer prediction for target B |
-| `score_a` | float64 | Alias for `affinity_a` (legacy) |
-| `score_b` | float64 | Alias for `affinity_b` (legacy) |
 | `is_hit_both` | bool | `affinity_a ≤ thr_a AND affinity_b ≤ thr_b` (inclusive) |
 | `combined_min` | float64 | `max(affinity_a, affinity_b)` — worst-case objective |
 | `combined_*` | float64 | Additional objectives from `experiment.yaml` (geometric, harmonic, weighted_sum, weighted_product, tchebycheff) |

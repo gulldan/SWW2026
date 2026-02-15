@@ -32,6 +32,7 @@ class TestMoleculeRenderConfig:
         config = MoleculeRenderConfig()
         assert config.modes == ["single_a", "single_b", "double"]
         assert config.primary_col == "combined_min"
+        assert config.mode_top_n == 25
         assert config.top_n == 5
         assert config.dpi == 150
 
@@ -180,3 +181,36 @@ class TestRenderAllPairs:
         # Should create mode-specific and top-hits files
         files = list(tmp_path.glob("CDK2_ERK2_*.png"))
         assert len(files) > 0
+
+    def test_mode_grid_is_capped(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Mode-specific grids should render only top-N molecules."""
+        n = 60
+        df = pd.DataFrame({
+            "pair": ["CDK2_ERK2"] * n,
+            "mode": ["single_a"] * n,
+            "smiles": ["CCO"] * n,
+            "affinity_a": np.linspace(-9.0, -3.0, n),
+            "affinity_b": np.linspace(-8.5, -2.5, n),
+            "combined_min": np.linspace(-8.0, -2.0, n),
+        })
+        target_names = {"CDK2_ERK2": ("CDK2", "ERK2")}
+        thresholds = {"CDK2_ERK2": (-6.0, -5.0)}
+        seen_sizes: list[int] = []
+
+        import dualdocking.reporting.plots.molecules as mod
+
+        def _capture(df_in: pd.DataFrame, *_args: object, **_kwargs: object) -> None:
+            seen_sizes.append(len(df_in))
+
+        monkeypatch.setattr(mod, "render_molecule_grid", _capture)
+
+        render_all_pairs(
+            df,
+            tmp_path,
+            target_names,
+            thresholds,
+            config=MoleculeRenderConfig(modes=["single_a"], mode_top_n=12, top_n=5),
+        )
+
+        assert seen_sizes
+        assert seen_sizes[0] == 12

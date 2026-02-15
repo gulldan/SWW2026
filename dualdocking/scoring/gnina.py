@@ -1,9 +1,9 @@
 """GNINA CNN-based molecular docking scorer (optional cross-validation).
 
 Provides ``score_batch()`` for docking and scoring a list of SMILES against a
-receptor using the GNINA Docker image.  GNINA uses convolutional neural
-networks for pose scoring and affinity prediction on top of the smina/Vina
-scoring function.
+receptor using either a local GNINA binary or a Docker image.  GNINA uses
+convolutional neural networks for pose scoring and affinity prediction on top
+of the smina/Vina scoring function.
 
 GNINA runs in full docking mode (not ``--score_only``), making it independent
 of UniDock/Boltz-2 poses.  A binding box must be provided either via an
@@ -11,11 +11,14 @@ autobox ligand or explicit center/size coordinates.
 
 This module is intended for post-hoc cross-validation of UniDock/Boltz-2
 scores, not as an RL reward signal.
+
+Set ``GNINA_BINARY`` to the path of a local gnina executable to bypass Docker.
 """
 
 from __future__ import annotations
 
 import contextlib
+import os
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -26,9 +29,14 @@ from loguru import logger
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-_DOCKER_IMAGE = "gnina/gnina:v1.1"
+_DOCKER_IMAGE = "gnina/gnina:v1.3.2"
 _SCORE_TIMEOUT = 300  # seconds per batch
 _EXHAUSTIVENESS = 8  # GNINA default
+_SUB_BATCH_SIZE = 50  # molecules per GNINA invocation
+_TIMEOUT_PER_MOL = 30  # seconds per molecule for timeout calculation
+
+# Local binary path (overrides Docker when set)
+_GNINA_BINARY: str | None = os.environ.get("GNINA_BINARY")
 
 _NAN = float("nan")
 
@@ -101,6 +109,144 @@ def _parse_gnina_output(sdf_path: Path) -> list[tuple[float, float, float]]:
     return results
 
 
+def _build_local_cmd(
+    gnina_bin: str,
+    receptor_pdb: Path,
+    ligands_sdf: Path,
+    output_sdf: Path,
+    *,
+    autobox_ligand: Path | None,
+    center: tuple[float, float, float] | None,
+    box_size: tuple[float, float, float] | float,
+    exhaustiveness: int,
+    seed: int,
+) -> list[str]:
+    """Build command for local gnina binary."""
+    cmd = [
+        gnina_bin,
+        "-r", str(receptor_pdb),
+        "-l", str(ligands_sdf),
+        "-o", str(output_sdf),
+        "--exhaustiveness", str(exhaustiveness),
+        "--num_modes", "1",
+        "--seed", str(seed),
+    ]
+    if autobox_ligand is not None:
+        cmd.extend(["--autobox_ligand", str(autobox_ligand)])
+    elif center is not None:
+        if isinstance(box_size, (list, tuple)):
+            sx, sy, sz = box_size
+        else:
+            sx = sy = sz = float(box_size)
+        cmd.extend([
+            "--center_x", str(center[0]),
+            "--center_y", str(center[1]),
+            "--center_z", str(center[2]),
+            "--size_x", str(sx),
+            "--size_y", str(sy),
+            "--size_z", str(sz),
+        ])
+    return cmd
+
+
+def _build_docker_cmd(
+    docker_image: str,
+    receptor_pdb: Path,
+    tmp: Path,
+    output_sdf_name: str,
+    *,
+    autobox_ligand: Path | None,
+    center: tuple[float, float, float] | None,
+    box_size: tuple[float, float, float] | float,
+    exhaustiveness: int,
+    seed: int,
+) -> list[str]:
+    """Build command for Docker-based gnina execution."""
+    cmd: list[str] = [
+        "docker", "run", "--rm", "--gpus", "all",
+        "-v", f"{receptor_pdb.parent}:/receptor:ro",
+        "-v", f"{tmp}:/work",
+    ]
+    gnina_args: list[str] = [
+        docker_image,
+        "-r", f"/receptor/{receptor_pdb.name}",
+        "-l", "/work/ligands.sdf",
+        "-o", f"/work/{output_sdf_name}",
+        "--exhaustiveness", str(exhaustiveness),
+        "--num_modes", "1",
+        "--seed", str(seed),
+    ]
+    if autobox_ligand is not None:
+        cmd.extend(["-v", f"{autobox_ligand.parent}:/autobox:ro"])
+        gnina_args.extend(["--autobox_ligand", f"/autobox/{autobox_ligand.name}"])
+    elif center is not None:
+        if isinstance(box_size, (list, tuple)):
+            sx, sy, sz = box_size
+        else:
+            sx = sy = sz = float(box_size)
+        gnina_args.extend([
+            "--center_x", str(center[0]),
+            "--center_y", str(center[1]),
+            "--center_z", str(center[2]),
+            "--size_x", str(sx),
+            "--size_y", str(sy),
+            "--size_z", str(sz),
+        ])
+    cmd.extend(gnina_args)
+    return cmd
+
+
+def _run_gnina_on_sdf(
+    combined_sdf: Path,
+    receptor_pdb: Path,
+    output_sdf: Path,
+    tmp: Path,
+    *,
+    autobox_ligand: Path | None,
+    center: tuple[float, float, float] | None,
+    box_size: tuple[float, float, float] | float,
+    exhaustiveness: int,
+    docker_image: str,
+    timeout: int,
+    seed: int,
+) -> list[tuple[float, float, float]]:
+    """Run a single GNINA invocation on a prepared SDF and return parsed scores."""
+    use_local = _GNINA_BINARY is not None
+
+    if use_local and _GNINA_BINARY is not None:
+        cmd = _build_local_cmd(
+            _GNINA_BINARY, receptor_pdb, combined_sdf, output_sdf,
+            autobox_ligand=autobox_ligand, center=center, box_size=box_size,
+            exhaustiveness=exhaustiveness, seed=seed,
+        )
+    else:
+        cmd = _build_docker_cmd(
+            docker_image, receptor_pdb, tmp, output_sdf.name,
+            autobox_ligand=autobox_ligand, center=center, box_size=box_size,
+            exhaustiveness=exhaustiveness, seed=seed,
+        )
+
+    mode_str = f"local ({_GNINA_BINARY})" if use_local else f"docker ({docker_image})"
+    logger.debug("GNINA cmd ({}): {}", mode_str, " ".join(cmd))
+
+    try:
+        proc = subprocess.run(  # noqa: S603
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+        if proc.returncode != 0:
+            logger.warning("GNINA failed (rc={}, {}): {}", proc.returncode, mode_str, proc.stderr[:500])
+            return []
+    except subprocess.TimeoutExpired:
+        logger.warning("GNINA timed out after {}s ({})", timeout, mode_str)
+        return []
+
+    return _parse_gnina_output(output_sdf) if output_sdf.exists() else []
+
+
 def score_batch(
     smiles_list: list[str],
     receptor_pdb: Path,
@@ -112,11 +258,16 @@ def score_batch(
     docker_image: str = _DOCKER_IMAGE,
     timeout: int = _SCORE_TIMEOUT,
     seed: int = 42,
+    sub_batch_size: int = _SUB_BATCH_SIZE,
 ) -> list[GninaResult]:
     """Dock and score a batch of SMILES against a receptor using GNINA.
 
     Runs GNINA in full docking mode (not ``--score_only``), so it generates
     its own poses independently of any other docking engine.
+
+    Large batches are automatically split into sub-batches of
+    ``sub_batch_size`` molecules to avoid timeouts.  The timeout for each
+    sub-batch is ``max(timeout, sub_batch_size * 30)`` seconds.
 
     Args:
         smiles_list: List of SMILES to dock and score.
@@ -127,8 +278,9 @@ def score_batch(
             or a (sx, sy, sz) tuple for rectangular.
         exhaustiveness: Search exhaustiveness (higher = slower but more thorough).
         docker_image: GNINA Docker image.
-        timeout: Timeout in seconds.
+        timeout: Minimum timeout in seconds (actual = max of this and per-mol estimate).
         seed: Random seed for conformer generation and docking.
+        sub_batch_size: Max molecules per GNINA invocation.
 
     Returns:
         List of GninaResult, one per input SMILES.
@@ -137,113 +289,91 @@ def score_batch(
         logger.error("GNINA requires either autobox_ligand or center for binding box")
         return [_invalid_result(smi) for smi in smiles_list]
 
-    with tempfile.TemporaryDirectory(prefix="gnina_") as tmpdir:
-        tmp = Path(tmpdir)
+    n_total = len(smiles_list)
 
-        # Generate conformers and write combined SDF
-        valid_indices: list[int] = []
-        combined_sdf = tmp / "ligands.sdf"
-        writer = Chem.SDWriter(str(combined_sdf))
-        for i, smi in enumerate(smiles_list):
-            mol = generate_conformer(smi, seed=seed + i)
-            if mol is not None:
-                mol.SetProp("_Name", f"mol_{i}")
+    # Pre-generate all conformers
+    conformers: list[Chem.Mol | None] = []
+    for i, smi in enumerate(smiles_list):
+        conformers.append(generate_conformer(smi, seed=seed + i))
+
+    n_conf = sum(1 for m in conformers if m is not None)
+    if n_conf == 0:
+        logger.warning("No valid conformers generated for {} molecules", n_total)
+        return [_invalid_result(smi) for smi in smiles_list]
+
+    logger.info("Generated conformers for {}/{} molecules", n_conf, n_total)
+
+    # Build index of (global_idx, mol) for molecules with valid conformers
+    work: list[tuple[int, Chem.Mol]] = [
+        (i, mol) for i, mol in enumerate(conformers) if mol is not None
+    ]
+
+    # Split into sub-batches
+    chunks: list[list[tuple[int, Chem.Mol]]] = [
+        work[i : i + sub_batch_size] for i in range(0, len(work), sub_batch_size)
+    ]
+    n_chunks = len(chunks)
+    logger.info("Split {} molecules into {} sub-batches of <={}", n_conf, n_chunks, sub_batch_size)
+
+    # Run each sub-batch
+    score_map: dict[int, tuple[float, float, float]] = {}
+
+    for chunk_idx, chunk in enumerate(chunks):
+        chunk_size = len(chunk)
+        chunk_timeout = max(timeout, chunk_size * _TIMEOUT_PER_MOL)
+
+        with tempfile.TemporaryDirectory(prefix="gnina_") as tmpdir:
+            tmp = Path(tmpdir)
+            combined_sdf = tmp / "ligands.sdf"
+            output_sdf = tmp / "output.sdf"
+
+            writer = Chem.SDWriter(str(combined_sdf))
+            chunk_indices: list[int] = []
+            for global_idx, mol in chunk:
+                mol.SetProp("_Name", f"mol_{global_idx}")
                 writer.write(mol)
-                valid_indices.append(i)
-        writer.close()
+                chunk_indices.append(global_idx)
+            writer.close()
 
-        if not valid_indices:
-            return [_invalid_result(smi) for smi in smiles_list]
-
-        # Build Docker command
-        output_sdf = tmp / "output.sdf"
-        cmd: list[str] = [
-            "docker",
-            "run",
-            "--rm",
-            "-v",
-            f"{receptor_pdb.parent}:/receptor:ro",
-            "-v",
-            f"{tmp}:/work",
-        ]
-
-        gnina_args: list[str] = [
-            docker_image,
-            "gnina",
-            "-r",
-            f"/receptor/{receptor_pdb.name}",
-            "-l",
-            "/work/ligands.sdf",
-            "-o",
-            "/work/output.sdf",
-            "--exhaustiveness",
-            str(exhaustiveness),
-            "--seed",
-            str(seed),
-        ]
-
-        if autobox_ligand is not None:
-            cmd.extend(["-v", f"{autobox_ligand.parent}:/autobox:ro"])
-            gnina_args.extend(["--autobox_ligand", f"/autobox/{autobox_ligand.name}"])
-        elif center is not None:
-            if isinstance(box_size, (list, tuple)):
-                sx, sy, sz = box_size
-            else:
-                sx = sy = sz = float(box_size)
-            gnina_args.extend(
-                [
-                    "--center_x",
-                    str(center[0]),
-                    "--center_y",
-                    str(center[1]),
-                    "--center_z",
-                    str(center[2]),
-                    "--size_x",
-                    str(sx),
-                    "--size_y",
-                    str(sy),
-                    "--size_z",
-                    str(sz),
-                ]
+            logger.info(
+                "Sub-batch {}/{}: {} mols, timeout={}s",
+                chunk_idx + 1, n_chunks, chunk_size, chunk_timeout,
             )
 
-        cmd.extend(gnina_args)
-
-        try:
-            proc = subprocess.run(  # noqa: S603
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                check=False,
+            scored = _run_gnina_on_sdf(
+                combined_sdf, receptor_pdb, output_sdf, tmp,
+                autobox_ligand=autobox_ligand, center=center, box_size=box_size,
+                exhaustiveness=exhaustiveness, docker_image=docker_image,
+                timeout=chunk_timeout, seed=seed,
             )
-            if proc.returncode != 0:
-                logger.warning("GNINA failed (rc={}): {}", proc.returncode, proc.stderr[:500])
-                return [_invalid_result(smi) for smi in smiles_list]
-        except subprocess.TimeoutExpired:
-            logger.warning("GNINA timed out after {}s", timeout)
-            return [_invalid_result(smi) for smi in smiles_list]
 
-        # Parse results
-        scored = _parse_gnina_output(output_sdf) if output_sdf.exists() else []
+            for idx, scores in zip(chunk_indices, scored):
+                score_map[idx] = scores
 
-        # Map back to original indices
-        score_map = {idx: (cs, ca, vs) for idx, (cs, ca, vs) in zip(valid_indices, scored)}
+            n_ok = sum(
+                1 for s in scored
+                if not (np.isnan(s[0]) or np.isnan(s[1]))
+            )
+            logger.info(
+                "Sub-batch {}/{}: {}/{} valid scores",
+                chunk_idx + 1, n_chunks, n_ok, chunk_size,
+            )
 
-        results: list[GninaResult] = []
-        for i, smi in enumerate(smiles_list):
-            if i in score_map:
-                cs, ca, vs = score_map[i]
-                results.append(
-                    GninaResult(
-                        smiles=smi,
-                        cnn_score=cs,
-                        cnn_affinity=ca,
-                        vina_score=vs,
-                        valid=not (np.isnan(cs) or np.isnan(ca)),
-                    )
+    # Assemble final results
+    results: list[GninaResult] = []
+    for i, smi in enumerate(smiles_list):
+        if i in score_map:
+            cs, ca, vs = score_map[i]
+            results.append(
+                GninaResult(
+                    smiles=smi,
+                    cnn_score=cs,
+                    cnn_affinity=ca,
+                    vina_score=vs,
+                    valid=not (np.isnan(cs) or np.isnan(ca)),
                 )
-            else:
-                results.append(_invalid_result(smi))
+            )
+        else:
+            results.append(_invalid_result(smi))
 
     return results

@@ -51,7 +51,6 @@ def run_score(
     force: bool = False,
     prune_cache: bool = False,
     molecules: str | None = None,
-    parallel_scoring: str = "auto",
 ) -> None:
     """Run Boltz-2 scoring for one ``(pair, mode, seed)`` combination."""
     args = [
@@ -61,8 +60,6 @@ def run_score(
         mode,
         "--seed",
         str(seed),
-        "--parallel-scoring",
-        parallel_scoring,
     ]
     if force:
         args.append("--force")

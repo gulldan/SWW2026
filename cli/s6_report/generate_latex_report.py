@@ -10,7 +10,7 @@ import json
 import os
 import shutil
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,48 @@ from loguru import logger
 from dualdocking.reporting.latex_report import compile_latex_pdf, generate_latex_report
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def _latex_escape(value: object) -> str:
+    """Escape plain text for safe insertion into LaTeX text mode."""
+    text = str(value)
+    replacements = {
+        "\\": r"\textbackslash{}",
+        "&": r"\&",
+        "%": r"\%",
+        "#": r"\#",
+        "_": r"\_",
+        "{": r"\{",
+        "}": r"\}",
+    }
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+    return text
+
+
+def _sanitize_master_config_for_template(master_cfg: dict[str, Any]) -> dict[str, Any]:
+    """Build a template-facing subset of master config with escaped strings."""
+    sw = master_cfg.get("software", {})
+    ds = master_cfg.get("data_sources", {})
+    calib = ds.get("calibration_set", {})
+    base = ds.get("baseline_set", {})
+    return {
+        "version": _latex_escape(master_cfg.get("version", "unknown")),
+        "software": {
+            "docker_image_digest": _latex_escape(sw.get("docker_image_digest", "unknown")),
+            "boltz_version": _latex_escape(sw.get("boltz_version", "unknown")),
+            "docking_program": _latex_escape(sw.get("docking_program", "unknown")),
+            "docking_version": _latex_escape(sw.get("docking_version", "unknown")),
+        },
+        "data_sources": {
+            "calibration_set": {
+                "path": _latex_escape(calib.get("path", "unknown")),
+            },
+            "baseline_set": {
+                "path": _latex_escape(base.get("path", "unknown")),
+            },
+        },
+    }
 
 
 def _load_mapping_file(path: Path, loader: Callable[[str], object]) -> dict[str, Any]:
@@ -135,6 +177,8 @@ def _pair_order(
     order = list(pairs_cfg.get("pairs", {}).keys())
     for source in (metrics, stats):
         for pair_id in source:
+            if str(pair_id).startswith("_"):
+                continue
             if pair_id not in order:
                 order.append(pair_id)
     return order
@@ -222,6 +266,8 @@ def _build_stats_rows(stats: dict[str, Any], pair_ids: list[str]) -> list[dict[s
     """
     rows: list[dict[str, Any]] = []
     for pair_id in pair_ids:
+        if pair_id.startswith("_"):
+            continue
         tests = stats.get(pair_id, {})
         if not isinstance(tests, dict):
             continue
@@ -231,9 +277,9 @@ def _build_stats_rows(stats: dict[str, Any], pair_ids: list[str]) -> list[dict[s
             rows.append(
                 {
                     "pair_id": pair_id,
-                    "test_id": test_id,
+                    "test_id": _latex_escape(test_id),
                     "comparison": entry.get("comparison"),
-                    "metric": entry.get("metric"),
+                    "metric": _latex_escape(entry.get("metric", "-")),
                     "observed_diff": entry.get("observed_diff"),
                     "p_value_adjusted": entry.get("p_value_adjusted"),
                     "cliffs_delta": entry.get("cliffs_delta"),
@@ -245,18 +291,19 @@ def _build_stats_rows(stats: dict[str, Any], pair_ids: list[str]) -> list[dict[s
     return rows
 
 
-def _figure_paths(figures_dir: Path) -> list[str]:
-    """Collect PNG figure paths relative to the project root.
+def _figure_paths(figures_dir: Path, base_dir: Path) -> list[str]:
+    """Collect PNG figure paths relative to a base directory.
 
     Args:
         figures_dir: Directory to scan for ``*.png`` files.
+        base_dir: Directory used as base for relative paths.
 
     Returns:
         Sorted list of relative path strings.
     """
     if not figures_dir.exists():
         return []
-    return [str(p.relative_to(PROJECT_ROOT)) for p in sorted(figures_dir.glob("*.png"))]
+    return [rf"\detokenize{{{p.relative_to(base_dir).as_posix()}}}" for p in sorted(figures_dir.glob("*.png"))]
 
 
 def _summary_excerpt(summary_path: Path, max_chars: int = 2000) -> str:
@@ -322,6 +369,7 @@ def main(
     stats_data = _load_json(PROJECT_ROOT / stats)
     pairs_cfg = _load_yaml(PROJECT_ROOT / pairs_config)
     master_cfg = _load_yaml(PROJECT_ROOT / master_config)
+    master_cfg_for_template = _sanitize_master_config_for_template(master_cfg)
 
     chapters_path = PROJECT_ROOT / chapters_dir
     manifest = _load_manifest(PROJECT_ROOT / chapters_manifest)
@@ -330,7 +378,7 @@ def main(
     pair_ids = _pair_order(pairs_cfg, metrics_data, stats_data)
     metric_rows = _build_metric_rows(pairs_cfg, metrics_data, pair_ids)
     stats_rows = _build_stats_rows(stats_data, pair_ids)
-    figures = _figure_paths(PROJECT_ROOT / "report" / "figures")
+    figures = _figure_paths(PROJECT_ROOT / "report" / "figures", PROJECT_ROOT / "report")
     run_id = os.environ.get("EXPERIMENT_RUN_ID", "adhoc")
     keywords = manifest.get("keywords", [])
     keyword_text = ", ".join(str(k) for k in keywords if str(k).strip())
@@ -350,9 +398,9 @@ def main(
         "objective_columns": objective_columns,
         "figures": figures,
         "summary_excerpt": _summary_excerpt(PROJECT_ROOT / summary_path),
-        "master_config": master_cfg,
+        "master_config": master_cfg_for_template,
         "run_id": run_id,
-        "date": datetime.now(UTC).date().isoformat(),
+        "date": datetime.now().date().isoformat(),
     }
 
     tex_path = generate_latex_report(

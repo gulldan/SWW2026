@@ -249,6 +249,31 @@ def filter_one(smiles: str, cfg: dict) -> FilterResult:
     )
 
 
+def filter_results_to_columns(results: list[FilterResult]) -> dict[str, list]:
+    """Convert a list of FilterResult to a dict suitable for DataFrame column assignment.
+
+    Args:
+        results: List of :class:`FilterResult` from :func:`compute_filters`.
+
+    Returns:
+        Dictionary mapping column names to lists of values.
+    """
+    return {
+        "passes_lipinski": [r.passes_lipinski for r in results],
+        "passes_qed": [r.passes_qed for r in results],
+        "passes_pains": [r.passes_pains for r in results],
+        "passes_sa": [r.passes_sa for r in results],
+        "passes_veber": [r.passes_veber for r in results],
+        "passes_all_filters": [r.passes_all for r in results],
+        "mw": [r.mw for r in results],
+        "logp": [r.logp for r in results],
+        "qed_score": [r.qed_score for r in results],
+        "sa_score": [r.sa_score for r in results],
+        "rotatable_bonds": [r.rotatable_bonds for r in results],
+        "tpsa": [r.tpsa for r in results],
+    }
+
+
 def compute_filters(smiles_list: list[str], cfg: dict) -> tuple[list[FilterResult], FilterStats]:
     """Apply drug-likeness filters to a batch of SMILES.
 

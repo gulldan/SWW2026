@@ -95,20 +95,25 @@ def simulate_power_hierarchical(
     rejections = 0
 
     for _ in range(n_simulations):
-        # Generate control: standard normal per seed
-        control_seeds = [rng.normal(0.0, 1.0, size=n_molecules) for _ in range(n_seeds)]
-        # Generate treatment: shifted to achieve approximate Cliff's delta
+        # Generate control/treatment: (n_seeds, n_molecules)
+        control = rng.normal(0.0, 1.0, size=(n_seeds, n_molecules))
         shift = effect_size * 1.7  # empirical mapping: delta~0.3 -> shift~0.51
-        treatment_seeds = [rng.normal(shift, 1.0, size=n_molecules) for _ in range(n_seeds)]
+        treatment = rng.normal(shift, 1.0, size=(n_seeds, n_molecules))
 
-        # Hierarchical bootstrap
-        diffs = np.empty(n_bootstrap)
-        for b in range(n_bootstrap):
-            idx_c = rng.integers(0, n_seeds, size=n_seeds)
-            idx_t = rng.integers(0, n_seeds, size=n_seeds)
-            boot_c = np.array([control_seeds[k][rng.integers(0, n_molecules, size=n_molecules)].mean() for k in idx_c])
-            boot_t = np.array([treatment_seeds[k][rng.integers(0, n_molecules, size=n_molecules)].mean() for k in idx_t])
-            diffs[b] = np.mean(boot_t) - np.mean(boot_c)
+        # Vectorized hierarchical bootstrap:
+        # Level 1 — resample seeds with replacement
+        idx_c = rng.integers(0, n_seeds, size=(n_bootstrap, n_seeds))
+        idx_t = rng.integers(0, n_seeds, size=(n_bootstrap, n_seeds))
+        # Level 2 — resample molecules within each selected seed
+        mol_idx_c = rng.integers(0, n_molecules, size=(n_bootstrap, n_seeds, n_molecules))
+        mol_idx_t = rng.integers(0, n_molecules, size=(n_bootstrap, n_seeds, n_molecules))
+
+        sel_c = control[idx_c]       # (B, S, M)
+        sel_t = treatment[idx_t]     # (B, S, M)
+        resamp_c = np.take_along_axis(sel_c, mol_idx_c, axis=2)
+        resamp_t = np.take_along_axis(sel_t, mol_idx_t, axis=2)
+
+        diffs = resamp_t.mean(axis=2).mean(axis=1) - resamp_c.mean(axis=2).mean(axis=1)
 
         p_value = float(np.mean(diffs <= 0))
         if p_value < alpha:

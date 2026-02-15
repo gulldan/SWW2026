@@ -68,13 +68,12 @@ def wild_cluster_bootstrap(
     residuals_t = treatment - grand_mean
     residuals_c = control - grand_mean
 
-    boot_diffs = np.empty(n_boot)
-    for b in range(n_boot):
-        w_t = rng.choice([-1.0, 1.0], size=len(treatment))
-        w_c = rng.choice([-1.0, 1.0], size=len(control))
-        boot_t = grand_mean + residuals_t * w_t
-        boot_c = grand_mean + residuals_c * w_c
-        boot_diffs[b] = np.mean(boot_t) - np.mean(boot_c)
+    # Vectorized Rademacher draws (much faster than Python loop at n_boot=O(1e4)).
+    w_t = rng.choice([-1.0, 1.0], size=(n_boot, len(treatment)))
+    w_c = rng.choice([-1.0, 1.0], size=(n_boot, len(control)))
+    boot_t_means = np.mean(grand_mean + w_t * residuals_t, axis=1)
+    boot_c_means = np.mean(grand_mean + w_c * residuals_c, axis=1)
+    boot_diffs = boot_t_means - boot_c_means
 
     if alternative == "less":
         p_value = float(np.mean(boot_diffs <= 0))

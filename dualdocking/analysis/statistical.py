@@ -84,6 +84,16 @@ def _column_mean(arr: NDArray[np.float64], indices: NDArray[np.intp]) -> float:
     return float(np.mean(arr[indices]))
 
 
+def _is_binary_01(arr: NDArray[np.float64]) -> bool:
+    """Return whether finite values in *arr* are all in {0, 1}."""
+    if arr.size == 0:
+        return False
+    finite = arr[np.isfinite(arr)]
+    if finite.size == 0:
+        return False
+    return bool(np.all((finite == 0.0) | (finite == 1.0)))
+
+
 def hierarchical_bootstrap_test(
     scored_csvs_a: Iterable[Any],
     scored_csvs_b: Iterable[Any],
@@ -133,6 +143,37 @@ def hierarchical_bootstrap_test(
         arrays_b = [df[fast_column].to_numpy(dtype=float, copy=False) for df in group_b]
         lens_a = np.array([len(a) for a in arrays_a])
         lens_b = np.array([len(b) for b in arrays_b])
+
+        # Binary hit-rate fast path (exact for mean under bootstrap resampling):
+        # each within-seed resample mean equals Binomial(n, p_hat) / n.
+        if fast_fn is None and all(_is_binary_01(arr) for arr in (*arrays_a, *arrays_b)):
+            rates_a = np.array([_safe_nanmean(arr) for arr in arrays_a], dtype=float)
+            rates_b = np.array([_safe_nanmean(arr) for arr in arrays_b], dtype=float)
+            observed_diff = _safe_nanmean(rates_b) - _safe_nanmean(rates_a)
+
+            n_a = len(arrays_a)
+            n_b = len(arrays_b)
+
+            idx_a = rng.integers(0, n_a, size=(n_bootstrap, n_a))
+            idx_b = rng.integers(0, n_b, size=(n_bootstrap, n_b))
+
+            n_sel_a = lens_a[idx_a]
+            n_sel_b = lens_b[idx_b]
+            p_sel_a = rates_a[idx_a]
+            p_sel_b = rates_b[idx_b]
+
+            boot_a = rng.binomial(n_sel_a, p_sel_a) / n_sel_a
+            boot_b = rng.binomial(n_sel_b, p_sel_b) / n_sel_b
+            diffs = np.nanmean(boot_b, axis=1) - np.nanmean(boot_a, axis=1)
+
+            p_value = float(np.mean(diffs <= 0))
+            ci_lower, ci_upper = np.percentile(diffs, [2.5, 97.5])
+            return BootstrapResult(
+                observed_diff=observed_diff,
+                p_value=p_value,
+                ci_lower=float(ci_lower),
+                ci_upper=float(ci_upper),
+            )
 
         # Observed diff
         metrics_a_obs = np.array([_fn(arr, np.arange(len(arr))) for arr in arrays_a], dtype=float)

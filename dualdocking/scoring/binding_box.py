@@ -201,6 +201,36 @@ def compute_box(
     return center_str, size_str
 
 
+def resolve_binding_box(
+    data_dir: Path,
+    target_id: str,
+    default_autobox_size: tuple[float, float, float] = (25.0, 25.0, 25.0),
+) -> tuple[Path | None, tuple[float, float, float] | None, tuple[float, float, float]]:
+    """Resolve binding box for a target: autobox ligand or PDB extraction.
+
+    Tries the co-crystallized ligand file first (for autobox-based
+    docking).  When no ligand file exists, extracts centre and size
+    from the receptor PDB via :func:`extract_binding_box`.
+
+    Args:
+        data_dir: Root data directory containing ``{target_id}/`` sub-dirs.
+        target_id: Target identifier (e.g. ``"CDK2"``).
+        default_autobox_size: Box size used when an autobox ligand is available.
+
+    Returns:
+        ``(autobox_ligand_path | None, center | None, box_size)``
+    """
+    autobox = data_dir / target_id / f"{target_id}_ligand.pdb"
+    if autobox.exists():
+        return autobox, None, default_autobox_size
+
+    receptor = data_dir / target_id / f"{target_id}_receptor.pdb"
+    center_str, size_str = extract_binding_box(receptor)
+    center = tuple(float(v) for v in center_str.split(","))
+    size = tuple(float(v) for v in size_str.split(","))
+    return None, center, size  # type: ignore[return-value]
+
+
 def extract_binding_box(
     pdb_path: str | Path,
     padding: float = 10.0,

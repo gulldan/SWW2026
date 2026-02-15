@@ -25,6 +25,12 @@ from dualdocking.analysis.metrics.common import (
 )
 
 _N_BOOTSTRAP = 10_000
+_H2_BOOTSTRAP_CAP = 2_000
+_MIN_SEEDS_FOR_SENSITIVITY = 3
+_POWER_SIMULATIONS = 120
+_POWER_BOOTSTRAP = 199
+_WILD_BOOTSTRAP = 2_999
+_RLIABLE_BOOTSTRAP = 1_500
 
 
 # ---------------------------------------------------------------------------
@@ -215,13 +221,39 @@ def compute_sensitivity_analyses(
     """
     sensitivity: dict[str, Any] = {}
 
+    # Sensitivity procedures are unstable/underpowered with very few seeds.
+    max_seeds_available = max(
+        (len(data.get(pair_id, {}).get(mode, {})) for pair_id in pairs for mode in modes),
+        default=0,
+    )
+    if max_seeds_available < _MIN_SEEDS_FOR_SENSITIVITY:
+        msg = (
+            f"Skipping sensitivity analyses: only {max_seeds_available} seed(s) available. "
+            f"Need >= {_MIN_SEEDS_FOR_SENSITIVITY} for meaningful resampling."
+        )
+        logger.warning(msg)
+        return {
+            "skipped": True,
+            "reason": "insufficient_seeds",
+            "max_seeds_available": max_seeds_available,
+            "min_required": _MIN_SEEDS_FOR_SENSITIVITY,
+        }
+
     try:
         from dualdocking.analysis.power_analysis import detectable_effect as _det_effect
         from dualdocking.analysis.power_analysis import sensitivity_table as _sens_table
 
         sensitivity["power_analysis"] = {
-            "detectable_cliffs_delta_m5": _det_effect(n_seeds=5, n_simulations=500, n_bootstrap=499),
-            "sensitivity_table": _sens_table(seed_range=[3, 5, 10, 15], n_simulations=500, n_bootstrap=499),
+            "detectable_cliffs_delta_m5": _det_effect(
+                n_seeds=5,
+                n_simulations=_POWER_SIMULATIONS,
+                n_bootstrap=_POWER_BOOTSTRAP,
+            ),
+            "sensitivity_table": _sens_table(
+                seed_range=[3, 5, 10, 15],
+                n_simulations=_POWER_SIMULATIONS,
+                n_bootstrap=_POWER_BOOTSTRAP,
+            ),
         }
     except Exception as exc:
         logger.warning("Power analysis failed: {}", exc)
@@ -239,7 +271,7 @@ def compute_sensitivity_analyses(
                     continue
                 vals_a = np.array([metric_hr_both(df) for df in group_a_dfs])
                 vals_b = np.array([metric_hr_both(df) for df in group_b_dfs])
-                wb = wild_cluster_bootstrap(vals_b, vals_a, n_boot=9999, alternative="less")
+                wb = wild_cluster_bootstrap(vals_b, vals_a, n_boot=_WILD_BOOTSTRAP, alternative="less")
                 pair_wild[test_id] = {
                     "p_value": wb.p_value,
                     "observed_diff": wb.observed_diff,
@@ -267,7 +299,7 @@ def compute_sensitivity_analyses(
             if hr_both_vals:
                 arr = np.array(hr_both_vals)
                 iqm = compute_iqm(arr)
-                lo, hi = compute_iqm_ci(arr, n_boot=5000)
+                lo, hi = compute_iqm_ci(arr, n_boot=_RLIABLE_BOOTSTRAP)
                 rliable_out[mode] = {"iqm": iqm, "iqm_ci_lower": lo, "iqm_ci_upper": hi}
 
         for baseline in ("single_a", "single_b"):
@@ -703,7 +735,11 @@ def compute_metrics(config: ComputeMetricsConfig) -> ComputeMetricsResult:
                 group_a,
                 group_b,
                 metric_fn,
-                n_bootstrap=config.n_bootstrap,
+                n_bootstrap=(
+                    config.n_bootstrap
+                    if test_id in ("H1a", "H1b")
+                    else min(config.n_bootstrap, _H2_BOOTSTRAP_CAP)
+                ),
                 rng_seed=42,
                 fast_column=fast_col,
                 fast_fn=fast_fn,

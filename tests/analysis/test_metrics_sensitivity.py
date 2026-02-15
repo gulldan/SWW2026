@@ -179,3 +179,20 @@ def test_run_sensitivity_robustness_summary(mock_project: Path) -> None:
     summary = result.json_out["robustness_summary"]
     assert "0.0" in summary
     assert summary["0.0"]["n_core_total"] == 1
+
+
+def test_run_sensitivity_defaults_missing_set_to_core(mock_project: Path) -> None:
+    """Pairs without 'set' should default to core in robustness summary."""
+    cfg = SensitivityConfig(
+        project_root=mock_project,
+        pairs={"P1": {"target_a": {"id": "T1"}, "target_b": {"id": "T2"}}},
+        modes=["single_a", "single_b", "double"],
+        seeds=[42, 137],
+        metrics_cfg={},
+        exp_cfg={},
+        thresholds=[0.0],
+        n_bootstrap=100,
+    )
+    result = run_sensitivity(cfg)
+    summary = result.json_out["robustness_summary"]["0.0"]
+    assert summary["n_core_total"] == 1

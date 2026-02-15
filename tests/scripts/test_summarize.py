@@ -14,8 +14,8 @@ def _make_df(n: int = 5, pair: str = "pair1", mode: str = "single_a") -> pd.Data
     return pd.DataFrame(
         {
             "smiles": smiles,
-            "score_a": [-8.0 + i for i in range(n)],
-            "score_b": [-7.0 + i for i in range(n)],
+            "affinity_a": [-8.0 + i for i in range(n)],
+            "affinity_b": [-7.0 + i for i in range(n)],
             "combined_min": [-7.5 + i for i in range(n)],
             "combined_harmonic": [-7.3 + i for i in range(n)],
             "combined_geometric": [-7.4 + i for i in range(n)],
@@ -187,8 +187,8 @@ def test_legacy_csv_fallback(tmp_path, monkeypatch):
     df = pd.DataFrame(
         {
             "smiles": ["CCO"],
-            "score_a": [-8.0],
-            "score_b": [-7.0],
+            "affinity_a": [-8.0],
+            "affinity_b": [-7.0],
             "combined_min": [-7.5],
             "pair": ["pair1"],
             "mode": ["double"],

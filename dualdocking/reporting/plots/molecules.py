@@ -31,6 +31,7 @@ class MoleculeRenderConfig:
     Attributes:
         modes: Generation modes to render.
         primary_col: Column used to sort molecules (ascending = best first).
+        mode_top_n: Number of molecules to render per mode-specific grid.
         top_n: Number of top molecules for the combined top-hits grid.
         dpi: Resolution for saved figures.
         max_cols: Maximum columns in the grid.
@@ -38,6 +39,7 @@ class MoleculeRenderConfig:
 
     modes: list[str] = field(default_factory=lambda: ["single_a", "single_b", "double"])
     primary_col: str = "combined_min"
+    mode_top_n: int = 25
     top_n: int = 5
     dpi: int = 150
     max_cols: int = MAX_COLS
@@ -228,11 +230,14 @@ def render_all_pairs(
         name_a, name_b = target_names.get(pair_id, ("A", "B"))
         th_a, th_b = thresholds.get(pair_id, (0.0, 0.0))
         df_pair = df[df["pair"] == pair_id]
+        sort_col = config.primary_col if config.primary_col in df_pair.columns else "combined_min"
 
         for mode in config.modes:
             df_mode = df_pair[df_pair["mode"] == mode]
             if df_mode.empty:
                 continue
+            if config.mode_top_n > 0 and len(df_mode) > config.mode_top_n:
+                df_mode = df_mode.nsmallest(config.mode_top_n, sort_col).reset_index(drop=True)
             render_molecule_grid(
                 df_mode,
                 fig_dir / f"{pair_id}_molecules_{mode}.png",
@@ -247,7 +252,6 @@ def render_all_pairs(
             )
 
         # Top hits: best across all modes
-        sort_col = config.primary_col if config.primary_col in df_pair.columns else "combined_min"
         frames = []
         for mode in config.modes:
             df_mode = df_pair[df_pair["mode"] == mode].nsmallest(config.top_n, sort_col)

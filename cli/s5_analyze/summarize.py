@@ -109,8 +109,8 @@ def _top_molecules_block(
             smiles = smiles[:57] + "..."
         lines.append(
             f"    {i}. {smiles}\n"
-            f"       {name_a}={_fmt(row.get('score_a', row.get('affinity_a', float('nan'))))}  "
-            f"{name_b}={_fmt(row.get('score_b', row.get('affinity_b', float('nan'))))}  "
+            f"       {name_a}={_fmt(row.get('affinity_a', float('nan')))}  "
+            f"{name_b}={_fmt(row.get('affinity_b', float('nan')))}  "
             f"{sort_col}={_fmt(row.get(sort_col, float('nan')))}"
         )
     return "\n".join(lines) + "\n"
@@ -166,8 +166,8 @@ def _build_report(
         lines.append("")
 
         df_pair = df[df["pair"] == pair_id]
-        col_a = "affinity_a" if "affinity_a" in df_pair.columns else "score_a"
-        col_b = "affinity_b" if "affinity_b" in df_pair.columns else "score_b"
+        col_a = "affinity_a"
+        col_b = "affinity_b"
 
         for mode in modes:
             df_mode = df_pair[df_pair["mode"] == mode]

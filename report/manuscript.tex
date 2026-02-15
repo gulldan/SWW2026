@@ -7,60 +7,1100 @@
 \usepackage{amsmath}
 \usepackage{xcolor}
 
-\title{Dual-Target Docking for Multi-Target Hit Discovery:
-  A Reproducible Empirical Study}
-\author{SWW2026 Workshop Team}
-\affiliation{SWW2026 Workshop}
+\title{ Dual-Target Docking for Multi-Target Hit Discovery: A Reproducible Empirical Study }
+\author{ SWW2026 Workshop Team }
+\affiliation{ SWW2026 Workshop }
+
 
 \abbreviations{RL, FREED++, UniDock, GNINA, QED, SA, PAINS, ADMET, FDR, AUROC, BEDROC}
-\keywords{dual-target docking, molecular generation, FREED++, Boltz-2, reproducibility}
+\keywords{ dual-target docking, molecular generation, FREED++, Boltz-2, reproducibility }
+
+
+
+
 
 \begin{document}
 
 \begin{abstract}
-\input{chapters/00_abstract}
+
+Multi-target drug design aims to discover single molecules that simultaneously
+modulate two or more disease-relevant proteins, yet current reinforcement-learning
+(RL) generators optimize binding to one target at a time.  We ask whether
+RL generation with a joint dual-target reward produces molecules with higher
+dual hit-rates than single-target baselines evaluated post-hoc on both targets.
+
+We extend the fragment-based RL generator FREED++ with a worst-case
+scalarization reward, $R = -\max(z_A, z_B)$, over UniDock GPU docking
+scores and evaluate generated molecules with Boltz-2 affinity
+predictions---an orthogonal, learned surrogate that is never used as a
+training signal.  Six reward configurations spanning the selectivity--polypharmacology
+spectrum are tested across five pre-registered core target pairs (including
+AD-relevant BACE1/GSK3$\beta$, AChE/BACE1, and kinase controls), each with
+five independent seeds and 1000 molecules per run.
+
+% >>> PLACEHOLDER: replace after pipeline completion <<<
+% On N/5 core pairs, \texttt{double} mode achieves a statistically significant
+% improvement in dual hit-rate (BH-adjusted $p < 0.05$, Cliff's $\delta \geq 0.33$).
+% Per-target hit-rates show no large degradation (Cliff's $\delta > -0.47$).
+% >>> END PLACEHOLDER <<<
+
+All comparisons enforce fairness through matched molecular budgets, fixed seeds,
+shared hit-threshold definitions, and pre-registered success criteria
+with hierarchical bootstrap inference and FDR correction.
+Code, configurations, and the statistical analysis plan are publicly available.
+
+
 \end{abstract}
 
-\section{Introduction}
-\input{chapters/01_introduction}
 
-\section{Related Work}
-\input{chapters/02_related_work}
+\section{ Introduction }
 
-\section{Methods}
-\input{chapters/03_methods_notes}
+% ===========================================================================
+%  Chapter 1: Introduction
+%  Dual-Target RL Molecular Generation — Workshop Report
+% ===========================================================================
 
-\section{Experimental Protocol and Fairness Controls}
-\input{chapters/04_experimental_protocol}
+Polypharmacology---the deliberate modulation of multiple biological
+targets by a single molecule---has emerged as a promising strategy for
+complex multifactorial diseases~\citep{bolognesi2013polypharmacology,
+anighoro2014polypharmacology}.
+In Alzheimer's disease alone, the simultaneous inhibition of
+cholinesterases (AChE, BChE), $\beta$-secretase (BACE1), and kinases
+involved in tau phosphorylation (GSK3$\beta$, CDK5) has been pursued
+both computationally and
+clinically~\citep{stern2022multitarget, weinreb2012cholinesterase}.
+Approved dual-target agents such as lapatinib (EGFR/HER2) and
+ladostigil (AChE/MAO-B) demonstrate that single molecules \emph{can}
+engage structurally distinct binding sites, but their discovery has
+relied on serendipity or labor-intensive medicinal chemistry campaigns.
 
-\section{Results}
-\input{chapters/05_results_scope}
+Reinforcement learning (RL) offers a principled framework for
+goal-directed molecular generation: an agent constructs molecules
+step by step and receives a scalar reward derived from a computational
+scoring function~\citep{telepov2023freedpp, loeffler2024reinvent4}.
+To date, RL-based generators have been applied almost exclusively
+in single-target mode, optimizing docking score or predicted affinity
+toward one protein at a time.
+Multi-objective extensions typically optimize \emph{property}
+trade-offs (QED, SA, logP) rather than binding affinity to two
+specific protein targets
+simultaneously~\citep{fromer2023moo, wang2024scarlp}.
 
-\section{Discussion}
-\input{chapters/08_discussion}
+This study addresses three gaps identified in our systematic
+literature survey (Section~\ref{sec:rw:moo}):
+\begin{enumerate}
+\item \textbf{Systematic weight-space exploration.}
+  No prior work scans the continuous weight space from selective
+  ($w_A{=}1, w_B{=}{-1}$) through single-target ($w_A{=}1, w_B{=}0$)
+  to dual-target ($w_A{=}1, w_B{=}1$) using structure-based docking
+  as the RL reward for two protein targets.
+  We implement six reward configurations---\texttt{single\_a},
+  \texttt{single\_b}, \texttt{double}, \texttt{linear\_equal},
+  \texttt{biased\_a}, and \texttt{selective\_a}---within the same
+  generator architecture (FREED++).
+\item \textbf{Orthogonal evaluation.}
+  Most generative studies evaluate molecules with the same scorer
+  used as the RL reward, creating a circular evaluation.
+  We decouple training (UniDock docking scores $d_A, d_B$) from
+  evaluation (Boltz-2 affinity predictions $a_A, a_B$), using two
+  fundamentally different methods---physics-based empirical scoring
+  versus a transformer-based learned surrogate---to mitigate
+  scorer-specific artifacts.
+\item \textbf{Selectivity--polypharmacology spectrum.}
+  The literature treats target selectivity and multi-target design
+  as separate research fields.  We show that these are points on a
+  single parametric scale controlled by the reward weight vector,
+  enabling direct comparison within a unified experimental framework.
+\end{enumerate}
 
-\section{Limitations}
-\label{sec:limitations}
-\input{chapters/06_limitations}
+The primary hypothesis is that dual-target RL generation
+(\texttt{double} mode, $R = -\max(d_A, d_B)$) increases the
+probability of obtaining simultaneous hits on both targets relative
+to single-target baselines (\texttt{single\_a}, \texttt{single\_b}),
+as measured by Boltz-2 affinity evaluated independently of the RL
+reward.
 
-\section{Conclusion}
-\input{chapters/07_conclusion}
+The experiment is organized as a fully reproducible eight-stage
+pipeline: data acquisition, target preparation, calibration,
+generation, Boltz-2 scoring, aggregation and statistical
+testing, report generation, and claim audit.
+All comparisons enforce fairness through matched molecular budgets,
+fixed seed sets, shared hit-threshold definitions, and uniform
+post-processing rules.
+Success criteria, pair assignments, and the statistical analysis
+plan are pre-registered before any generation runs.
+
+
+
+\section{ Related Work }
+
+% ===========================================================================
+%  Chapter 2: Related Work
+%  Dual-Target RL Molecular Generation — Workshop Report
+% ===========================================================================
+
+This section surveys six areas of prior work that motivate and contextualize our
+dual-target reinforcement-learning pipeline: multi-target drug design
+(Section~\ref{sec:rw:mtdd}), de~novo generation with RL
+(Section~\ref{sec:rw:rlgen}), multi-objective optimization
+(Section~\ref{sec:rw:moo}), docking-based scoring
+(Section~\ref{sec:rw:docking}), learned affinity prediction
+(Section~\ref{sec:rw:boltz2}), and clinical validation of AI-designed
+therapeutics (Section~\ref{sec:rw:clinical}).
+
+% ---------------------------------------------------------------------------
+\subsection{Multi-Target Drug Design and Polypharmacology}
+\label{sec:rw:mtdd}
+% ---------------------------------------------------------------------------
+
+Complex diseases rarely arise from single-gene perturbations.
+Alzheimer's disease (AD), for instance, involves amyloid precursor processing
+(BACE1), tau phosphorylation cascades (GSK3$\beta$, CDK5), and
+cholinergic deficit (AChE, BChE), motivating simultaneous modulation of
+multiple targets~\citep{bolognesi2013polypharmacology}.
+Polypharmacology---the deliberate design of ligands that engage two or more
+targets---offers potential advantages over combination therapy: simplified
+pharmacokinetics, reduced drug--drug interactions, and a single
+ADMET profile to optimize~\citep{stern2022multitarget}.
+Clinical precedents include ladostigil, a dual AChE/MAO-B inhibitor
+developed for AD~\citep{weinreb2012cholinesterase}, and donepezil--memantine
+fixed-dose combinations.
+
+The computational challenge is non-trivial: binding sites of target pairs
+such as BACE1/GSK3$\beta$---where GSK3$\beta$ directly regulates BACE1
+expression~\citep{ly2013gsk3b}---share little structural homology, so
+optimizing affinity to one pocket often degrades binding to the other.
+Notably, \citet{jiang2020notopterol} identified Notopterol as a natural
+dual BACE1/GSK3$\beta$ inhibitor via traditional screening; our work
+instead uses RL-based generation to explore the joint chemical space
+systematically.
+
+% ---------------------------------------------------------------------------
+\subsection{De Novo Molecular Generation with Reinforcement Learning}
+\label{sec:rw:rlgen}
+% ---------------------------------------------------------------------------
+
+\paragraph{Fragment-based RL.}
+FREED~\citep{yang2021freed} introduced a fragment-attachment MDP where an
+agent iteratively selects molecular fragments to extend a growing molecule,
+receiving a docking-score reward.
+FREED++~\citep{telepov2023freedpp} provided a thorough reproduction and
+improvement: explorative experience replay, reward shaping, and stabilized
+training yielded consistent gains on standard benchmarks.
+Our pipeline adopts FREED++ as the base generator.
+In \texttt{double} mode, we monkey-patch the reward computation to call
+UniDock on both targets per RL step, combining scores via a worst-case
+scalarization ($R = -\max(d_A, d_B)$) before returning the reward signal
+to the agent.  This is, to our knowledge, the first dual-target extension
+of FREED++.
+
+\paragraph{SMILES-based RL.}
+REINVENT~4~\citep{loeffler2024reinvent4} is the current release of the
+AstraZeneca generative platform, supporting de~novo, R-group, linker,
+and Mol2Mol modes with a modular scoring stack.
+It uses a DAP (Difference between Agent and Prior) loss and supports
+curriculum learning.
+ADMETrix~\citep{mourdoukoutas2025admetrix} extends REINVENT with 27 ADMET
+and 10 physicochemical predictors via the ADMET-AI model, demonstrating
+that RL agents can optimize pharmacological profiles beyond single
+binding scores.
+While REINVENT employs weighted-sum scalarization for multi-objective
+tasks, our design deliberately avoids this choice to isolate the
+dual-target effect under a single, fixed architecture.
+
+\paragraph{Synthesis-aware generation.}
+A recent line of work constrains generation to synthetically accessible
+molecules.
+SynFlowNet~\citep{cretu2025synflownet} applies GFlowNets in a
+reaction-template space, jointly producing molecules and synthesis
+routes.
+SynGFN~\citep{kim2025syngfn} introduces hierarchical pre-trained policies
+over cascaded simulated reactions.
+RxnFlow~\citep{lee2025rxnflow} scales to 1.2\,M building blocks and 71
+reaction templates, achieving state-of-the-art mean Vina scores
+($-8.85$\,kcal/mol on CrossDocked2020).
+These approaches are complementary to ours: our focus is the
+dual-target reward signal rather than synthetic feasibility, though
+combining both is a promising future direction.
+
+% ---------------------------------------------------------------------------
+\subsection{Multi-Objective Optimization in Molecular Design}
+\label{sec:rw:moo}
+% ---------------------------------------------------------------------------
+
+Multi-objective molecular optimization seeks to balance competing
+properties---binding affinity to multiple targets, synthetic accessibility,
+ADMET constraints---that cannot be collapsed into a single scalar without
+loss of information.
+\citet{fromer2023moo} provide a comprehensive taxonomy of approaches,
+distinguishing \emph{scalarization} methods (which reduce the problem to
+a single objective) from \emph{Pareto-based} methods (which maintain a
+population on the Pareto front).
+
+\paragraph{Scalarization.}
+Weighted sums are the simplest and most widely used
+approach~\citep{loeffler2024reinvent4, liu2023drugexv3}; however, they
+can only recover convex regions of the Pareto front.
+Tchebycheff decomposition~\citep{zhang2007moead} overcomes this limitation
+and is used in DrugEx~v3~\citep{liu2023drugexv3}.
+Our primary reward, $\max(d_A, d_B)$ (worst-case), is a special case of
+Tchebycheff with equal weights and a zero reference point: it penalizes
+molecules that sacrifice one target for the other, providing a
+conservative lower bound on dual-target quality.
+
+\paragraph{Pareto-based methods.}
+DrugEx~v2~\citep{liu2021drugex} pioneered Pareto-ranked RL for
+polypharmacological design, using non-dominated sorting within a
+population-based policy.
+ParetoDrug~\citep{paretodrug2024} combines Pareto MCTS with a pre-trained
+autoregressive model, using a ParetoPUCT criterion to balance exploration
+and exploitation.
+PMMG~\citep{pmmg2025} extends Pareto MCTS to seven simultaneous
+objectives (dual EGFR/HER2 affinity, QED, SA, and toxicity), achieving
+51.65\% success rate---2.5$\times$ higher than prior work.
+CMOMO~\citep{cmomo2025} introduces dynamic constraints in a two-stage
+framework, doubling the success rate for GSK3$\beta$ inhibitors.
+ScaRL-P~\citep{wang2024scarlp} applies clustered Pareto RL with
+per-objective critics.
+
+\paragraph{Quality metrics.}
+The \emph{hypervolume indicator} measures the volume of objective space
+dominated by a Pareto front, providing a single scalar that captures both
+convergence and diversity~\citep{verhellen2022hypervolume}.
+HMAMP~\citep{wang2025hmamp} uses hypervolume-driven search for
+antimicrobial peptide design; we adopt the hypervolume as a secondary
+endpoint (Section~5).
+
+\paragraph{Our positioning.}
+We restrict the primary experiment to a single scalarization
+($\max(d_A, d_B)$) rather than employing Pareto-based methods.  This isolates the effect of \emph{dual-target RL generation}
+under controlled conditions: identical generator (FREED++), identical
+molecular budget, and identical reward architecture, varying only the
+number of targets.  Pareto and hypervolume alternatives are evaluated
+offline as sensitivity analyses.
+
+% ---------------------------------------------------------------------------
+\subsection{Docking-Based Scoring Functions}
+\label{sec:rw:docking}
+% ---------------------------------------------------------------------------
+
+AutoDock Vina~\citep{trott2010vina} remains the most widely used
+open-source docking program, employing an empirical scoring function
+that combines steric, hydrophobic, and hydrogen-bond terms with an
+iterated local search optimizer.
+The CASF-2016 benchmark~\citep{su2019casf2016} reported Vina's scoring
+power as Pearson $r = 0.604$ and ranking power as Spearman
+$\rho = 0.528$---competitive among classical scoring functions but far
+from perfect.
+
+UniDock~\citep{yu2023unidock} ports the Vina scoring function to GPU,
+achieving up to 1000$\times$ speedup over CPU Vina while preserving
+identical scoring semantics.
+This makes UniDock practical as an RL reward: each molecule can be
+docked in milliseconds, enabling the thousands of evaluations required
+per RL epoch.
+Our pipeline uses UniDock GPU (\texttt{unidock\_gpu}) as the docking
+backend for both single- and dual-target reward computation.
+
+\paragraph{Known limitations.}
+Docking scores are approximate: they neglect explicit solvation,
+protein flexibility, and entropic contributions.
+PoseX~\citep{posex2025} demonstrated that on certain targets, Vina-family
+scoring functions perform near-randomly for virtual screening hit
+identification.
+Performance is target-dependent: some pockets are well-suited to
+empirical scoring, while others require more sophisticated methods.
+These limitations motivate our use of an orthogonal evaluation
+surrogate (Boltz-2, Section~\ref{sec:rw:boltz2}) and our per-target
+Spearman $\rho$ sanity check between docking scores $d_X$ and
+learned affinities $a_X$.
+
+% ---------------------------------------------------------------------------
+\subsection{Learned Affinity Prediction: Boltz-2}
+\label{sec:rw:boltz2}
+% ---------------------------------------------------------------------------
+
+Boltz-2~\citep{passaro2025boltz2} is a unified biomolecular prediction
+model that extends a structure-prediction backbone (PairFormer) with
+binding-likelihood and affinity-prediction heads.
+The affinity module is trained on approximately 750\,K compound--target
+pairs drawn from ChEMBL, BindingDB, and PDBbind, spanning Ki, Kd,
+IC$_{50}$, and EC$_{50}$ assay types.
+The training loss combines Huber regression on absolute values with
+pairwise intra-assay differences, encouraging consistent ranking
+within each assay context.
+The output is $\log_{10}(\text{IC}_{50}\text{-like},\;\mu\text{M})$,
+where lower values indicate stronger predicted binding; notably, this
+is \emph{not} pIC$_{50}$ (which is $-\log_{10}$).
+
+\paragraph{Performance.}
+On the authors' four-target FEP+ validation subset (CDK2, TYK2, JNK1,
+p38), Boltz-2 achieves Pearson $r = 0.66$, comparable to OpenFE and
+below commercial FEP+ ($r = 0.78$).
+Independent evaluations report more modest correlations: the PL-REX
+benchmark (Yesylevskyy) yields mean $r \approx 0.42$, while DeepMirror
+per-target evaluations range from $r = 0.26$ (cGAS, narrow activity
+range) to $r = 0.81$ (Mpro).
+These results underscore target-dependent performance and motivate our
+per-target Spearman $\rho$ sanity check.
+
+\paragraph{Limitations.}
+The affinity module does not explicitly model cofactors, ions, or
+multimeric binding partners; predictions for cofactor-containing pockets
+(e.g., MAO-B with FAD) are unreliable.
+The predicted values span a compressed range (typically
+$-2$ to $+3$ log units) relative to experimental data, and a
+$\sim$40\% false-positive rate at stringent thresholds has been
+reported.
+We therefore use Boltz-2 exclusively as an \emph{evaluation surrogate}
+for relative comparison between generation strategies, never as a
+training reward, and interpret hit-rate differences rather than
+absolute predicted IC$_{50}$ values.
+
+\paragraph{Ecosystem.}
+Several recent tools build on Boltz-2.
+Boltzina~\citep{furui2025boltzina} combines AutoDock Vina docking poses
+with the Boltz-2 affinity head, achieving up to 11.8$\times$ speedup
+over full Boltz-2 inference.
+Most relevant to our work, SynFlowNet~\citep{cretu2025synflownet}
+uses Boltz-2 as a scoring function within a GFlowNet RL loop
+(off-policy, with replay buffer), providing a direct precedent for
+Boltz-2 as an RL scoring surrogate in molecular generation.
+Our pipeline differs in that Boltz-2 is used post-hoc for evaluation
+rather than as the RL reward, avoiding potential mode collapse
+toward Boltz-2-specific artifacts.
+
+% ---------------------------------------------------------------------------
+\subsection{Clinical Validation of AI-Generated Therapeutics}
+\label{sec:rw:clinical}
+% ---------------------------------------------------------------------------
+
+While computational molecular design has a long history, recent clinical
+milestones demonstrate that AI-generated molecules can reach the clinic.
+Rentosertib~\citep{xu2025rentosertib}, a TNIK inhibitor for idiopathic
+pulmonary fibrosis, was designed end-to-end using AI: PandaOmics
+identified the target, Chemistry42 generated the molecule, and the
+program progressed from target identification to preclinical candidate
+in 18 months.
+In a Phase~2a randomized trial (NCT05938920), rentosertib improved FVC
+by $+98.4$\,mL versus $-20.3$\,mL for placebo, providing the first
+clinical evidence that an AI-designed molecule can achieve efficacy
+in humans~\citep{xu2025rentosertib}.
+
+In the polypharmacology domain, POLYGON~\citep{ren2024polygon}
+generated 32 synthesized dual MEK1/mTOR compounds, with the majority
+showing $>$50\% inhibition of both targets at 10\,$\mu$M.
+Automated multi-target ligand design via chemical language
+models~\citep{zhang2024clm} produced 12 synthesized compounds across
+six target pairs.
+These experimental validations, while still pre-clinical, demonstrate
+that multi-target generative design can yield physically real,
+biologically active molecules, motivating further computational
+investigation of dual-target RL strategies.
+
+
+
+\section{ Methods }
+
+% ===========================================================================
+%  Chapter 3: Methods
+%  Dual-Target RL Molecular Generation — Workshop Report
+% ===========================================================================
+
+\subsection{Scoring Architecture}
+\label{sec:methods:scoring}
+
+Two independent scoring systems serve complementary roles:
+\begin{itemize}
+\item \textbf{RL reward:} UniDock GPU docking scores
+  $d_A, d_B$ (kcal/mol, lower is better).  UniDock~\citep{yu2023unidock}
+  ports the AutoDock Vina scoring function to GPU, enabling
+  millisecond-per-molecule docking required for RL training.
+\item \textbf{Evaluation surrogate:} Boltz-2 affinity predictions
+  $a_A, a_B$ ($\log_{10}$(IC$_{50}$-like), $\mu$M; trained on a
+  mixture of Ki/Kd/IC$_{50}$/EC$_{50}$ assay
+  types)~\citep{passaro2025boltz2}.
+  Boltz-2 is used exclusively for post-hoc evaluation, never as
+  an RL reward signal.
+\end{itemize}
+The two scorers are never mixed: $a_X$ is interpreted as a
+ranking metric for relative comparisons between generation modes,
+not as a calibrated IC$_{50}$ estimate.
+
+\subsection{Generation Modes}
+\label{sec:methods:modes}
+
+FREED++~\citep{telepov2023freedpp} is a fragment-based RL generator
+that assembles molecules by iteratively attaching molecular fragments.
+We extend it with a dual-target monkey-patch
+(\texttt{docker/freedpp/dual\_reward\_patch.py}) that intercepts
+the reward computation and applies per-target $z$-score
+normalization before scalarization.
+
+Six reward configurations span the selectivity--polypharmacology
+spectrum:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Mode & Reward $R$ & Interpretation \\
+\midrule
+\texttt{single\_a}     & $-z_A$                & Target A only \\
+\texttt{single\_b}     & $-z_B$                & Target B only \\
+\texttt{double}        & $-\max(z_A, z_B)$     & Worst-case (primary) \\
+\texttt{linear\_equal} & $-(z_A + z_B)$        & Equal linear sum \\
+\texttt{biased\_a}     & $-(z_A + 0.3\,z_B)$  & Target A priority \\
+\texttt{selective\_a}  & $-(z_A - z_B)$        & Selectivity for A \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent where $z_X = (d_X - \mu_X) / \sigma_X$ is the per-target
+$z$-score computed from calibration docking of 1{,}000 drug-like
+ZINC molecules.  The three primary modes (\texttt{single\_a},
+\texttt{single\_b}, \texttt{double}) are pre-registered;
+the three additional modes (\texttt{linear\_equal},
+\texttt{biased\_a}, \texttt{selective\_a}) are exploratory.
+Invalid docking scores (GPU errors, timeouts) are assigned a
+capped penalty $z = +4.0$ to prevent extreme reward signals.
+
+\subsection{Reward Scalarization for Double Mode}
+\label{sec:methods:reward}
+
+\textbf{Primary experiment:} $R = -\max(z_A, z_B)$ (worst-case).
+The molecule is scored by its worst-performing target, ensuring
+that the agent cannot exploit one easy pocket while ignoring the
+other.  This is a special case of Tchebycheff decomposition with
+equal weights and a zero reference point.
+
+\textbf{Sensitivity analysis (offline):} Alternative scalarizations
+(sum, geometric mean, harmonic mean, Tchebycheff, weighted product)
+are re-computed over molecules already generated by the six RL modes.
+These are secondary endpoints that do not influence generation.
+
+\subsection{Target Pair Design}
+\label{sec:methods:pairs}
+
+The experiment includes 9 target pairs (8 active, 1 blocked),
+classified along three factorial axes: \emph{disease context}
+(AD vs.\ Non-AD), \emph{structural relation} (Homologous vs.\
+Heterologous), and \emph{cofactor presence} (Clean vs.\ Present).
+Pairs are assigned to pre-registered strata:
+
+\begin{itemize}
+\item \textbf{Core set} (5~pairs) --- primary hypothesis testing:
+  CDK2\_ERK2 (Non-AD, Homo), AChE\_BChE (AD, Homo),
+  BACE1\_GSK3B, AChE\_BACE1, GSK3B\_CDK5 (AD, Hetero).
+  All cofactor-free; Boltz-2 affinity predictions are applicable.
+\item \textbf{Auxiliary set} (3~pairs) --- robustness and sensitivity:
+  EGFR\_HER2 (second Homo control), BACE1\_CDK5 (tau kinase swap),
+  AChE\_MAOB (cofactor-sensitive: FAD removed in receptor prep,
+  Boltz-2 binary classifier recommended over regression).
+\item \textbf{Blocked}: COX1\_COX2 (non-human PDB: COX1 \emph{Ovis
+  aries}, COX2 \emph{Mus musculus}).
+\end{itemize}
+
+Homologous pairs (AChE\_BChE, CDK2\_ERK2) serve as an ``easy'' test:
+high pocket similarity facilitates dual-target generation.
+Heterologous AD pairs (BACE1\_GSK3B, GSK3B\_CDK5) provide a
+``hard'' test, probing the ability of \texttt{double} mode to
+find dual-active molecules for structurally dissimilar targets.
+
+The core/auxiliary split is frozen before any generation runs;
+primary statistical tests are conducted on the core set only.
+
+\subsection{Pipeline Architecture}
+\label{sec:methods:pipeline}
+
+Orchestration is organized into eight stages, each implemented
+as an independent CLI script:
+\begin{enumerate}
+\item[0.] \textbf{Fetch} --- PDB, FASTA, MSA, calibration sets, ChEMBL actives, Docker build.
+\item[1.] \textbf{Prepare} --- receptor cleanup, binding box extraction, PDBQT conversion.
+\item[2.] \textbf{Calibrate} --- $z$-score normalization, re-docking QC (RMSD $\leq$~2\,\AA),
+  enrichment benchmark (AUROC, BEDROC, EF vs.\ ChEMBL actives).
+\item[3.] \textbf{Generate} --- FREED++ RL generation ($6~\text{modes} \times
+  5~\text{pairs} \times 5~\text{seeds}$).
+\item[4.] \textbf{Score} --- Boltz-2 affinity prediction for each molecule $\times$
+  2~targets (primary evaluation).
+\item[5.] \textbf{Analyze} --- aggregation into \texttt{all\_results.parquet},
+  hierarchical bootstrap~\citep{cameron2008bootstrap}, Cliff's~$\delta$~\citep{cliff1993dominance},
+  FDR correction~\citep{benjamini1995fdr}, degradation guard, sensitivity analyses.
+\item[6.] \textbf{Report} --- figures, molecule renders, \LaTeX\ manuscript assembly.
+\item[7.] \textbf{Audit} --- claim $\leftrightarrow$ evidence traceability mapping.
+\end{enumerate}
+
+Planned extensions not yet integrated into the automated pipeline include
+GNINA~CNN re-scoring~\citep{posex2025} for independent cross-validation
+and GROMACS molecular dynamics for binding-stability confirmation of
+top candidates.
+
+Stage~1 (\texttt{cli/pipeline/run\_full\_experiment.py}) executes
+generation and scoring; Stage~2
+(\texttt{cli/pipeline/run\_post\_pipeline.py}) performs aggregation,
+metrics, visualization, and manuscript compilation.
+
+
+
+\section{ Experimental Protocol and Fairness Controls }
+
+All experiments are executed under a two-stage orchestration model.
+
+\textbf{Stage 1} (\texttt{cli/run\_full\_experiment.py}) performs
+FREED++~\citep{telepov2023freedpp} molecule generation (UniDock
+GPU~\citep{yu2023unidock} reward) and Boltz-2~\citep{passaro2025boltz2}
+scoring for each pair, mode, and seed.
+
+\textbf{Stage 2} (\texttt{cli/run\_post\_pipeline.py}) performs aggregation,
+metric computation, statistical testing, figure generation, and manuscript assembly.
+
+Fairness controls:
+\begin{itemize}
+\item identical seed set across modes;
+\item identical molecule budget per run;
+\item identical hit thresholds per pair from \texttt{configs/metrics.yaml};
+\item identical score convention (lower is better);
+\item run-level metadata and timestamped logs for traceability.
+\end{itemize}
+
+Any interrupted run is resumed only if required artifacts are missing; otherwise it is skipped.
+
+Pre-registration document: \texttt{docs/preregistration.md} (frozen at commit \texttt{f2eceb2}).
+
+\textbf{Compute parity.} All three pre-registered modes (\texttt{single\_a},
+\texttt{single\_b}, \texttt{double}) share identical parameters: molecule
+budget (1000 per run), seed set ([42, 137, 256, 512, 1024]), RL epochs (200),
+and chemical-space constraints.  The only difference between modes is the reward
+function (from UniDock docking scores $d_A, d_B$): $-z_A$, $-z_B$, or
+$-\max(z_A, z_B)$, where $z_X$ is the per-target $z$-score.
+Evaluation uses Boltz-2 affinity $a_A, a_B$ (orthogonal to the RL reward).
+Three additional exploratory modes (\texttt{linear\_equal},
+\texttt{biased\_a}, \texttt{selective\_a}) probe the weight-space
+spectrum from dual-target to selective design; their results are
+reported separately and do not contribute to the primary hypothesis test.
+
+\textbf{Docking calls trade-off.} In \texttt{double} mode each RL step invokes
+UniDock GPU twice (targets A and B), so total docking calls $\approx 2\times$
+those of \texttt{single}.  The primary comparison uses \emph{fixed molecule count}
+(1000).  A sensitivity baseline doubles the RL epochs for single modes
+(\texttt{epochs: 400}), equalizing the training-time docking budget rather
+than merely sampling more molecules from the same policy.
+
+\textbf{Statistical inference.} Each contrast (\texttt{double} vs.\
+\texttt{single\_x}) is evaluated by hierarchical
+bootstrap~\citep{cameron2008bootstrap, efron1993bootstrap} with 10\,000
+replicates, yielding percentile 95\% confidence intervals and one-sided
+$p$-values.  Multiple-testing correction uses
+Benjamini--Hochberg FDR~\citep{benjamini1995fdr} across the 10~primary
+contrasts (5~core pairs $\times$ 2~baselines).  Effect size is
+quantified by Cliff's delta~\citep{cliff1993dominance} (primary,
+thresholds per \citet{romano2006ordinal}) and Cohen's
+$d$~\citep{cohen1988statistical} (secondary).
+
+\textbf{Core vs.\ auxiliary.} Primary hypothesis tests are conducted on the
+pre-registered \emph{core set} (5~pairs); auxiliary pairs are used for
+robustness/sensitivity analysis only and do not contribute to the primary
+statistical comparison.
+
+\subsection*{Key comparisons}
+
+\begin{itemize}
+\item \texttt{double} vs \texttt{single\_a} cross-evaluated on target B:
+  does \texttt{double} lose on one target for dual-activity?
+\item \texttt{double} vs $\text{top}(\texttt{single\_a}) \cap \text{top}(\texttt{single\_b})$:
+  does \texttt{double} find molecules that post-hoc intersection misses?
+\item Homologous pairs (AChE\_BChE, CDK2\_ERK2) vs heterogeneous (BACE1\_GSK3B):
+  how much does pocket similarity facilitate dual generation?
+\item UniDock GPU ranking vs Boltz-2 ranking: are two independent methods in agreement?
+\end{itemize}
+
+
+
+\section{ Result Scope and Decision Criteria }
+
+% This chapter is populated by the post-pipeline (generate_latex_report.py).
+% Placeholder subsections below define the structure; each will be filled
+% with auto-generated tables, figures, and statistical summaries.
+
+\subsection{Experimental Completeness}
+
+% >>> PLACEHOLDER: auto-filled by compute_metrics.py <<<
+% Run completion rate, quality-gate pass/fail summary, missing data report.
+% >>> END PLACEHOLDER <<<
+
+\subsection{Primary Endpoint: Dual Hit-Rate}
+
+The primary endpoint is the dual hit-rate difference
+$\Delta\mathrm{hr}_{\mathrm{both}} = \mathrm{hr}_{\mathrm{both}}(\texttt{double})
+- \mathrm{hr}_{\mathrm{both}}(\texttt{single\_x})$
+on each of the five pre-registered core pairs.
+A contrast is declared significant only if all three conditions hold:
+BH-adjusted $p < 0.05$, $|\text{Cliff's } \delta| \geq 0.33$, and the
+bootstrap 95\% CI excludes
+zero~\citep{cameron2008bootstrap, cliff1993dominance, benjamini1995fdr}.
+
+% >>> PLACEHOLDER: primary results table <<<
+% Table: pair | hr_both(double) | hr_both(single_a) | hr_both(single_b) |
+%   delta_a | delta_b | p_adj_a | p_adj_b | CI | verdict
+% >>> END PLACEHOLDER <<<
+
+\subsection{No-Degradation Guard}
+
+For every core pair, per-target hit-rates $\mathrm{hr}_a(\texttt{double})$
+and $\mathrm{hr}_b(\texttt{double})$ are compared against the corresponding
+single-mode baseline.  A pair is flagged if Cliff's $\delta < -0.47$
+(large negative effect).
+
+% >>> PLACEHOLDER: degradation table <<<
+% >>> END PLACEHOLDER <<<
+
+\subsection{Secondary Endpoints}
+
+\paragraph{Score balance.}
+Median $|a_A - a_B|$ per mode; lower values indicate more balanced
+dual-target affinity.
+
+\paragraph{Enrichment@K.}
+For $K \in \{10, 50, 100, 500\}$, enrichment factor of dual hits
+in the top-$K$ molecules ranked by $\max(a_A, a_B)$ ascending.
+
+\paragraph{Pareto hypervolume.}
+Hypervolume dominated by the non-dominated set in $(a_A, a_B)$ space,
+with reference point $r = (2.0, 2.0)$.
+
+% >>> PLACEHOLDER: secondary metrics table <<<
+% >>> END PLACEHOLDER <<<
+
+\subsection{Exploratory Endpoints}
+
+\paragraph{Reward weight-space spectrum.}
+Comparison of all six modes (including exploratory \texttt{linear\_equal},
+\texttt{biased\_a}, \texttt{selective\_a}) on dual hit-rate and per-target
+hit-rates, reported descriptively.
+
+\paragraph{Docking--Boltz-2 concordance.}
+Per-target Spearman $\rho(d_X, a_X)$ as a sanity check for surrogate agreement.
+
+\paragraph{Chemical diversity.}
+Internal diversity (Tanimoto), scaffold diversity, and uniqueness
+across modes.
+
+% >>> PLACEHOLDER: exploratory figures <<<
+% >>> END PLACEHOLDER <<<
+
+\subsection{Sensitivity Analyses}
+
+\paragraph{Threshold sensitivity.}
+Primary analysis repeated at $T \in \{-1.0, 0.0, +1.0\}$
+(100\,nM, 1\,$\mu$M, 10\,$\mu$M).
+
+\paragraph{Equal docking calls.}
+Single modes with doubled RL epochs (400) to equalize
+training-time docking budget.
+
+\paragraph{Alternative scalarizations.}
+Offline re-computation of reward under geometric mean, harmonic mean,
+weighted sum, weighted product, and Tchebycheff decomposition.
+
+% >>> PLACEHOLDER: sensitivity tables <<<
+% >>> END PLACEHOLDER <<<
+
+Where data are incomplete at the time of manuscript assembly, the gap is
+recorded explicitly rather than backfilled with extrapolations.
+
+
+
+\section{ Limitations }
+
+Current limitations:
+\begin{itemize}
+\item computational cost remains high for full multi-pair, multi-seed runs;
+\item final external scorer latency constrains rapid iteration;
+\item conclusions depend on selected target pairs and may not generalize
+to all polypharmacology regimes.
+\end{itemize}
+
+Methodological limitations:
+\begin{itemize}
+\item reward shaping and normalization choices can bias search trajectories;
+\item docking-driven objectives remain proxy objectives rather than direct wet-lab endpoints.
+\end{itemize}
+
+Boltz-2 limitations:
+\begin{itemize}
+\item \textbf{Data leakage:} all selected targets appear in the Boltz-2 training
+set~\citep{passaro2025boltz2} (PDB cutoff 06/2023, $\sim$3M affinity records from
+ChEMBL).  This does not invalidate the comparison between generation modes (bias is
+identical across modes), but predicted affinities may be optimistic in absolute terms.
+\item \textbf{Cofactor incompatibility:} the Boltz-2 affinity module does not
+explicitly model cofactors~\citep{passaro2025boltz2}.  For pairs COX1\_COX2 (heme)
+and AChE\_MAOB (covalent FAD), Boltz-2 predictions should be interpreted with
+caution.  For MAO-B, \texttt{affinity\_probability\_binary} is recommended over
+\texttt{affinity\_pred\_value}.
+\item \textbf{Mutation insensitivity:} \citet{bret2026boltz2docking} report that
+Boltz-2 affinity predictions may be insensitive to key binding-site mutations,
+suggesting limited sensitivity to fine structural differences.  This reinforces
+our use of Boltz-2 as a \emph{relative} ranking tool rather than an absolute
+predictor.
+\end{itemize}
+
+Docking score limitations:
+\begin{itemize}
+\item \textbf{Docking as a weak proxy:} the PoseX benchmark~\citep{posex2025}
+shows that Vina-family scoring functions (including
+UniDock~\citep{yu2023unidock}) exhibit near-random performance on several
+targets in virtual screening.  This is precisely why independent validation
+via Boltz-2 strengthens the study---if the \texttt{double} mode advantage is
+confirmed by two independent methods, the result is more convincing.
+\item \textbf{UniDock GPU as reward backend:}
+FREED++~\citep{telepov2023freedpp} uses UniDock GPU for docking-based reward
+computation.  While significantly faster than CPU-based
+alternatives~\citep{trott2010vina}, the underlying scoring function remains an
+approximation of binding free energy~\citep{su2019casf2016}.
+\end{itemize}
+
+Surrogate mismatch limitations:
+\begin{itemize}
+\item \textbf{Training vs.\ evaluation metric:} FREED++ optimizes UniDock docking
+scores $d_A, d_B$ (physics-based), while the primary evaluation metric is Boltz-2
+affinity $a_A, a_B$ (learned surrogate). There is no guarantee that improving $d$
+consistently improves $a$; the correlation is target-dependent. Per-target Spearman
+$\rho(d_X, a_X)$ is computed as a sanity check; where $\rho \approx 0$, hit-rate
+conclusions are flagged with additional caution.
+\item \textbf{Boltz-2 calibration:} Boltz-2 affinity was trained on a mixture of
+assay types (Ki, Kd, IC50, EC50, etc.) and should be interpreted as an IC50-like
+\emph{ranking} surrogate, not a globally calibrated IC50 predictor. The fixed
+threshold $T=0$ (1\,$\mu$M) is an empirical cutoff; target-specific calibration is
+not performed. All hit-rate comparisons are \emph{relative} (double vs.\ single
+under the same surrogate). Independent benchmarks show significant target-dependent
+variability: PL-REX reports mean Pearson $r \approx 0.42$ (vs.\ 0.66 on the
+canonical 4-target FEP+ subset from the original paper); DeepMirror per-target
+evaluations range from $r = 0.26$ (cGAS) to $r = 0.81$ (Mpro). This motivates
+the per-target Spearman $\rho(d_X, a_X)$ sanity check in our protocol.
+\end{itemize}
+
+Reward function limitations:
+\begin{itemize}
+\item \textbf{Reward function choice:} the choice of $R = -\max(d_A, d_B)$ (worst-case)
+versus $R = -(d_A + d_B)$ (sum) influences the characteristics
+of generated molecules. Different strategies introduce different biases toward balanced
+vs.\ single-target-dominant solutions. The primary experiment uses worst-case only;
+alternative scalarizations are evaluated offline as sensitivity analysis.
+\end{itemize}
+
+Validation limitations:
+\begin{itemize}
+\item \textbf{No wet-lab validation:} all results are computational. Molecules optimized
+for docking scores may not be real inhibitors. Experimental IC\textsubscript{50}
+confirmation is beyond the scope of this workshop.
+\end{itemize}
+
+Statistical design limitations:
+\begin{itemize}
+\item \textbf{Shared targets across pairs:} several targets (AChE, BACE1, GSK3B)
+appear in multiple pairs.  Consequently, the 9~pairs (8~active) do not constitute
+9~independent observations.  Primary statistical tests are conducted on the
+pre-registered \emph{core set} (5~pairs, where target overlap is minimized),
+while auxiliary pairs serve as within-target sensitivity analyses rather than
+additional independent replicates.
+\item \textbf{Core vs.\ auxiliary designation:} the core/auxiliary split was
+fixed \emph{before} any generation runs to prevent cherry-picking.  Results on
+auxiliary pairs are reported for transparency but do not contribute to the
+primary hypothesis test.
+\item \textbf{Bootstrap power at $m=5$ clusters:} the two-level
+bootstrap~\citep{cameron2008bootstrap, efron1993bootstrap} resamples over
+5~RL seeds (clusters) at level~1.  With only 5~clusters the bootstrap
+distribution is coarse-grained; confidence intervals and $p$-values should be
+interpreted with caution.  The primary evidence for the effect rests on
+\emph{effect size} (Cliff's delta~\citep{cliff1993dominance}, thresholds
+per \citet{romano2006ordinal}) and \emph{cross-pair consistency}
+($\geq$3/5 core pairs), not on $p$-values alone.
+\end{itemize}
+
+These limitations are tracked to prevent over-claiming and to guide future protocol upgrades.
+
+
+
+\section{ Conclusion and Next Steps }
+
+% >>> PLACEHOLDER: first paragraph should state the verdict (accept/reject H1)
+% based on the pre-registered criteria after pipeline completion. <<<
+
+This study investigated whether dual-target reinforcement-learning
+generation with a worst-case scalarization reward improves dual hit-rate
+relative to single-target baselines, as evaluated by an orthogonal learned
+affinity surrogate (Boltz-2).  The experimental design---pre-registered
+pairs, fixed budgets, hierarchical bootstrap with FDR correction, and
+a conjunctive significance criterion---was chosen to minimize the risk
+of over-claiming.
+
+% >>> PLACEHOLDER: insert 1-2 sentences summarizing the primary finding
+% (N/5 core pairs, effect size range, degradation status). <<<
+% >>> END PLACEHOLDER <<<
+
+Three methodological contributions extend beyond the specific hypothesis:
+(1)~the systematic exploration of a continuous reward-weight space unifies
+target selectivity and polypharmacology within a single parametric framework;
+(2)~orthogonal evaluation (UniDock training, Boltz-2 evaluation) avoids the
+circular evaluation common in generative drug design;
+(3)~the fully automated eight-stage pipeline produces reproducible,
+auditable results from configuration files alone.
+
+\subsection*{Future Work}
+
+\begin{itemize}
+\item \textbf{Independent cross-validation:} GNINA CNN re-scoring of
+  generated poses would add a third independent evaluation layer.
+\item \textbf{Binding stability:} molecular dynamics simulations
+  (GROMACS, $\geq$50\,ns) for top dual-hit candidates to assess
+  binding-mode stability beyond static scoring.
+\item \textbf{Pareto-based generation:} replacing the worst-case
+  scalarization with Pareto-based RL methods
+  (e.g., PMMG~\citep{pmmg2025}, ParetoDrug~\citep{paretodrug2024})
+  could improve Pareto-front coverage at the cost of additional
+  architectural complexity.
+\item \textbf{Synthesis-aware generation:} coupling dual-target
+  rewards with synthesis-constrained generators such as
+  SynFlowNet~\citep{cretu2025synflownet} or
+  RxnFlow~\citep{lee2025rxnflow} would produce immediately
+  synthesizable dual-active candidates.
+\item \textbf{Increased statistical power:} expanding to
+  $\geq$10 seeds and applying wild cluster
+  bootstrap~\citep{cameron2008bootstrap} would tighten confidence
+  intervals and strengthen $p$-value reliability.
+\item \textbf{Experimental validation:} synthesis and IC$_{50}$
+  measurement of top-ranked dual hits is the ultimate test of
+  the computational predictions.
+\end{itemize}
+
+
+
+
+\section{Quantitative Results}
+
+\subsection{Primary Metrics Across Pairs and Modes}
+\begin{longtable}{p{0.18\linewidth} p{0.10\linewidth} p{0.15\linewidth} p{0.15\linewidth} p{0.15\linewidth} p{0.15\linewidth}}
+\toprule
+Pair & Mode & HR\_A (mean $\pm$ SEM) & HR\_B (mean $\pm$ SEM) & HR\_both (mean $\pm$ SEM) & Balance (mean $\pm$ SEM) \\
+\midrule
+\endhead
+
+CDK2\_ERK2 &
+single\_a &
+0.234 $\pm$ 0.000 &
+0.181 $\pm$ 0.000 &
+0.105 $\pm$ 0.000 &
+0.320 $\pm$ 0.000 \\
+
+CDK2\_ERK2 &
+single\_b &
+0.217 $\pm$ 0.000 &
+0.159 $\pm$ 0.000 &
+0.096 $\pm$ 0.000 &
+0.303 $\pm$ 0.000 \\
+
+CDK2\_ERK2 &
+double &
+0.235 $\pm$ 0.000 &
+0.168 $\pm$ 0.000 &
+0.105 $\pm$ 0.000 &
+0.328 $\pm$ 0.000 \\
+
+\bottomrule
+\end{longtable}
+
+
+
+\subsection{Objective Sensitivity Analysis}
+\begin{longtable}{p{0.22\linewidth} p{0.12\linewidth} p{0.15\linewidth}}
+\toprule
+Pair & Mode & combined\_min \\
+\midrule
+\endhead
+
+CDK2\_ERK2 &
+single\_a &
+0.683 $\pm$ 0.000 \\
+
+CDK2\_ERK2 &
+single\_b &
+0.749 $\pm$ 0.000 \\
+
+CDK2\_ERK2 &
+double &
+0.745 $\pm$ 0.000 \\
+
+\bottomrule
+\end{longtable}
+
+
+
+\subsection{Hypothesis Tests (FDR-adjusted)}
+\begin{longtable}{p{0.17\linewidth} p{0.09\linewidth} p{0.19\linewidth} p{0.10\linewidth} p{0.10\linewidth} p{0.10\linewidth} p{0.10\linewidth}}
+\toprule
+Pair & Test & Comparison & Metric & $\Delta$ & p\_adj & Significant \\
+\midrule
+\endhead
+
+CDK2\_ERK2 &
+H1a &
+double\_vs\_single\_a &
+hr\_both &
+0.000 &
+0.5112 &
+no \\
+
+CDK2\_ERK2 &
+H1b &
+double\_vs\_single\_b &
+hr\_both &
+0.009 &
+0.5112 &
+no \\
+
+CDK2\_ERK2 &
+H2a &
+double\_vs\_single\_a &
+balance &
+0.008 &
+- &
+no \\
+
+CDK2\_ERK2 &
+H2b &
+double\_vs\_single\_b &
+balance &
+0.025 &
+- &
+no \\
+
+\bottomrule
+\end{longtable}
+
+
+\section{Figures}
+
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.88\linewidth]{ \detokenize{figures/CDK2_ERK2_affinitya_modes.png} }
+\caption{Auto-generated figure: \texttt{ \detokenize{figures/CDK2_ERK2_affinitya_modes.png} }}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.88\linewidth]{ \detokenize{figures/CDK2_ERK2_affinityb_modes.png} }
+\caption{Auto-generated figure: \texttt{ \detokenize{figures/CDK2_ERK2_affinityb_modes.png} }}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.88\linewidth]{ \detokenize{figures/CDK2_ERK2_boxplot.png} }
+\caption{Auto-generated figure: \texttt{ \detokenize{figures/CDK2_ERK2_boxplot.png} }}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.88\linewidth]{ \detokenize{figures/CDK2_ERK2_combinedmin_modes.png} }
+\caption{Auto-generated figure: \texttt{ \detokenize{figures/CDK2_ERK2_combinedmin_modes.png} }}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.88\linewidth]{ \detokenize{figures/CDK2_ERK2_molecules_double.png} }
+\caption{Auto-generated figure: \texttt{ \detokenize{figures/CDK2_ERK2_molecules_double.png} }}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.88\linewidth]{ \detokenize{figures/CDK2_ERK2_molecules_single_a.png} }
+\caption{Auto-generated figure: \texttt{ \detokenize{figures/CDK2_ERK2_molecules_single_a.png} }}
+\end{figure}
+
+
 
 \section{Reproducibility and Artifact Traceability}
 \subsection{Software Snapshot}
 \begin{itemize}
-\item Master config version: \texttt{2.5}
-\item Docker image digest:\\
-  {\footnotesize\texttt{sha256:84621724917265ea8f72445ced88af441730b45342b4613f4355ed5663c71d4a}}
-\item Boltz version: \texttt{2.2.1}
-\item Docking program/version: \texttt{unidock\_gpu} / \texttt{Uni-Dock v1.1.3}
+\item Master config version: \texttt{ 2.5 }
+
+\item Docker image digest: \texttt{ sha256:84621724917265ea8f72445ced88af441730b45342b4613f4355ed5663c71d4a }
+\item Boltz version: \texttt{ 2.2.1 }
+\item Docking program/version: \texttt{ unidock\_gpu } / \texttt{ Uni-Dock v1.1.3 }
 \end{itemize}
 
 \subsection{Data Snapshot}
+
 \begin{itemize}
-\item Calibration set: \texttt{data/calibration/zinc\_druglike\_calibration\_1000\_v2024.smi}
-\item Baseline set: \texttt{data/baseline/zinc\_druglike\_baseline\_1000\_seed42.smi}
+\item Calibration set: \texttt{ output/data/calibration/zinc\_druglike\_calibration\_1000\_v2024.smi }
+\item Baseline set: \texttt{ output/data/baseline/zinc\_druglike\_baseline\_1000\_seed42.smi }
 \end{itemize}
+
+\appendix
+\section{Machine Summary Excerpt}
+
+\begin{verbatim}
+========================================================================
+DUAL-TARGET DOCKING: SUMMARY REPORT
+========================================================================
+
+------------------------------------------------------------------------
+Pair: CDK2_ERK2
+  Kinase selectivity - CDK2 vs ERK2 (both Ser/Thr kinases, similar ATP-binding pockets)
+  Thresholds: CDK2 <= 0.0, ERK2 <= 0.0
+
+  [SINGLE_A] N=1000
+  CDK2:
+    median=0.455  min=-1.875  max=2.266  IQR=[0.029, 0.863]
+
+  ERK2:
+    median=0.570  min=-1.164  max=2.422  IQR=[0.146, 0.961]
+
+  combined_min:
+    median=0.715  min=-1.164  max=2.422  IQR=[0.337, 1.047]
+
+  Metrics: HR_A=0.234  HR_B=0.181  HR_both=0.105  balance=0.320
+
+  Top-3 molecules (by combined_min):
+    1. CC(c1ccc(-c2ccc3c(c2)C2C=CCC2CN3)c(N2CCC(C3CCN([SH](=O)=O...
+       CDK2=-1.492  ERK2=-1.164  combined_min=-1.164
+    2. O=COc1cc(C2CCCNC2)ccc1S(=O)(=O)N1CCC([NH2+]C2CCCC2)CC1
+       CDK2=-1.219  ERK2=-0.953  combined_min=-0.953
+    3. O=C(CS)Nc1ccc(C2CS(=O)(=O)CC2c2ccc3c(c2)C2C=CCC2CN3)cc1C1CC1
+       CDK2=-1.000  ERK2=-0.902  combined_min=-0.902
+
+  [SINGLE_B] N=1000
+  CDK2:
+    median=0.527  min=-1.875  max=2.234  IQR=[0.083, 0.914]
+
+  ERK2:
+    median=0.672  min=-1.219  max=2.234  IQR=[0.208, 1.055]
+
+  combined_min:
+    median=0.791  min=-1.070  max=2.234  IQR=[0.376, 1.125]
+
+  Metrics: HR_A=0.217  HR_B=0.159  HR_both=0.096  balance=0.303
+
+  Top-3 molecules (by combined_min):
+    1. NN[NH+]1CCN(C(CC2CCC(O)C2)c2cccc(C3CCCCCC3)c2)CC1
+       CDK2=-1.070  ERK2=-1.078  combined_min=-1.070
+    2. O=COc1cc(C2CCCNC2)ccc1S(=O)(=O)N1CCC([NH2+]C2CCCC2)CC1
+       CDK2=-1.219  ERK2=-0.953  combined_min=-0.953
+    3. CC1C(C2CC(O)C(c3cccc(-c4ccc5c(c4)C4C=CCC4CN5)c3)C2)CCCC1C...
+       CDK2=-0.902  ERK2=-0.812  combined_min=-0.812
+
+  [DOUBLE] N=1000
+  CDK2:
+    median=0.520  min=-1.492  max=2.812  IQR=[0.029, 0.918]
+
+  ERK2:
+    median=0.648  min=-1.438  max=2.375  IQR=[0.216, 1.018]
+
+  combined_min:
+    median=0.768  min=-1.203  max=2.812  IQR=[0.3
+[...]
+\end{verbatim}
+
 
 \bibliography{references}
 

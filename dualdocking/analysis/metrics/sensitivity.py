@@ -168,7 +168,11 @@ def run_sensitivity(config: SensitivityConfig) -> SensitivityResult:
                     logger.warning("Quality gate fail: {}", run_dir)
                     continue
 
-                raw_data[pair_id][mode][seed] = _load_scored(scored_stem)
+                df = _load_scored(scored_stem)
+                # Drop NaN affinity rows so binary hit column is clean for
+                # the Binomial fast path in hierarchical_bootstrap_test.
+                valid = df["affinity_a"].notna() & df["affinity_b"].notna()
+                raw_data[pair_id][mode][seed] = df[valid].copy() if not valid.all() else df
 
     # Completeness check
     missing_list = [
@@ -189,6 +193,8 @@ def run_sensitivity(config: SensitivityConfig) -> SensitivityResult:
     rows: list[dict[str, Any]] = []
     json_out: dict[str, Any] = {"thresholds_tested": config.thresholds, "results": {}}
 
+    _hit_col = "_is_hit_both_thr"
+
     for thr in config.thresholds:
         thr_key = str(thr)
         json_out["results"][thr_key] = {}
@@ -200,6 +206,14 @@ def run_sensitivity(config: SensitivityConfig) -> SensitivityResult:
             return _fn
 
         metric_fn = _make_metric_fn(thr)
+
+        # Pre-compute binary hit column for Binomial fast path
+        for pair_id in config.pairs:
+            for mode in config.modes:
+                for df in raw_data.get(pair_id, {}).get(mode, {}).values():
+                    aff_a = df["affinity_a"].to_numpy()
+                    aff_b = df["affinity_b"].to_numpy()
+                    df[_hit_col] = ((aff_a <= thr) & (aff_b <= thr)).astype(float)
 
         p_values: list[float] = []
         p_index: list[tuple[str, str]] = []
@@ -213,7 +227,7 @@ def run_sensitivity(config: SensitivityConfig) -> SensitivityResult:
                 if not seed_dfs:
                     continue
 
-                hr_both_vals = [compute_hr_both(df, thr) for df in seed_dfs.values()]
+                hr_both_vals = [float(df[_hit_col].mean()) for df in seed_dfs.values()]
                 hr_both_vals = [v for v in hr_both_vals if np.isfinite(v)]
                 if not hr_both_vals:
                     continue
@@ -240,9 +254,10 @@ def run_sensitivity(config: SensitivityConfig) -> SensitivityResult:
                     metric_fn,
                     n_bootstrap=config.n_bootstrap,
                     rng_seed=42,
+                    fast_column=_hit_col,
                 )
-                vals_ctrl = [metric_fn(df) for df in group_ctrl]
-                vals_treat = [metric_fn(df) for df in group_treat]
+                vals_ctrl = [float(df[_hit_col].mean()) for df in group_ctrl]
+                vals_treat = [float(df[_hit_col].mean()) for df in group_treat]
 
                 test_stats = {
                     "comparison": f"{mode_treat}_vs_{mode_ctrl}",
@@ -295,7 +310,8 @@ def run_sensitivity(config: SensitivityConfig) -> SensitivityResult:
                         r[f"{test_id}_sig"] = s.get("significant", False)
 
     # ---- Robustness summary ----
-    core_pairs = [p for p, cfg in config.pairs.items() if cfg.get("set") == "core"]
+    # Absent "set" defaults to "core" (same convention as compute_metrics/audit).
+    core_pairs = [p for p, cfg in config.pairs.items() if cfg.get("set", "core") == "core"]
     summary: dict[str, dict[str, Any]] = {}
     for thr in config.thresholds:
         thr_key = str(thr)
