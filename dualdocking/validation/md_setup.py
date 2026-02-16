@@ -154,8 +154,37 @@ def _parameterize_ligand(smiles: str, work_dir: Path, *, cmd_timeout: int = 600)
 
 
 # ── Index file creation ──────────────────────────────────────────────
+def _parse_ndx(ndx_path: Path) -> dict[str, list[int]]:
+    """Parse a GROMACS index file into {group_name: [atom_indices]}."""
+    groups: dict[str, list[int]] = {}
+    current: str | None = None
+    for line in ndx_path.read_text().splitlines():
+        line = line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1].strip()
+            groups[current] = []
+        elif current is not None and line:
+            groups[current].extend(int(x) for x in line.split())
+    return groups
+
+
+def _write_ndx(groups: dict[str, list[int]], ndx_path: Path) -> None:
+    """Write a GROMACS index file from {group_name: [atom_indices]}."""
+    lines: list[str] = []
+    for name, indices in groups.items():
+        lines.append(f"[ {name} ]")
+        for i in range(0, len(indices), 15):
+            lines.append(" ".join(str(x) for x in indices[i : i + 15]))
+    ndx_path.write_text("\n".join(lines) + "\n")
+
+
 def _make_index(tpr_path: Path, work_dir: Path, *, cmd_timeout: int = 600) -> Path:
-    """Create a GROMACS index file with LIG and Protein_LIG groups.
+    """Create a GROMACS index file with Protein_LIG and Water_and_ions groups.
+
+    Runs ``gmx make_ndx`` for default groups, then adds ``Protein_LIG``
+    as the union of ``Protein`` and ``LIG`` atom indices.  This avoids
+    reliance on ``make_ndx`` auto-naming for boolean operations (which
+    produces ``Protein_r_LIG`` rather than ``Protein_LIG``).
 
     Returns:
         Path to the created ``index.ndx`` file.
@@ -168,9 +197,29 @@ def _make_index(tpr_path: Path, work_dir: Path, *, cmd_timeout: int = 600) -> Pa
             "-o", str(ndx_path),
         ],
         cwd=work_dir,
-        input_text="Protein | r LIG\nq\n",
+        input_text="q\n",
         timeout=cmd_timeout,
     )
+
+    groups = _parse_ndx(ndx_path)
+
+    # Build Protein_LIG union group
+    protein_idx = groups.get("Protein", [])
+    lig_idx = groups.get("LIG", [])
+    if not lig_idx:
+        raise RuntimeError("LIG group not found in index — ligand missing from topology")
+    groups["Protein_LIG"] = sorted(set(protein_idx + lig_idx))
+
+    # Ensure Water_and_ions exists
+    if "Water_and_ions" not in groups:
+        water = groups.get("SOL", groups.get("Water", []))
+        ions = []
+        for ion_name in ("NA", "CL", "K", "MG", "CA", "ZN"):
+            ions.extend(groups.get(ion_name, []))
+        if water or ions:
+            groups["Water_and_ions"] = sorted(set(water + ions))
+
+    _write_ndx(groups, ndx_path)
     return ndx_path
 
 
@@ -344,7 +393,7 @@ def _setup_system(
             "-c", str(work_dir / "solv.gro"),
             "-p", str(work_dir / "topol.top"),
             "-o", str(work_dir / "ions.tpr"),
-            "-maxwarn", "0",
+            "-maxwarn", "1",
         ],
         cwd=work_dir, timeout=config.cmd_timeout,
     )
@@ -371,7 +420,7 @@ def _setup_system(
             "-c", str(work_dir / "solv_ions.gro"),
             "-p", str(work_dir / "topol.top"),
             "-o", str(work_dir / "em.tpr"),
-            "-maxwarn", "0",
+            "-maxwarn", "1",
         ],
         cwd=work_dir, timeout=config.cmd_timeout,
     )
