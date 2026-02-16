@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>Modern De Novo Molecular Generation Methods (2023-2026)</title>
 <style>
-  body { font-family: Arial, sans-serif; max-width: 1200px; margin: 20px auto; padding: 0 20px; font-size: 11pt; }
+  body { font-family: Arial, sans-serif; max-width: 1600px; margin: 20px auto; padding: 0 20px; font-size: 11pt; }
   h1 { font-size: 16pt; }
   h2 { font-size: 13pt; margin-top: 28px; border-bottom: 2px solid #333; padding-bottom: 4px; }
   table { border-collapse: collapse; width: 100%; margin: 10px 0 20px 0; }
@@ -16,30 +16,50 @@
   .yes { color: #137333; font-weight: bold; }
   .no { color: #888; }
   .note { font-size: 9pt; color: #555; }
+  .easy { color: #137333; font-weight: bold; }
+  .medium { color: #b45309; font-weight: bold; }
+  .hard { color: #c0392b; font-weight: bold; }
+  .nocode { color: #c0392b; font-weight: bold; }
+  .dead { color: #999; text-decoration: line-through; }
+  .stars { font-size: 9pt; color: #666; }
+  .warn { background-color: #fff3cd; }
+  .top { background-color: #d4edda; }
 </style>
 </head>
 <body>
 
 <h1>Современные методы de novo молекулярной генерации (2023-2026)</h1>
-<p class="note">Каталог альтернатив FREED++ для dual-target drug design. Составлен 2026-02-14.</p>
+<p class="note">Каталог альтернатив FREED++ для dual-target drug design. Составлен 2026-02-14, обновлён 2026-02-16 (hardware, код, интеграция верифицированы по GitHub/papers).</p>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>1. RL-based генераторы</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
 <tr>
   <td><b>REINVENT 4</b></td>
   <td>2024, J.&nbsp;Cheminformatics</td>
   <td>LSTM/Transformer + RL (DAP, AHC, BAR); multi-component scoring</td>
   <td class="yes">Да</td>
   <td class="no">Нет (SMILES + external docking)</td>
+  <td>T: 4-8 GB VRAM, 16 GB RAM<br>I: 2-4 GB VRAM<br>Disk: ~2 GB<br>CPU-only возможен</td>
+  <td class="yes">634 &starf;, MIT, production-grade</td>
+  <td class="medium">MEDIUM</td>
+  <td>SMILES &rarr; SMILES</td>
   <td><a href="https://doi.org/10.1186/s13321-024-00812-5">DOI</a>, <a href="https://github.com/MolecularAI/REINVENT4">GitHub</a></td>
 </tr>
-<tr>
+<tr class="top">
   <td><b>FREED++</b></td>
   <td>2024, TMLR</td>
   <td>Fragment-based RL + prioritized experience replay</td>
   <td class="no">Ограничено</td>
   <td class="yes">Да (docking reward)</td>
+  <td>T: 4-8 GB VRAM, 16 GB RAM<br>I: 4 GB + UniDock GPU<br>Disk: ~5 GB + Docker image</td>
+  <td class="yes">Наш baseline</td>
+  <td class="easy">BASELINE</td>
+  <td>PDBQT + fragments &rarr; SMILES + 3D pose</td>
   <td><a href="https://arxiv.org/abs/2401.09840">arXiv</a>, <a href="https://github.com/AIRI-Institute/FFREED">GitHub</a></td>
 </tr>
 <tr>
@@ -48,14 +68,22 @@
   <td>Graph Transformer + Pareto RL; scaffold-constrained</td>
   <td class="yes">Да (Pareto MO)</td>
   <td class="no">Нет (predictor-based)</td>
+  <td>T: 8-12 GB VRAM, 16 GB RAM<br>I: 4-8 GB VRAM<br>Disk: ~3 GB</td>
+  <td class="yes">24 &starf;, активный</td>
+  <td class="medium">MEDIUM</td>
+  <td>SMILES + activity predictors &rarr; SMILES</td>
   <td><a href="https://doi.org/10.1186/s13321-023-00694-z">DOI</a>, <a href="https://github.com/CDDLeiden/DrugEx">GitHub</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>Augmented Memory</b></td>
   <td>2024, JACS Au</td>
   <td>REINVENT LSTM + experience replay + SMILES augmentation</td>
   <td class="yes">Да</td>
   <td class="no">Нет</td>
+  <td>T: 4-8 GB VRAM, 16 GB RAM<br>I: 2-4 GB</td>
+  <td class="no">DEPRECATED &rarr; Saturn</td>
+  <td class="hard">DEPRECATED</td>
+  <td>SMILES &rarr; SMILES</td>
   <td><a href="https://doi.org/10.1021/jacsau.4c00066">DOI</a></td>
 </tr>
 <tr>
@@ -64,14 +92,22 @@
   <td>LSTM/Mamba + Augmented Memory RL</td>
   <td class="yes">Да</td>
   <td class="no">Нет</td>
+  <td>T: 8-16 GB VRAM, 32 GB RAM<br>I: 4-8 GB VRAM<br>Disk: ~3 GB</td>
+  <td class="yes">70 &starf;</td>
+  <td class="hard">HARD</td>
+  <td>SMILES &rarr; SMILES</td>
   <td><a href="https://arxiv.org/abs/2405.17066">arXiv</a>, <a href="https://github.com/schwallergroup/saturn">GitHub</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>ChemRLformer</b></td>
   <td>2024, OpenReview</td>
   <td>Transformer + REINFORCE; 25 задач</td>
   <td class="yes">Да</td>
   <td class="no">Нет (docking as oracle)</td>
+  <td>T: ~8-16 GB VRAM (Transformer RL)<br>I: ~4-8 GB; 16 GB RAM<br>Disk: ~2 GB</td>
+  <td class="nocode">НЕТ КОДА</td>
+  <td class="hard">IMPOSSIBLE</td>
+  <td>SMILES &rarr; SMILES</td>
   <td><a href="https://arxiv.org/abs/2310.02902">arXiv</a></td>
 </tr>
 <tr>
@@ -80,6 +116,10 @@
   <td>RL + adaptive intrinsic rewards (random distillation)</td>
   <td class="no">Нет</td>
   <td class="no">Нет</td>
+  <td>T: 4-8 GB VRAM, 8 GB RAM<br>I: 2-4 GB VRAM<br>Disk: ~1 GB</td>
+  <td class="yes">Минимальный</td>
+  <td class="hard">HARD</td>
+  <td>SMILES &rarr; SMILES</td>
   <td><a href="https://doi.org/10.1021/acs.jcim.4c01669">DOI</a>, <a href="https://github.com/DevSlem/Mol-AIR">GitHub</a></td>
 </tr>
 <tr>
@@ -88,6 +128,10 @@
   <td>Direct Preference Optimization + curriculum learning</td>
   <td class="yes">Да</td>
   <td class="no">Нет</td>
+  <td>T: 8-16 GB VRAM, 16 GB RAM<br>I: 4-8 GB VRAM<br>Disk: ~2 GB</td>
+  <td class="yes">Research-grade</td>
+  <td class="medium">MEDIUM-HARD</td>
+  <td>SMILES &rarr; SMILES</td>
   <td><a href="https://arxiv.org/abs/2504.01389">arXiv</a>, <a href="https://github.com/SiliconMangrove/MolDPO">GitHub</a></td>
 </tr>
 <tr>
@@ -96,27 +140,55 @@
   <td>Conditional Transformer + RL; reaction-aware optimization</td>
   <td class="yes">Да (property + synthesis)</td>
   <td class="no">Нет</td>
+  <td>T: 8-12 GB VRAM, 16 GB RAM<br>I: 4-8 GB VRAM<br>Disk: ~3 GB</td>
+  <td class="yes">Research-grade</td>
+  <td class="hard">HARD</td>
+  <td>SMILES &rarr; SMILES + синтетический путь</td>
   <td><a href="https://doi.org/10.1038/s42004-025-01437-x">DOI</a></td>
+</tr>
+<tr>
+  <td><b>METEOR</b></td>
+  <td>2024, Molecules</td>
+  <td>GCPN + multi-objective RL; affinity + QED + SA</td>
+  <td class="yes">Да (multi-obj)</td>
+  <td class="no">Нет (docking reward)</td>
+  <td>T: 11 GB VRAM (2080Ti &check;), 4 GB RAM/job<br>I: ~4 GB VRAM<br>Disk: ~2 GB</td>
+  <td class="yes"><a href="https://github.com/ComputArtCMCG/METEOR">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Target PDB (docking) &rarr; molecular graphs</td>
+  <td><a href="https://doi.org/10.3390/molecules3000018">DOI</a></td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>2. Diffusion-based</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
 <tr>
   <td><b>TargetDiff</b></td>
   <td>2023, ICLR</td>
   <td>SE(3)-equivariant diffusion на atom types + coordinates</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>RTX 3090 (24 GB); 16-24 GB VRAM</td>
+  <td class="yes">322 &starf;, MIT, stable</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB + ref ligand &rarr; SDF 3D</td>
   <td><a href="https://arxiv.org/abs/2303.03543">arXiv</a>, <a href="https://github.com/guanjq/targetdiff">GitHub</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>DecompDiff</b></td>
   <td>2023, ICML</td>
   <td>Diffusion с decomposed priors (arms + scaffold)</td>
   <td class="no">Нет (guidance)</td>
   <td class="yes">Да</td>
+  <td>~16-24 GB VRAM (A100-class train)</td>
+  <td class="no">69 &starf;, ARCHIVED, CC-BY-NC&nbsp;4.0</td>
+  <td class="hard">MEDIUM-HARD (archived, non-commercial)</td>
+  <td>Pocket PDB + decomposed ligand &rarr; SDF 3D</td>
   <td><a href="https://arxiv.org/abs/2403.07902">arXiv</a>, <a href="https://github.com/bytedance/DecompDiff">GitHub</a></td>
 </tr>
 <tr>
@@ -125,6 +197,10 @@
   <td>SE(3)-equivariant; negative design, inpainting, property guidance</td>
   <td class="yes">Да (guidance)</td>
   <td class="yes">Да</td>
+  <td>V100 32GB / A100 (verified in paper); train 3-60h</td>
+  <td class="yes">485 &starf;, MIT, best-maintained; 8 checkpoints on Zenodo</td>
+  <td class="medium">MEDIUM (best diffusion candidate)</td>
+  <td>Pocket PDB + ref ligand &rarr; SDF 3D (de novo / inpainting / opt)</td>
   <td><a href="https://doi.org/10.1038/s43588-024-00737-x">DOI</a>, <a href="https://github.com/arneschneuing/DiffSBDD">GitHub</a></td>
 </tr>
 <tr>
@@ -133,6 +209,10 @@
   <td>Dual diffusion (local + global molecular dynamics)</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>A100/V100 (inferred); 24-32 GB; DDP supported</td>
+  <td class="yes">148 &starf;; Zenodo weights; frag + linker modes</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB + ref lig / fragments &rarr; SDF 3D</td>
   <td><a href="https://doi.org/10.1038/s41467-024-46569-1">DOI</a>, <a href="https://github.com/Layne-Huang/PMDM">GitHub</a></td>
 </tr>
 <tr>
@@ -141,6 +221,10 @@
   <td>Equivariant diffusion + pretrain + importance sampling guidance</td>
   <td class="yes">Да (affinity + QED + SA)</td>
   <td class="yes">Да</td>
+  <td>V100 32 GB (verified README); SLURM multi-node</td>
+  <td class="yes">26 &starf;, Apache-2.0, Pfizer open-source</td>
+  <td class="hard">MEDIUM-HARD (3 conda envs, SLURM; but highest potential for MO guidance)</td>
+  <td>Pocket PDB + surrogates &rarr; SDF 3D + properties</td>
   <td><a href="https://doi.org/10.1039/D4SC03523B">DOI</a>, <a href="https://github.com/pfizer-opensource/e3moldiffusion">GitHub</a></td>
 </tr>
 <tr>
@@ -149,51 +233,188 @@
   <td>E(3)-equivariant + bond diffusion + guidance; wet-lab validated</td>
   <td class="yes">Да</td>
   <td class="yes">Да</td>
-  <td><a href="https://doi.org/10.1038/s41467-025-63245-0">DOI</a></td>
+  <td>~16-24 GB VRAM; CUDA 11.6</td>
+  <td class="yes">63 &starf;, MIT</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB + ref lig &rarr; SDF 3D (atoms + bonds)</td>
+  <td><a href="https://doi.org/10.1038/s41467-025-63245-0">DOI</a>, <a href="https://github.com/QiaoyuHu89/DiffGui">GitHub</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>DiffDTM</b></td>
   <td>2024, IEEE TPAMI</td>
   <td>Diffusion на графах, dual-sequence conditioning (ESM2)</td>
   <td class="yes"><b>Да (dual-target by design)</b></td>
   <td class="no">Нет (sequence-based)</td>
+  <td>24-40 GB VRAM (ESM2 + graph transformer)</td>
+  <td class="nocode">НЕТ КОДА</td>
+  <td class="hard">IMPOSSIBLE</td>
+  <td>2 protein sequences &rarr; 2D molecular graph (NOT 3D)</td>
   <td><a href="https://arxiv.org/abs/2306.13957">arXiv</a></td>
 </tr>
 <tr>
   <td><b>MDRL</b></td>
   <td>2025, J.&nbsp;Cheminformatics</td>
-  <td>3D diffusion + RL для multi-target binding + properties</td>
+  <td>3D diffusion + RL для multi-target binding + KAN networks</td>
   <td class="yes"><b>Да (multi-target)</b></td>
   <td class="yes">Да</td>
-  <td><a href="https://doi.org/10.1186/s13321-025-01035-y">DOI</a></td>
+  <td>~16-24 GB VRAM; CUDA 11.3, PyTorch 1.10</td>
+  <td class="no">8 &starf;, MIT, LOW maturity (2 contributors)</td>
+  <td class="medium">MEDIUM (best dual-target fit, but immature)</td>
+  <td>GEOM-Drug + target info &rarr; 3D molecules</td>
+  <td><a href="https://doi.org/10.1186/s13321-025-01035-y">DOI</a>, <a href="https://github.com/Xinol1024/MDRL">GitHub</a></td>
 </tr>
 <tr>
   <td><b>SGEDiff</b></td>
   <td>2025, J.&nbsp;Cheminformatics</td>
-  <td>Subgraph-enriched diffusion</td>
+  <td>Subgraph-enriched diffusion + pocket prediction module</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
-  <td><a href="https://doi.org/10.1186/s13321-025-01123-z">DOI</a></td>
+  <td>~16-24 GB VRAM (inferred)</td>
+  <td class="no">3 &starf;, MIT, VERY immature (2 commits)</td>
+  <td class="hard">MEDIUM-HARD (very early-stage)</td>
+  <td>Protein PDB + lig SDF &rarr; 3D molecules</td>
+  <td><a href="https://doi.org/10.1186/s13321-025-01123-z">DOI</a>, <a href="https://github.com/Luoacee/SGEDiff">GitHub</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>Apo2Mol</b></td>
-  <td>2025, preprint</td>
+  <td>2026, AAAI</td>
   <td>Hierarchical graph diffusion; apo&rarr;holo transitions</td>
   <td class="no">Нет</td>
   <td class="yes">Да (dynamic pocket)</td>
+  <td>24-32 GB VRAM (inferred)</td>
+  <td class="nocode">НЕТ КОДА (README only, 29 &starf;)</td>
+  <td class="hard">IMPOSSIBLE (wait for release)</td>
+  <td>Apo pocket PDB &rarr; 3D ligand + holo pocket</td>
   <td><a href="https://arxiv.org/abs/2511.14559">arXiv</a>, <a href="https://github.com/AIDD-LiLab/Apo2Mol">GitHub</a></td>
+</tr>
+<!-- NEW diffusion models -->
+<tr>
+  <td><b>IPDiff</b></td>
+  <td>2024, ICLR</td>
+  <td>Interaction priors в forward + reverse diffusion; pretrained IPNet</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>T: 20-24 GB VRAM, 48 GB RAM<br>I: 12-16 GB VRAM<br>Disk: ~20 GB (CrossDocked)</td>
+  <td class="yes"><a href="https://github.com/YangLing0818/IPDiff">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D atoms + types</td>
+  <td><a href="https://arxiv.org/abs/2305.16902">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>IRDiff</b></td>
+  <td>2024, ICML</td>
+  <td>Retrieval-augmented diffusion + PMINet interaction network</td>
+  <td class="no">Нет (retrieval extensible)</td>
+  <td class="yes">Да</td>
+  <td>T: 20-24 GB VRAM, 48 GB RAM<br>I: 12-16 GB VRAM<br>Disk: ~25 GB (CrossDocked + retrieval)</td>
+  <td class="yes"><a href="https://github.com/YangLing0818/IRDiff">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB + ref library &rarr; 3D molecules</td>
+  <td><a href="https://arxiv.org/abs/2308.13684">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>KGDiff</b></td>
+  <td>2024, Brief.&nbsp;Bioinform.</td>
+  <td>Knowledge-guided diffusion; Vina scoring distilled в SE(3)-invariant expert</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>T: <b>40 GB VRAM (A100 &check;)</b>, 64 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~30 GB</td>
+  <td class="yes"><a href="https://github.com/CMACH508/KGDiff">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D molecules</td>
+  <td><a href="https://doi.org/10.1093/bib/bbad435">DOI</a></td>
+</tr>
+<tr>
+  <td><b>DiffInt</b></td>
+  <td>2025, JCIM</td>
+  <td>E(3)-EGNN diffusion + explicit H-bond guidance via interaction particles</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>T: 16-24 GB VRAM, 32 GB RAM<br>I: 8-12 GB (Colab OK)<br>Disk: ~15 GB</td>
+  <td class="yes">MIT, <a href="https://github.com/sekijima-lab/DiffInt">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D molecules + H-bond info</td>
+  <td><a href="https://doi.org/10.1021/acs.jcim.4c01385">DOI</a></td>
+</tr>
+<tr>
+  <td><b>DiffSMol</b></td>
+  <td>2025, Nat. Mach. Intel.</td>
+  <td>Shape-conditioned diffusion; ligand shape embeddings + pocket guidance</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да (pocket guidance mode)</td>
+  <td>T: 20-32 GB VRAM, 32 GB RAM<br>I: 12-16 GB VRAM<br>Disk: ~50 GB (shape + diffusion)</td>
+  <td class="yes"><a href="https://github.com/ninglab/DiffSMol">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Ligand shape + pocket &rarr; 3D molecules</td>
+  <td><a href="https://doi.org/10.1038/s42256-025-01030-w">DOI</a></td>
+</tr>
+<tr>
+  <td><b>VFDiff</b></td>
+  <td>2025, Nat. Comms</td>
+  <td>SE(3)-equivariant + vector field guidance from binding energy</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>T: ~16-24 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~20 GB</td>
+  <td class="no">Код не подтверждён</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D molecules</td>
+  <td><a href="https://doi.org/10.1038/s41467-025-63245-0">DOI</a></td>
+</tr>
+<tr>
+  <td><b>IDOLpro</b></td>
+  <td>2025, Chem. Sci.</td>
+  <td>Diffusion + multi-obj gradient optimization; better than experimental ligands</td>
+  <td class="yes">Да (multi-objective gradient)</td>
+  <td class="yes">Да</td>
+  <td>T: 8-16 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~10 GB</td>
+  <td class="yes"><a href="https://github.com/sandbox-quantum/idolpro">GitHub</a></td>
+  <td class="easy">LOW-MEDIUM (MO framework directly extensible)</td>
+  <td>Pocket PDB &rarr; 3D molecules optimized for N objectives</td>
+  <td><a href="https://doi.org/10.1039/d5sc01778e">DOI</a></td>
+</tr>
+<tr>
+  <td><b>DiffMC-Gen</b></td>
+  <td>2025, Adv. Sci.</td>
+  <td>Dual denoising diffusion; discrete + continuous; multi-conditional</td>
+  <td class="yes">Да (multi-conditional by design)</td>
+  <td class="yes">Да</td>
+  <td>T: ~16-24 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~20 GB</td>
+  <td class="no">Код не подтверждён</td>
+  <td class="easy">LOW (multi-conditional directly applicable)</td>
+  <td>Multiple conditions + target &rarr; 2D/3D molecules</td>
+  <td><a href="https://doi.org/10.1002/advs.202417726">DOI</a></td>
+</tr>
+<tr>
+  <td><b>AutoFragDiff</b></td>
+  <td>2024, NeurIPS workshop</td>
+  <td>Autoregressive fragment-based diffusion + geometric vector perceptrons</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>T: 12-16 GB VRAM (batch 4), 32 GB RAM<br>I: 6-10 GB VRAM<br>Disk: ~20 GB (CrossDock)</td>
+  <td class="yes"><a href="https://github.com/keiserlab/autofragdiff">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB + opt scaffold &rarr; 3D (fragment-by-fragment)</td>
+  <td>arXiv 2024</td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>3. Flow Matching</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
 <tr>
   <td><b>FlowMol</b></td>
   <td>2024-2025</td>
   <td>Mixed continuous/categorical flow matching</td>
   <td class="no">Нет</td>
   <td class="no">Нет (VoxBind &mdash; Да)</td>
+  <td>A100 40 GB (training); unconditional</td>
+  <td class="yes">180 &starf;, <a href="https://github.com/Dunni3/FlowMol">GitHub</a></td>
+  <td class="hard">HARD (unconditional, no pocket)</td>
+  <td>Noise &rarr; 3D all-atom molecule</td>
   <td><a href="https://github.com/Dunni3/FlowMol">GitHub</a></td>
 </tr>
 <tr>
@@ -202,14 +423,22 @@
   <td>Scalable E(3)-equivariant attention + flow matching</td>
   <td class="no">Нет</td>
   <td class="no">Нет</td>
-  <td><a href="https://arxiv.org/abs/2406.07266">arXiv</a>, <a href="https://github.com/rssrwn/semla-flow">GitHub</a></td>
+  <td>A100 40 GB; unconditional</td>
+  <td class="yes"><a href="https://github.com/rssrwn/semla-flow">GitHub</a></td>
+  <td class="hard">HARD (unconditional)</td>
+  <td>Noise &rarr; 3D molecule</td>
+  <td><a href="https://arxiv.org/abs/2406.07266">arXiv</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>FlexSBDD</b></td>
   <td>2024, NeurIPS</td>
   <td>Flow matching + flexible protein backbone/sidechain</td>
   <td class="no">Нет</td>
   <td class="yes">Да (protein flexibility)</td>
+  <td>T: ~16-24 GB VRAM (flow matching 3D)<br>I: ~8-12 GB; 32 GB RAM<br>Disk: ~20 GB</td>
+  <td class="nocode">НЕТ КОДА (placeholder only)</td>
+  <td class="hard">IMPOSSIBLE</td>
+  <td>Flexible pocket &rarr; 3D molecule</td>
   <td><a href="https://proceedings.neurips.cc/paper_files/paper/2024/file/60fb8cf8000f0386063fb24ead366330-Paper-Conference.pdf">PDF</a></td>
 </tr>
 <tr>
@@ -218,19 +447,104 @@
   <td>Multi-modal flow matching для SBDD</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>T: ~16-24 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~20 GB</td>
+  <td class="yes">Pocket-conditioned</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D molecule</td>
   <td><a href="https://arxiv.org/abs/2507.05503">arXiv</a></td>
+</tr>
+<!-- NEW flow matching models -->
+<tr>
+  <td><b>FLOWR / FLOWR.root</b></td>
+  <td>2025, ICLR (Spotlight)</td>
+  <td>Foundation model: continuous + categorical FM + equivariant OT; joint affinity prediction (pIC50/pKi/pKd/pEC50); 70&times; faster than diffusion</td>
+  <td class="yes">Да (multi-endpoint affinity)</td>
+  <td class="yes">Да (interaction profiles)</td>
+  <td>T: multi-GPU (foundation pretrain)<br>I: ~8-16 GB VRAM, 32 GB RAM<br>70&times; faster inference vs diffusion</td>
+  <td class="no">Код ещё не выпущен</td>
+  <td class="medium">MEDIUM (high potential; code pending)</td>
+  <td>Pocket + interaction profiles / fragments &rarr; 3D mol + affinity + confidence</td>
+  <td><a href="https://arxiv.org/abs/2504.10564">arXiv</a>, <a href="https://arxiv.org/abs/2510.02578">FLOWR.root</a></td>
+</tr>
+<tr>
+  <td><b>DrugFlow</b></td>
+  <td>2025, ICLR</td>
+  <td>Multi-domain flow (continuous coords + discrete Markov bridges for atoms/bonds); protein sidechain flexibility; OOD detection</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да (+ protein flexibility)</td>
+  <td>T: 16-24 GB VRAM, 64 GB RAM<br>I: 8-16 GB VRAM<br>Disk: ~30 GB</td>
+  <td class="yes"><a href="https://github.com/LPDI-EPFL/DrugFlow">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D molecule + bond types</td>
+  <td>ICLR 2025</td>
+</tr>
+<tr>
+  <td><b>CGFlow</b></td>
+  <td>2025, ICML</td>
+  <td>Compositional flow matching: joint 3D molecule + synthetic pathway; Vina -9.38, AiZynth 62.2%</td>
+  <td class="no">Нет (reward extensible)</td>
+  <td class="yes">Да (3D binding pose)</td>
+  <td>T: 16-32 GB VRAM, 32 GB RAM<br>I: 8-16 GB VRAM<br>Disk: ~20 GB; CUDA 12.4</td>
+  <td class="yes"><a href="https://github.com/tsa87/cgflow">GitHub</a></td>
+  <td class="medium">MEDIUM-HIGH (synthesis-aware)</td>
+  <td>Pocket &rarr; 3D molecule + synthetic route</td>
+  <td><a href="https://arxiv.org/abs/2504.08051">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>PAFlow</b></td>
+  <td>2025, NeurIPS</td>
+  <td>Prior-guided flow matching + interaction predictor; 20 sampling steps only</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>T: ~16-24 GB VRAM, 32 GB RAM<br>I: 8-12 GB (20 steps only)<br>Disk: ~20 GB</td>
+  <td class="no">Код не подтверждён</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket 3D &rarr; 3D molecules</td>
+  <td><a href="https://arxiv.org/abs/2509.01486">arXiv</a></td>
+</tr>
+<tr>
+  <td><b>PocketFlow</b></td>
+  <td>2024, Nat. Mach. Intel.</td>
+  <td>Autoregressive flow + chemical knowledge; 100% validity; wet-lab validated (HAT1, YTHDC1)</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>T: 16-24 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~50 GB</td>
+  <td class="yes"><a href="https://github.com/Saoge123/PocketFlow">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D molecule</td>
+  <td><a href="https://doi.org/10.1038/s42256-024-00808-8">DOI</a></td>
+</tr>
+<tr>
+  <td><b>PropMolFlow</b></td>
+  <td>2026, Nat. Comp. Sci.</td>
+  <td>SE(3)-equivariant FM; property-guided; 10&times; faster than diffusion</td>
+  <td class="no">Нет (property-conditional)</td>
+  <td class="no">Нет</td>
+  <td>T: 24-40 GB VRAM (A100/L4/B200)<br>64 GB RAM; CUDA &ge;12.8<br>I: 12-20 GB<br>Disk: ~25 GB</td>
+  <td class="yes"><a href="https://github.com/Liu-Group-UF/PropMolFlow">GitHub</a></td>
+  <td class="hard">HIGH (no pocket conditioning)</td>
+  <td>Property conditions &rarr; 3D molecule</td>
+  <td><a href="https://doi.org/10.1038/s43588-025-00946-y">DOI</a></td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>4. Autoregressive 3D</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
 <tr>
   <td><b>Pocket2Mol</b></td>
   <td>2022, ICML</td>
   <td>E(3)-equivariant GNN, atom-by-atom</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>T: 12-16 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~15 GB</td>
+  <td class="yes">383 &starf;, complete</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D molecule atom-by-atom</td>
   <td><a href="https://arxiv.org/abs/2205.07249">arXiv</a>, <a href="https://github.com/pengxingang/Pocket2Mol">GitHub</a></td>
 </tr>
 <tr>
@@ -239,6 +553,10 @@
   <td>RL fine-tuning Pocket2Mol для drug-likeness + affinity</td>
   <td class="yes">Да (multi-property)</td>
   <td class="yes">Да</td>
+  <td>T: N/A (no train code)<br>I: 8-12 GB VRAM, 16 GB RAM<br>Disk: ~15 GB</td>
+  <td class="no">Inference only; CC BY-NC-SA</td>
+  <td class="hard">HARD (no training code, restrictive license)</td>
+  <td>Pocket PDB &rarr; 3D molecule (RL-optimized)</td>
   <td><a href="https://github.com/deargen/Pocket2Mol_RL_public">GitHub</a></td>
 </tr>
 <tr>
@@ -247,6 +565,10 @@
   <td>Parallel multiscale autoregressive</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>T: 12-16 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~15 GB</td>
+  <td class="yes">106 &starf;</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D molecule</td>
   <td><a href="https://doi.org/10.1038/s42256-023-00712-7">DOI</a></td>
 </tr>
 <tr>
@@ -255,19 +577,31 @@
   <td>Fragment-based autoregressive diffusion</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>T: 12-16 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~15 GB</td>
+  <td class="yes">71 &starf;</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; 3D molecule (fragment-based)</td>
   <td>NeurIPS 2022 workshop</td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>5. GFlowNet-based</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
 <tr>
   <td><b>SynFlowNet</b></td>
   <td>2025, ICLR (Spotlight)</td>
   <td>GFlowNet + synthesis-constrained actions; guaranteed synthesis</td>
   <td class="yes">Да (diversity + properties)</td>
   <td class="no">Нет (docking reward)</td>
+  <td>T: 4-8 GB VRAM, 32 GB RAM<br>I: 2-4 GB VRAM<br>Disk: ~5 GB + building blocks</td>
+  <td class="yes">No pretrained weights</td>
+  <td class="hard">MEDIUM-HARD</td>
+  <td>Building blocks + reactions &rarr; synthesizable SMILES</td>
   <td><a href="https://arxiv.org/abs/2405.01155">arXiv</a>, <a href="https://github.com/mirunacrt/synflownet">GitHub</a></td>
 </tr>
 <tr>
@@ -276,6 +610,10 @@
   <td>GFlowNet, 1M+ building blocks, 100 reaction templates</td>
   <td class="yes">Да (MOGFN)</td>
   <td class="yes">Да (docking reward)</td>
+  <td>T: 6-10 GB VRAM, 32 GB RAM<br>I: 3-5 GB VRAM<br>Disk: ~5 GB + UniDock</td>
+  <td class="yes">Fully available, best GFlowNet candidate</td>
+  <td class="easy">EASY-MEDIUM</td>
+  <td>Pocket PDB + building blocks &rarr; synthesizable SMILES</td>
   <td><a href="https://github.com/SeonghwanSeo/RxnFlow">GitHub</a></td>
 </tr>
 <tr>
@@ -284,6 +622,10 @@
   <td>GFlowNet + Pareto conditioning</td>
   <td class="yes">Да (by design)</td>
   <td class="no">Нет (property rewards)</td>
+  <td>T: 4-8 GB VRAM, 16 GB RAM<br>I: 2-4 GB VRAM<br>Disk: ~2 GB</td>
+  <td class="no">Partial (sequence domains only)</td>
+  <td class="hard">HARD</td>
+  <td>Property targets &rarr; SMILES</td>
   <td><a href="https://arxiv.org/abs/2210.12765">arXiv</a></td>
 </tr>
 <tr>
@@ -292,6 +634,10 @@
   <td>Reaction-GFlowNet; все молекулы синтезируемы</td>
   <td class="yes">Да (diversity)</td>
   <td class="yes">Да (GPU docking)</td>
+  <td>T: 8-12 GB VRAM (batch 100), 32 GB RAM<br>I: 3-6 GB VRAM<br>Disk: ~5 GB</td>
+  <td class="yes">Modular API</td>
+  <td class="medium">MEDIUM</td>
+  <td>Building blocks + reactions &rarr; synthesizable molecules</td>
   <td><a href="https://arxiv.org/abs/2406.08506">arXiv</a>, <a href="https://github.com/koziarskilab/RGFN">GitHub</a></td>
 </tr>
 <tr>
@@ -300,19 +646,44 @@
   <td>GFlowNet + GA guidance</td>
   <td class="yes">Да</td>
   <td class="no">Нет</td>
+  <td>T: 4-6 GB VRAM, 16 GB RAM<br>I: 2-3 GB VRAM<br>Disk: ~2 GB</td>
+  <td class="yes">Complete</td>
+  <td class="medium">MEDIUM</td>
+  <td>Property targets &rarr; SMILES</td>
   <td><a href="https://arxiv.org/abs/2402.05961">arXiv</a>, <a href="https://github.com/hyeonahkimm/genetic_gfn">GitHub</a></td>
+</tr>
+<!-- NEW GFlowNet -->
+<tr>
+  <td><b>TacoGFN</b></td>
+  <td>2024, TMLR</td>
+  <td>Target-conditioned GFlowNet; affinity + QED + SA reward; SOTA CrossDocked2020; orders of magnitude faster than diffusion</td>
+  <td class="no">Нет (reward extensible for dual)</td>
+  <td class="yes">Да</td>
+  <td>T: 12-24 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~3 GB (pretrained)</td>
+  <td class="yes"><a href="https://github.com/tsa87/TacoGFN-SBDD">GitHub</a>, trained models included</td>
+  <td class="medium">MEDIUM (reward framework directly supports multi-target extension)</td>
+  <td>Pocket 3D &rarr; 3D molecules</td>
+  <td><a href="https://arxiv.org/abs/2310.03223">arXiv</a></td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>6. Transformer / LLM-based</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
 <tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
+<tr class="warn">
   <td><b>BindGPT</b></td>
   <td>2025, AAAI</td>
   <td>Decoder-only LLM; SMILES + XYZ tokens; pretrain + SFT + RL</td>
   <td class="yes">Да (RL)</td>
   <td class="yes">Да (3D pocket tokens)</td>
+  <td>~100M params; single GPU inference; A100-class pretrain</td>
+  <td class="no">GitHub 404; HF weights only (insilicomedicine/bindgpt_*)</td>
+  <td class="hard">MEDIUM-HARD (no full pipeline code)</td>
+  <td>Pocket tokens &rarr; SMILES + XYZ</td>
   <td><a href="https://arxiv.org/abs/2406.03686">arXiv</a></td>
 </tr>
 <tr>
@@ -321,6 +692,10 @@
   <td>Token-only LLM для pocket-based 3D generation + RL</td>
   <td class="yes">Да (RL)</td>
   <td class="yes">Да</td>
+  <td>V100; ~0.45s/mol</td>
+  <td class="yes">31 &starf;, checkpoints on Google Drive</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB + ref lig SDF &rarr; 3D SMILES</td>
   <td><a href="https://doi.org/10.1039/D4SC06864E">DOI</a>, <a href="https://github.com/ashipiling/GPT_3DSMILES">GitHub</a></td>
 </tr>
 <tr>
@@ -329,14 +704,22 @@
   <td>Language model + geometric DL; fragment-based SMILES</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>T: 5-10 GB VRAM, 16 GB RAM<br>I: &ge;5 GB VRAM; setup ~40 min<br>Disk: ~3 GB</td>
+  <td class="yes">64 &starf;, GPL-3.0</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB &rarr; MOL 3D</td>
   <td><a href="https://doi.org/10.1038/s42256-023-00775-6">DOI</a>, <a href="https://github.com/stonewiseAIDrugDesign/Lingo3DMol">GitHub</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>MTMol-GPT</b></td>
   <td>2024, PLoS Comp. Bio.</td>
   <td>GPT + generative adversarial imitation learning; multi-target</td>
   <td class="yes"><b>Да (multi-target by design)</b></td>
   <td class="no">Нет</td>
+  <td>T: ~8-16 GB VRAM (GPT)<br>I: ~4-8 GB; 16 GB RAM<br>Disk: ~2 GB</td>
+  <td class="nocode">10 &starf;, INCOMPLETE (placeholder README, no weights)</td>
+  <td class="hard">HARD (incomplete)</td>
+  <td>SMILES/SELFIES &rarr; SMILES/SELFIES</td>
   <td><a href="https://doi.org/10.1371/journal.pcbi.1012229">DOI</a>, <a href="https://github.com/guofei-tju/MTMol-GPT">GitHub</a></td>
 </tr>
 <tr>
@@ -345,19 +728,68 @@
   <td>Transformer; 2D/3D + properties в discrete tokens</td>
   <td class="yes">Да (multi-property)</td>
   <td class="yes">Да</td>
+  <td>4&times;RTX 8000 48 GB (RL); single GPU for inference</td>
+  <td class="yes">62 &starf;; ext deps (QuickVina2, ADFRsuite)</td>
+  <td class="hard">MEDIUM-HARD (multi-GPU RL)</td>
+  <td>Pocket pickles / PDB &rarr; CSV molecules</td>
   <td><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12075800/">PMC</a></td>
+</tr>
+<!-- NEW LLM models -->
+<tr>
+  <td><b>TamGen</b></td>
+  <td>2024, Nat. Comms</td>
+  <td>GPT + Transformer protein encoder + VAE context; pretrained 10M compounds; <b>wet-lab: 14 actives, IC50 1.9 &mu;M</b></td>
+  <td class="no">Нет (single target)</td>
+  <td class="yes">Да (Transformer encoder)</td>
+  <td>T: 16-40 GB VRAM (fairseq GPT), 32 GB RAM<br>I: 8-16 GB VRAM<br>Disk: ~5 GB (Zenodo ckpts)</td>
+  <td class="yes">MIT, <a href="https://github.com/microsoft/TamGen">Microsoft GitHub</a></td>
+  <td class="easy">LOW (easy integration, Microsoft-backed)</td>
+  <td>Pocket 3D PDB &rarr; SMILES</td>
+  <td><a href="https://doi.org/10.1038/s41467-024-53632-4">DOI</a></td>
+</tr>
+<tr>
+  <td><b>DRAGONFLY</b></td>
+  <td>2024, Nat. Comms</td>
+  <td>Graph Transformer + LSTM CLM; trained on ~360K ligands / ~3K targets; zero-shot; <b>wet-lab validated (PPAR&gamma; crystal structures)</b></td>
+  <td class="yes">Да (interactome-based)</td>
+  <td class="yes">Да</td>
+  <td>T: 12-20 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~5 GB (interactome data)</td>
+  <td class="yes"><a href="https://github.com/ETHmodlab/dragonfly_gen">GitHub</a></td>
+  <td class="easy">LOW-MEDIUM (zero-shot, no fine-tuning)</td>
+  <td>Pocket / ligand template &rarr; SMILES</td>
+  <td><a href="https://doi.org/10.1038/s41467-024-47613-w">DOI</a></td>
+</tr>
+<tr>
+  <td><b>Rag2Mol</b></td>
+  <td>2025, Brief. Bioinform.</td>
+  <td>RAG-based SBDD; dual retriever (global + molecular) + generator; found PTPN2 inhibitors</td>
+  <td class="no">Нет</td>
+  <td class="yes">Да</td>
+  <td>T: 12-18 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~20 GB (CrossDocked + index)</td>
+  <td class="yes"><a href="https://github.com/CQ-zhang-2016/Rag2Mol">GitHub</a></td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket 3D + compound library &rarr; molecules</td>
+  <td><a href="https://doi.org/10.1093/bib/bbaf265">DOI</a></td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>7. Joint 2D+3D (Bayesian Flow Networks)</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
 <tr>
   <td><b>MolCRAFT</b></td>
   <td>2024, ICML</td>
   <td>Bayesian Flow Network; continuous parameter space</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>T: 24-40 GB VRAM (A100), 64 GB RAM<br>~30h train; Docker<br>I: 12-16 GB VRAM<br>Disk: ~25 GB</td>
+  <td class="yes">143 &starf;, CC-BY-NC-SA, HF models; very active</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB + ref lig SDF &rarr; .pt / SDF 3D</td>
   <td><a href="https://arxiv.org/abs/2404.12141">arXiv</a>, <a href="https://github.com/GenSI-THUAIR/MolCRAFT">GitHub</a></td>
 </tr>
 <tr>
@@ -366,6 +798,10 @@
   <td>BFN + gradient guidance; backward correction; SOTA CrossDocked2020</td>
   <td class="yes">Да (multi-obj opt)</td>
   <td class="yes">Да</td>
+  <td>T: 24-40 GB VRAM (A100), 64 GB RAM<br>Docker; I: 12-16 GB VRAM<br>Disk: ~25 GB</td>
+  <td class="yes">Same repo (143 &starf;), HF: GenSI/MolJO</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB + ref lig &rarr; .pt / SDF 3D + Vina</td>
   <td><a href="https://huggingface.co/GenSI/MolJO">HuggingFace</a>, <a href="https://github.com/GenSI-THUAIR/MolCRAFT">GitHub</a></td>
 </tr>
 <tr>
@@ -374,27 +810,56 @@
   <td>VLB-Optimal Scheduling; 95.9% PB-Valid rate</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>T: 24-40 GB VRAM (A100), 64 GB RAM<br>Docker; I: 12-16 GB VRAM<br>Disk: ~25 GB</td>
+  <td class="yes">Same repo, HF: GenSI/MolPilot</td>
+  <td class="medium">MEDIUM</td>
+  <td>Pocket PDB + ref lig &rarr; 3D molecule</td>
   <td>Same repo as MolCRAFT</td>
 </tr>
 <tr>
   <td><b>JODO</b></td>
-  <td>2023, preprint</td>
+  <td>2023, TMLR / IEEE TPAMI</td>
   <td>Joint 2D+3D diffusion (types + bonds + coords)</td>
   <td class="no">Нет</td>
   <td class="no">Нет</td>
+  <td>T: 2-4&times;16+ GB VRAM, 64 GB RAM<br>batch 2500 (QM9) / 500 (GEOM)<br>I: 8-16 GB; Disk: ~5 GB</td>
+  <td class="yes">52 &starf;; pretrained + 10K molecules</td>
+  <td class="hard">HARD (unconditional)</td>
+  <td>Datasets (QM9/GEOM) &rarr; RDKit Mol .pkl 3D</td>
   <td><a href="https://arxiv.org/abs/2305.12347">arXiv</a>, <a href="https://github.com/GRAPH-0/JODO">GitHub</a></td>
+</tr>
+<!-- NEW BFN -->
+<tr>
+  <td><b>CByG</b></td>
+  <td>2025, NeurIPS</td>
+  <td>BFN + gradient-based conditional guidance (affinity, SA, selectivity)</td>
+  <td class="yes">Да (selectivity guidance)</td>
+  <td class="yes">Да</td>
+  <td>T: ~16-24 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~20 GB</td>
+  <td class="no">Код не подтверждён</td>
+  <td class="medium">MEDIUM (guidance extensible to dual-target)</td>
+  <td>Pocket + property guidance &rarr; 3D molecule</td>
+  <td><a href="https://arxiv.org/abs/2508.21468">arXiv</a></td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>8. VAE-based</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
 <tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
+<tr class="top">
   <td><b>POLYGON</b></td>
   <td>2024, Nat. Comms</td>
-  <td>VAE + iterative RL; polypharmacology; 32 молекулы синтезированы</td>
-  <td class="yes"><b>Да (dual-target)</b></td>
+  <td>VAE + iterative RL; polypharmacology; <b>32 молекулы синтезированы (MEK1+mTOR)</b></td>
+  <td class="yes"><b>Да (dual-target by design)</b></td>
   <td class="no">Нет (predictor-based)</td>
+  <td>T: 4-8 GB VRAM (VAE), 16 GB RAM<br>I: 2-4 GB (CPU OK)<br>Disk: ~2 GB</td>
+  <td class="yes">41 &starf;, MIT, CLI</td>
+  <td class="easy">EASY (purpose-built for dual-target)</td>
+  <td>SMILES + CSV binding data &rarr; SMILES dual-target</td>
   <td><a href="https://doi.org/10.1038/s41467-024-47120-y">DOI</a>, <a href="https://github.com/bpmunson/polygon">GitHub</a></td>
 </tr>
 <tr>
@@ -403,6 +868,10 @@
   <td>Hierarchical VAE; 3D voxel grids</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
+  <td>T: 12-24 GB VRAM, 32 GB RAM<br>I: 8-16 GB (grids &gt;48A &rarr; multi-GPU)<br>Disk: ~10 GB; CUDA 11.6</td>
+  <td class="yes">110 &starf;; scaffold hopping + linker + frag growing</td>
+  <td class="medium">MEDIUM</td>
+  <td>SDF/MOL2 + protein PDB &rarr; 3D molecules + docking</td>
   <td><a href="https://doi.org/10.1021/acs.jcim.4c01193">DOI</a>, <a href="https://github.com/jssweller/DrugHIVE">GitHub</a></td>
 </tr>
 <tr>
@@ -411,104 +880,237 @@
   <td>Score-based denoising на 3D voxels; atoms as Gaussian densities</td>
   <td class="no">Нет</td>
   <td class="yes">Да (VoxBind)</td>
+  <td>VoxMol: 2-4&times;16+ GB VRAM<br>VoxBind: 4&times;16+ GB VRAM<br>64-128 GB RAM; Disk: ~30 GB</td>
+  <td class="yes">VoxMol 21&starf; / VoxBind 35&starf;, Apache-2.0</td>
+  <td class="hard">MEDIUM-HARD (multi-GPU)</td>
+  <td>Pocket PDB + ref lig &rarr; .xyz / SDF 3D</td>
   <td><a href="https://arxiv.org/abs/2306.07473">arXiv</a>, <a href="https://github.com/Genentech/voxmol">GitHub</a></td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>9. Dual / Multi-target специализированные</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
 <tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
+<tr class="warn">
   <td><b>AIxFuse</b></td>
   <td>2024, Chem. Sci.</td>
   <td>Self-play RL + pharmacophore fusion + dual-pocket docking</td>
   <td class="yes">Да (dual-pocket)</td>
+  <td>GPU + <b>Schr&ouml;dinger suite</b> (~$10K+/yr)</td>
+  <td class="no">11 &starf;; 99% Jupyter; <b>requires Schr&ouml;dinger (commercial)</b></td>
+  <td class="hard">HARD (commercial dependency)</td>
+  <td>Protein structures + pharmacophores &rarr; molecules</td>
   <td><a href="https://doi.org/10.1039/d4sc00094c">DOI</a>, <a href="https://github.com/biomed-AI/AIxFuse">GitHub</a></td>
 </tr>
-<tr>
+<tr class="top">
   <td><b>Isigkeit CLM</b></td>
   <td>2024, Nat. Comms</td>
-  <td>Chemical Language Model fine-tuning; <b>7/12 wet-lab confirmed</b></td>
+  <td>Chemical Language Model fine-tuning; <b>7/12 wet-lab confirmed dual ligands, double-digit nM potency</b></td>
   <td class="no">Нет (ligand-based)</td>
+  <td>T: 4-8 GB VRAM (CLM), 16 GB RAM<br>I: 2-4 GB (CPU OK)<br>Disk: ~1 GB</td>
+  <td class="yes">Zenodo (conda env); experimentally validated</td>
+  <td class="easy">EASY (lightweight CLM fine-tuning)</td>
+  <td>SMILES known ligands for 2 targets &rarr; SMILES dual-target</td>
   <td><a href="https://doi.org/10.1038/s41467-024-52060-8">DOI</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>DiffDTM</b></td>
   <td>2024, IEEE TPAMI</td>
   <td>Diffusion + dual sequence conditioning (ESM2 encoder)</td>
   <td class="no">Нет (sequence-based)</td>
+  <td>24-40 GB (ESM2)</td>
+  <td class="nocode">НЕТ КОДА</td>
+  <td class="hard">IMPOSSIBLE</td>
+  <td>2 protein sequences &rarr; 2D molecular graph</td>
   <td><a href="https://arxiv.org/abs/2306.13957">arXiv</a></td>
 </tr>
 <tr>
   <td><b>MDRL</b></td>
   <td>2025, J. Cheminformatics</td>
-  <td>3D Diffusion + RL для multi-target binding + properties</td>
+  <td>3D Diffusion + RL для multi-target binding + KAN</td>
   <td class="yes">Да</td>
-  <td><a href="https://doi.org/10.1186/s13321-025-01035-y">DOI</a></td>
+  <td>~16-24 GB; CUDA 11.3</td>
+  <td class="no">8 &starf;, MIT, low maturity</td>
+  <td class="medium">MEDIUM (best dual-target 3D model, but immature)</td>
+  <td>GEOM-Drug + target info &rarr; 3D molecules</td>
+  <td><a href="https://doi.org/10.1186/s13321-025-01035-y">DOI</a>, <a href="https://github.com/Xinol1024/MDRL">GitHub</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>MTMol-GPT</b></td>
   <td>2024, PLoS Comp. Bio.</td>
   <td>GPT + imitation learning для multi-target</td>
   <td class="no">Нет (activity-based)</td>
-  <td><a href="https://doi.org/10.1371/journal.pcbi.1012229">DOI</a>, <a href="https://github.com/guofei-tju/MTMol-GPT">GitHub</a></td>
+  <td>T: ~8-16 GB VRAM (GPT)<br>I: ~4-8 GB; 16 GB RAM<br>Disk: ~2 GB</td>
+  <td class="nocode">INCOMPLETE repo</td>
+  <td class="hard">HARD (incomplete)</td>
+  <td>SMILES &rarr; SMILES</td>
+  <td><a href="https://doi.org/10.1371/journal.pcbi.1012229">DOI</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>SFG-Drug</b></td>
   <td>2025, MDPI Inventions</td>
   <td>MCTS + GRU для dual-target (MEK1 + mTOR)</td>
   <td class="no">Нет (SMILES-based)</td>
+  <td>T: ~2-4 GB VRAM (GRU+MCTS)<br>I: 1-2 GB (CPU OK)<br>Disk: ~1 GB</td>
+  <td class="nocode">НЕТ КОДА; low-impact journal</td>
+  <td class="hard">IMPOSSIBLE</td>
+  <td>Fragments + docking rewards &rarr; SMILES</td>
   <td><a href="https://doi.org/10.3390/inventions11010012">DOI</a></td>
+</tr>
+<!-- NEW dual-target -->
+<tr>
+  <td><b>DeepICL</b></td>
+  <td>2024, Nat. Comms</td>
+  <td>Interaction-aware 3D conditional generation; interaction fingerprints control binding mode; mutant-selective design</td>
+  <td class="yes">Да (via interaction control)</td>
+  <td>T: 8-16 GB VRAM (DDP), ~4 GB RAM/job<br>I: 6-12 GB VRAM<br>Disk: ~10 GB</td>
+  <td class="yes"><a href="https://github.com/ACE-KAIST/DeepICL">GitHub</a></td>
+  <td class="medium">MEDIUM (interaction-guided selectivity)</td>
+  <td>Pocket 3D + interaction profile &rarr; 3D molecular graphs</td>
+  <td><a href="https://doi.org/10.1038/s41467-024-47011-2">DOI</a></td>
+</tr>
+<tr>
+  <td><b>G2D-Diff</b></td>
+  <td>2025, Nat. Comms</td>
+  <td>Genotype-to-drug diffusion; cancer genotype conditioning; implicit polypharmacology through pathway alterations</td>
+  <td class="yes">Да (implicit via genotype)</td>
+  <td>T: 12-24 GB VRAM, 32 GB RAM<br>I: 8-12 GB VRAM; CUDA 11.3<br>Disk: ~10 GB</td>
+  <td class="yes"><a href="https://github.com/GIST-CSBL/G2D-Diff">GitHub</a></td>
+  <td class="medium">MEDIUM (unique genotype paradigm)</td>
+  <td>Somatic genotype + response class &rarr; molecular structures</td>
+  <td><a href="https://doi.org/10.1038/s41467-025-60763-9">DOI</a></td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>10. MCTS / Genetic</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Ссылки</th></tr>
+<tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
 <tr>
   <td><b>PMMG</b></td>
   <td>2025, Adv. Sci.</td>
   <td>RNN + Pareto MCTS; &gt;4 objectives; тест на EGFR/HER2</td>
   <td class="yes">Да</td>
-  <td><a href="https://doi.org/10.1002/advs.202410640">DOI</a></td>
+  <td>T: 2-4 GB VRAM (RNN), 8 GB RAM<br>I: 1-2 GB (CPU OK)<br>Disk: ~1 GB; TF 2.5</td>
+  <td class="yes">12 &starf;; user-defined reward</td>
+  <td class="medium">MEDIUM</td>
+  <td>Custom reward fn + YAML &rarr; SMILES</td>
+  <td><a href="https://doi.org/10.1002/advs.202410640">DOI</a>, <a href="https://github.com/Liuyifeii/PMMG">GitHub</a></td>
 </tr>
 <tr>
   <td><b>ParetoDrug</b></td>
   <td>2024, Comm. Bio.</td>
-  <td>Pareto MCTS на chemical space graphs</td>
+  <td>Pareto MCTS на chemical space graphs; ParetoPUCT</td>
   <td class="yes">Да</td>
-  <td><a href="https://doi.org/10.1038/s42003-024-06746-w">DOI</a></td>
+  <td>T: 8-12 GB VRAM, 32 GB RAM, 8 CPU<br>I: 4-8 GB + SMINA docking<br>Disk: ~5 GB</td>
+  <td class="yes">10 &starf;; pretrained model; Google Colab</td>
+  <td class="medium">MEDIUM (Colab available)</td>
+  <td>Protein PDB + ref lig SDF &rarr; SMILES Pareto-optimal</td>
+  <td><a href="https://doi.org/10.1038/s42003-024-06746-w">DOI</a>, <a href="https://github.com/CNDOTA/ParetoDrug">GitHub</a></td>
 </tr>
-<tr>
+<tr class="warn">
   <td><b>MNopt</b></td>
   <td>2025, JCIM</td>
   <td>MCTS + NSGA-II genetic algorithm</td>
   <td class="yes">Да</td>
+  <td>T: ~2-4 GB VRAM (MCTS+GA), 8 GB RAM<br>I: 1-2 GB (CPU OK)<br>Disk: ~1 GB</td>
+  <td class="nocode">НЕТ КОДА</td>
+  <td class="hard">IMPOSSIBLE</td>
+  <td>SMILES + multi-obj &rarr; SMILES</td>
   <td><a href="https://doi.org/10.1021/acs.jcim.5c00584">DOI</a></td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>11. Foundation / Unified модели</h2>
 <table>
-<tr><th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th><th>Ссылки</th></tr>
+<tr>
+  <th>Метод</th><th>Год / Venue</th><th>Подход</th><th>Multi-target</th><th>Pocket-cond.</th>
+  <th>Hardware (VRAM / RAM / Disk)</th><th>Код</th><th>Интеграция</th><th>Вход &rarr; Выход</th><th>Ссылки</th>
+</tr>
 <tr>
   <td><b>UniMoMo</b></td>
-  <td>2025, PMLR</td>
+  <td>2025, ICML</td>
   <td>Unified generative для small molecules, peptides, antibodies</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
-  <td><a href="https://arxiv.org/abs/2503.19300">arXiv</a></td>
+  <td>T: 8&times;80 GB VRAM (A100), 256 GB RAM<br>I: 12+ GB VRAM, 32 GB RAM<br>Disk: ~30 GB</td>
+  <td class="yes">84 &starf;, MIT; clean API</td>
+  <td class="medium">MEDIUM</td>
+  <td>PDB + YAML (target chains, binder type) &rarr; PDB 3D</td>
+  <td><a href="https://arxiv.org/abs/2503.19300">arXiv</a>, <a href="https://github.com/kxz18/UniMoMo">GitHub</a></td>
 </tr>
 <tr>
   <td><b>MolSnapper</b></td>
   <td>2025, JCIM</td>
-  <td>Diffusion conditioned на 3D pharmacophores</td>
+  <td>Diffusion conditioned на 3D pharmacophores; adapts MolDiff without retraining</td>
   <td class="no">Нет</td>
   <td class="yes">Да</td>
-  <td><a href="https://doi.org/10.1021/acs.jcim.4c02008">DOI</a></td>
+  <td>T: 16-24 GB VRAM (batch 32 inf), 32 GB RAM<br>I: 8-12 GB; CUDA 11.7<br>Disk: ~20 GB (CrossDocked + MolDiff)</td>
+  <td class="yes">54 &starf;, MIT</td>
+  <td class="medium">MEDIUM</td>
+  <td>Protein PDB + ref lig SDF + pharmacophores &rarr; SDF 3D</td>
+  <td><a href="https://doi.org/10.1021/acs.jcim.4c02008">DOI</a>, <a href="https://github.com/oxpig/MolSnapper">GitHub</a></td>
+</tr>
+<!-- NEW foundation/pharmacophore models -->
+<tr>
+  <td><b>PhoreGen</b></td>
+  <td>2025, Nat. Comp. Sci.</td>
+  <td>Pharmacophore-oriented 3D diffusion + asynchronous perturbation; <b>wet-lab: new bicyclic boronate MBL inhibitors</b></td>
+  <td class="yes">Да (merged pharmacophores)</td>
+  <td class="yes">Да (via pharmacophore)</td>
+  <td>T: 12-20 GB VRAM, 32 GB RAM<br>I: 6-12 GB (web server OK)<br>Disk: ~15 GB; CUDA 12.1</td>
+  <td class="yes"><a href="https://github.com/ppjian19/PhoreGen">GitHub</a>, <a href="https://phoregen.ddtmlab.org/">Web</a></td>
+  <td class="medium">MEDIUM (pharmacophore merge for dual-target)</td>
+  <td>3D pharmacophore model &rarr; 3D molecules aligned to pharmacophore</td>
+  <td><a href="https://doi.org/10.1038/s43588-025-00850-5">DOI</a></td>
+</tr>
+<tr>
+  <td><b>ShEPhERD</b></td>
+  <td>2025, ICLR</td>
+  <td>SE(3)-equivariant diffusion + shape/ESP/pharmacophore; spherical harmonics E3NNs</td>
+  <td class="yes">Да (composable interaction profiles)</td>
+  <td class="no">Нет (ligand-based profiles)</td>
+  <td>T: 12-20 GB VRAM (E3NN), 32 GB RAM<br>I: 2-4 GB (scoring CPU OK)<br>Disk: ~5 GB</td>
+  <td class="yes"><a href="https://github.com/coleygroup/shepherd-score">GitHub</a> (scoring)</td>
+  <td class="medium">MEDIUM-HIGH</td>
+  <td>Shape/ESP/pharmacophore profile &rarr; 3D molecule</td>
+  <td>ICLR 2025</td>
+</tr>
+<tr>
+  <td><b>GenMol (NVIDIA)</b></td>
+  <td>2025</td>
+  <td>Masked discrete diffusion on SAFE; 89M params; fragment remasking optimization</td>
+  <td class="no">Нет (ligand-centric)</td>
+  <td class="no">Нет</td>
+  <td>A100/H100 (Ampere+); PyTorch &ge; 2.5.1</td>
+  <td class="yes">HF: nvidia/NV-GenMol-89M-v2, Apache 2.0</td>
+  <td class="medium">MEDIUM (lead opt only, no pocket)</td>
+  <td>SAFE strings &rarr; SAFE molecules + scores</td>
+  <td><a href="https://huggingface.co/nvidia/NV-GenMol-89M-v2">HuggingFace</a></td>
+</tr>
+<tr>
+  <td><b>DrugGPS</b></td>
+  <td>2023, ICML</td>
+  <td>Subpocket prototype learning + hierarchical graph transformer + motif-based 3D generation</td>
+  <td class="no">Нет (but subpocket sharing across targets)</td>
+  <td class="yes">Да (subpocket features)</td>
+  <td>T: 16-24 GB VRAM, 48 GB RAM<br>I: 8-12 GB VRAM<br>Disk: ~20 GB (CrossDocked + subpockets)</td>
+  <td class="yes"><a href="https://github.com/zaixizhang/DrugGPS_ICML23">GitHub</a></td>
+  <td class="medium">MEDIUM (cross-target via shared subpockets)</td>
+  <td>Pocket 3D (subpockets) &rarr; 3D molecules from motifs</td>
+  <td><a href="https://arxiv.org/abs/2305.13997">arXiv</a></td>
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>12. Бенчмарки</h2>
 <table>
 <tr><th>Ресурс</th><th>Описание</th><th>Ссылки</th></tr>
@@ -529,17 +1131,34 @@
 </tr>
 </table>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <hr>
-<h2>Топ-6 наиболее релевантных альтернатив FREED++ для dual-target</h2>
+<h2>Топ-10 наиболее релевантных альтернатив FREED++ для dual-target</h2>
 <table>
-<tr><th>#</th><th>Метод</th><th>Почему релевантен</th></tr>
-<tr><td>1</td><td><b>REINVENT 4</b></td><td>Промышленный стандарт, multi-component scoring, легко интегрировать dual-target docking</td></tr>
-<tr><td>2</td><td><b>MDRL</b></td><td>3D diffusion + RL для multi-target; прямой конкурент, 2025</td></tr>
-<tr><td>3</td><td><b>AIxFuse</b></td><td>Dual-pocket structure-aware RL; ближайший по задаче</td></tr>
-<tr><td>4</td><td><b>DiffDTM</b></td><td>Diffusion с dual-sequence; не требует 3D структур</td></tr>
-<tr><td>5</td><td><b>MTMol-GPT</b></td><td>GPT для multi-target; ligand-based</td></tr>
-<tr><td>6</td><td><b>PMMG</b></td><td>MCTS для Pareto front с docking; тестирован на EGFR/HER2</td></tr>
+<tr><th>#</th><th>Метод</th><th>Почему релевантен</th><th>Код</th><th>Интеграция</th></tr>
+<tr class="top"><td>1</td><td><b>POLYGON</b></td><td>Purpose-built для dual-target (VAE+RL); 32 молекулы синтезированы MEK1+mTOR; MIT</td><td class="yes">Да</td><td class="easy">EASY</td></tr>
+<tr class="top"><td>2</td><td><b>Isigkeit CLM</b></td><td>CLM fine-tuning; 7/12 wet-lab confirmed dual ligands, nM potency; lightweight</td><td class="yes">Zenodo</td><td class="easy">EASY</td></tr>
+<tr><td>3</td><td><b>REINVENT 4</b></td><td>Промышленный стандарт, 634&starf;, multi-component scoring; dual-target через 2 docking scores</td><td class="yes">Да</td><td class="medium">MEDIUM</td></tr>
+<tr><td>4</td><td><b>IDOLpro</b></td><td>Multi-objective gradient guidance на diffusion; extensible к N целям; 100&times; fast</td><td class="yes">Да</td><td class="easy">LOW-MEDIUM</td></tr>
+<tr><td>5</td><td><b>MDRL</b></td><td>3D diffusion + RL для multi-target; прямой конкурент (но 8&starf;, immature)</td><td class="yes">Да</td><td class="medium">MEDIUM</td></tr>
+<tr><td>6</td><td><b>DRAGONFLY</b></td><td>Interactome-based zero-shot; wet-lab validated (PPAR&gamma;); polypharmacology native</td><td class="yes">Да</td><td class="easy">LOW-MEDIUM</td></tr>
+<tr><td>7</td><td><b>RxnFlow</b></td><td>GFlowNet + 1M BBs; pocket-conditioned; MOGFN reward naturally supports dual-target</td><td class="yes">Да</td><td class="easy">EASY-MEDIUM</td></tr>
+<tr><td>8</td><td><b>DiffSBDD</b></td><td>Best-maintained diffusion (485&starf; MIT); 3 modes (de novo/inpainting/opt); modular</td><td class="yes">Да</td><td class="medium">MEDIUM</td></tr>
+<tr><td>9</td><td><b>TamGen</b></td><td>Microsoft-backed GPT; wet-lab 14 actives; 85-394&times; faster; MIT</td><td class="yes">Да</td><td class="easy">LOW</td></tr>
+<tr><td>10</td><td><b>PhoreGen</b></td><td>Pharmacophore-conditioned 3D diffusion; merged pharmacophores for dual-target; wet-lab validated</td><td class="yes">Да</td><td class="medium">MEDIUM</td></tr>
 </table>
+
+<p class="note"><b>Hardware:</b> T = training, I = inference. VRAM верифицирован по README/paper где указан &check;, остальное &mdash; оценка по архитектуре (размер модели &times; batch size &times; dataset).
+Ориентиры: SMILES-RL ~4-8 GB; 3D diffusion на CrossDocked ~16-24 GB; BFN ~24-40 GB; GFlowNet SMILES ~4-12 GB.</p>
+<p class="note"><b>Легенда:</b>
+<span class="easy">EASY</span> = drop-in или минимальные изменения;
+<span class="medium">MEDIUM</span> = wrapper/adapter нужен;
+<span class="hard">HARD</span> = серьёзная переработка или нет кода;
+<span class="nocode">НЕТ КОДА</span> = код недоступен;
+<span style="background:#fff3cd;padding:2px 4px;">жёлтый</span> = проблема (deprecated, no code, archived);
+<span style="background:#d4edda;padding:2px 4px;">зелёный</span> = top candidate.
+&starf; = GitHub stars.
+</p>
 
 </body>
 </html>
