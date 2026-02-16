@@ -19,11 +19,12 @@ from dualdocking.validation.md_mdp import (
 
 # ── PDB repair ───────────────────────────────────────────────────────
 def _repair_pdb(pdb_path: Path, out_path: Path) -> Path:
-    """Fix missing side-chain atoms in a PDB file using PDBFixer.
+    """Fix missing side-chain atoms and remove heterogens using PDBFixer.
 
-    Crystal structures often have disordered side chains reported as missing
-    atoms (REMARK 470).  ``pdb2gmx`` rejects such structures.  PDBFixer
-    rebuilds missing heavy atoms so the structure is complete.
+    Crystal structures often have disordered side chains (REMARK 470) and
+    crystallization artifacts (EDO, GOL, PEG, etc.) that ``pdb2gmx`` cannot
+    handle.  PDBFixer rebuilds missing heavy atoms and strips non-water
+    heterogens so the structure is clean for topology generation.
 
     Returns:
         *out_path* — the repaired PDB.
@@ -37,6 +38,10 @@ def _repair_pdb(pdb_path: Path, out_path: Path) -> Path:
         return out_path
 
     fixer = PDBFixer(filename=str(pdb_path))
+
+    # Remove crystallization artifacts (EDO, GOL, etc.); keep water for solvation
+    fixer.removeHeterogens(keepWater=True)
+
     fixer.findMissingResidues()
     fixer.findMissingAtoms()
 
