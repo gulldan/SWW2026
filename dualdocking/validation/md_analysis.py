@@ -253,9 +253,15 @@ def _analyze_trajectory(
             hbond_df = pd.DataFrame(columns=["time_ns", "n_hbonds"])
     hbond_df.to_csv(out_dir / "hbonds.csv", index=False)
 
-    # Copy trajectory
+    # Copy trajectory + reference structure (needed for visualization)
     if xtc_fit.exists():
         shutil.copy2(xtc_fit, out_dir / "trajectory.xtc")
+    tpr = work_dir / "md.tpr"
+    if tpr.exists():
+        shutil.copy2(tpr, out_dir / "reference.tpr")
+    npt_gro = work_dir / "npt.gro"
+    if npt_gro.exists():
+        shutil.copy2(npt_gro, out_dir / "reference.gro")
 
     # ── Compute summary metrics ──────────────────────────────────
     # Ligand RMSD stability (last N ns)

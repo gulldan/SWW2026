@@ -45,9 +45,9 @@ FROM nvidia/cuda:12.8.0-runtime-ubuntu24.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 
-# System deps
+# System deps (g++ needed for gmx_MMPBSA/parmed build)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        wget ca-certificates bzip2 libgomp1 \
+        wget ca-certificates bzip2 libgomp1 g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy GROMACS from builder
@@ -87,7 +87,8 @@ RUN uv pip install --no-cache \
         "pyyaml==6.0.3" \
         "scipy==1.17.0" \
         "loguru==0.7.3" \
-        "click==8.3.1"
+        "click==8.3.1" \
+        "gmx_MMPBSA>=1.6"
 
 # ── Entrypoint ──────────────────────────────────────────────────────
 COPY docker/md/entrypoint.sh /opt/entrypoint.sh

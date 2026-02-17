@@ -269,10 +269,9 @@ uv run python cli/s5_analyze/summarize.py
 
 ## MD Validation (Optional, Post-Hoc)
 
-> **Status: NOT YET VERIFIED.** The Docker image builds and the CLI runs, but
-> no end-to-end MD run has completed successfully yet. The container has been
-> observed to exit silently without producing output. Treat this stage as
-> work-in-progress until the first successful `md_result.json` is produced.
+> **Status: VERIFIED** (2026-02-17). Smoke test passed end-to-end on
+> CDK2_ERK2/single_a with 1 ns simulation time (~15 min on RTX 4090).
+> Produces `md_result.json`, per-frame CSVs, and `trajectory.xtc`.
 
 Molecular dynamics validation for top candidate molecules. Not part of the
 primary endpoint — used to strengthen Q1 publication credibility.
@@ -421,11 +420,23 @@ skipped. To re-run, delete the specific `target_{A,B}/` directory.
 
 ### Timing Estimates (RTX 4090)
 
+Measured on CDK2_ERK2/single_a (2026-02-17):
+
+| Phase | 1 ns measured |
+|-------|--------------|
+| Ligand parameterization (antechamber AM1-BCC) | ~4 min |
+| EM + NVT + NPT equilibration | ~3 min |
+| Production MD | ~8 min |
+| Trajectory preprocessing + analysis | ~10 sec |
+| **Total per molecule×target** | **~15 min** |
+
+Extrapolated estimates:
+
 | Simulation | Time/molecule×target | Total for top-3 × 3 modes × 2 targets |
 |------------|---------------------|---------------------------------------|
-| 1 ns (smoke) | ~5-10 min | ~1.5-3 hours |
-| 10 ns | ~30-60 min | ~9-18 hours |
-| 50 ns (default) | ~2-4 hours | ~36-72 hours |
+| 1 ns (smoke) | ~15 min | ~4.5 hours |
+| 10 ns | ~45-60 min | ~13-18 hours |
+| 50 ns (default) | ~3-4 hours | ~54-72 hours |
 
 ### Troubleshooting
 
