@@ -888,3 +888,134 @@ class TestDualCallSelectiveWeighted:
         assert self.mod._call_stats["total"] == 1
         assert self.mod._call_stats["invalid_a"] == 0
         assert self.mod._call_stats["invalid_b"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Facade mechanism tests — validate the refactored module structure
+# ---------------------------------------------------------------------------
+
+
+class TestFacadeGetattr:
+    """Verify __getattr__ dispatch from facade to submodules."""
+
+    @pytest.fixture(autouse=True)
+    def _import(self, _patch_module):
+        self.mod = _patch_module
+
+    def test_state_symbol_resolves(self):
+        """_capped_zscore lives in state module, must be reachable via facade."""
+        fn = self.mod._capped_zscore
+        assert callable(fn)
+        z, inv = fn(score=-7.5, error_val=99.9, mean=-7.5, std=1.0, penalty_cap=4.0)
+        assert z == pytest.approx(0.0)
+        assert inv is False
+
+    def test_gpu_symbol_resolves(self):
+        """_GPU_BATCH_ENABLED lives in gpu module, must be reachable."""
+        val = self.mod._GPU_BATCH_ENABLED
+        assert isinstance(val, bool)
+
+    def test_hooks_symbol_resolves(self):
+        """_build_rdkit_docking lives in hooks module, must be reachable."""
+        fn = self.mod._build_rdkit_docking
+        assert callable(fn)
+
+    def test_nonexistent_attr_raises(self):
+        """Accessing a symbol that exists in no submodule must raise AttributeError."""
+        with pytest.raises(AttributeError, match="no attribute"):
+            _ = self.mod._this_does_not_exist_anywhere_42
+
+    def test_mutable_state_is_shared(self):
+        """Mutating _call_stats via facade mutates the real state dict."""
+        self.mod._call_stats["total"] = 999
+        import dual_reward_patch_state as state_mod
+
+        assert state_mod._call_stats["total"] == 999
+
+    def test_logger_resolves(self):
+        """Logger is accessible and is the state module's logger."""
+        log = self.mod.logger
+        assert log.name == "dual_reward_patch_state"
+
+
+class TestFreshImportIsolation:
+    """Verify that _fresh_import produces truly independent module state."""
+
+    def test_state_reset_between_imports(self, tmp_path, monkeypatch):
+        """Two successive _fresh_import calls must yield independent _call_stats."""
+        from unittest.mock import MagicMock
+
+        mock_vina = MagicMock(name="DockingVina")
+        mock_vina.__call__ = MagicMock(return_value=-7.0)
+        _install_ffreed_mock(monkeypatch, mock_vina)
+        _setup_env(monkeypatch, tmp_path, reward_mode="single_a")
+
+        mod1 = _fresh_import(monkeypatch)
+        mod1._call_stats["total"] = 42
+
+        mod2 = _fresh_import(monkeypatch)
+        assert mod2._call_stats["total"] == 0, (
+            "_call_stats should be zero after fresh import; "
+            "submodule state was not reset"
+        )
+
+        if PATCH_DIR in sys.path:
+            sys.path.remove(PATCH_DIR)
+        for name in _PATCH_MODULES:
+            sys.modules.pop(name, None)
+
+    def test_env_var_changes_take_effect(self, tmp_path, monkeypatch):
+        """Changing INVALID_Z_PENALTY between imports must take effect."""
+        from unittest.mock import MagicMock
+
+        mock_vina = MagicMock(name="DockingVina")
+        mock_vina.__call__ = MagicMock(return_value=-7.0)
+        _install_ffreed_mock(monkeypatch, mock_vina)
+        _setup_env(monkeypatch, tmp_path, reward_mode="single_a")
+        monkeypatch.setenv("INVALID_Z_PENALTY", "4.0")
+
+        mod1 = _fresh_import(monkeypatch)
+        assert mod1._INVALID_Z_PENALTY == pytest.approx(4.0)
+
+        monkeypatch.setenv("INVALID_Z_PENALTY", "6.0")
+        mod2 = _fresh_import(monkeypatch)
+        assert mod2._INVALID_Z_PENALTY == pytest.approx(6.0)
+
+        if PATCH_DIR in sys.path:
+            sys.path.remove(PATCH_DIR)
+        for name in _PATCH_MODULES:
+            sys.modules.pop(name, None)
+
+
+class TestWriteRewardMetadataPathParam:
+    """Verify path= parameter works correctly in _write_reward_metadata."""
+
+    @pytest.fixture(autouse=True)
+    def _import(self, _patch_module, tmp_path):
+        self.mod = _patch_module
+        self.tmp_path = tmp_path
+
+    def test_default_path_uses_env_var(self):
+        """Without path=, writes to REWARD_METADATA_PATH location."""
+        self.mod._call_stats.update({"total": 1, "invalid_a": 0, "invalid_b": 0, "timeout_a": 0, "timeout_b": 0})
+        self.mod._write_reward_metadata()
+        assert self.mod._METADATA_PATH.exists()
+
+    def test_explicit_path_overrides_default(self):
+        """path= writes to the given location, not REWARD_METADATA_PATH."""
+        custom = self.tmp_path / "custom" / "meta.json"
+        self.mod._call_stats.update({"total": 1, "invalid_a": 0, "invalid_b": 0, "timeout_a": 0, "timeout_b": 0})
+        self.mod._write_reward_metadata(path=custom)
+        assert custom.exists()
+        data = json.loads(custom.read_text())
+        assert data["total_calls"] == 1
+
+    def test_explicit_path_does_not_write_default(self):
+        """When path= is given, the default location must remain untouched."""
+        default_path = self.mod._METADATA_PATH
+        if default_path.exists():
+            default_path.unlink()
+        custom = self.tmp_path / "other.json"
+        self.mod._call_stats.update({"total": 1, "invalid_a": 0, "invalid_b": 0, "timeout_a": 0, "timeout_b": 0})
+        self.mod._write_reward_metadata(path=custom)
+        assert not default_path.exists()
