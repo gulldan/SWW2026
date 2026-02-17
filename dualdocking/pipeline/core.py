@@ -55,14 +55,13 @@ def detect_gpu_count() -> int:
         Number of detected CUDA devices, or 1 if detection fails.
     """
     # 1. Honor CUDA_VISIBLE_DEVICES if explicitly set
-    cvd = os.environ.get("CUDA_VISIBLE_DEVICES")
-    if cvd is not None:
-        devices = [d.strip() for d in cvd.split(",") if d.strip()]
+    devices = _parse_cuda_visible_devices(os.environ.get("CUDA_VISIBLE_DEVICES"))
+    if devices is not None:
         if devices:
             logger.debug("GPU count via CUDA_VISIBLE_DEVICES: {}", len(devices))
             return len(devices)
-        # CUDA_VISIBLE_DEVICES="" → no GPUs
-        logger.debug("CUDA_VISIBLE_DEVICES is empty, assuming 1 GPU")
+        # CUDA_VISIBLE_DEVICES masks all devices; keep pipeline conservative.
+        logger.debug("CUDA_VISIBLE_DEVICES masks all GPUs, assuming 1 GPU")
         return 1
 
     # 2. nvidia-smi (shows physical GPUs, unaffected by env vars)
@@ -98,6 +97,57 @@ def detect_gpu_count() -> int:
     return 1
 
 
+def _parse_cuda_visible_devices(raw: str | None) -> list[str] | None:
+    """Parse ``CUDA_VISIBLE_DEVICES`` into ordered device tokens.
+
+    Args:
+        raw: Raw environment value, or ``None`` when unset.
+
+    Returns:
+        Parsed list of device tokens when variable is set, empty list when it
+        masks all GPUs, or ``None`` when unset/``all`` (meaning unrestricted).
+    """
+    if raw is None:
+        return None
+
+    cvd_value = raw.strip()
+    if not cvd_value:
+        return []
+    cvd_value_l = cvd_value.lower()
+    if cvd_value_l == "all":
+        return None
+    if cvd_value == "-1" or cvd_value_l in {"none", "void"}:
+        return []
+    return [item.strip() for item in cvd_value.split(",") if item.strip()]
+
+
+def _resolve_gpu_token(gpu_id: int, env: dict[str, str]) -> str:
+    """Resolve logical GPU slot to the actual CUDA device token.
+
+    If ``CUDA_VISIBLE_DEVICES`` is set to a subset (for example ``"1,3"``),
+    slot ``0`` maps to ``"1"``, slot ``1`` maps to ``"3"``.
+
+    Args:
+        gpu_id: Logical GPU slot from scheduler.
+        env: Environment used for subprocess launch.
+
+    Returns:
+        Device token suitable for Docker ``--gpus device=...`` and CUDA env vars.
+    """
+    visible = _parse_cuda_visible_devices(env.get("CUDA_VISIBLE_DEVICES"))
+    if visible is None:
+        return str(gpu_id)
+    if 0 <= gpu_id < len(visible):
+        return visible[gpu_id]
+
+    logger.warning(
+        "GPU slot {} is out of range for CUDA_VISIBLE_DEVICES={!r}; using slot index directly",
+        gpu_id,
+        env.get("CUDA_VISIBLE_DEVICES", ""),
+    )
+    return str(gpu_id)
+
+
 def build_env_for_task(
     scorer_config: ScorerConfig,
     gpu_id: int | None = None,
@@ -118,14 +168,15 @@ def build_env_for_task(
     env = dict(base_env or os.environ)
 
     if gpu_id is not None:
-        env["FREEDPP_CUDA_DEVICE"] = str(gpu_id)
-        env["SCORER_CUDA_DEVICE"] = str(gpu_id)
+        gpu_token = _resolve_gpu_token(gpu_id, env)
+        env["FREEDPP_CUDA_DEVICE"] = gpu_token
+        env["SCORER_CUDA_DEVICE"] = gpu_token
 
     env["DUALDOCKING_SCORER_ENGINE"] = scorer_config.engine
 
     if scorer_config.engine == "boltz2":
         if gpu_id is not None:
-            env["BOLTZ_CUDA_DEVICE"] = str(gpu_id)
+            env["BOLTZ_CUDA_DEVICE"] = env["SCORER_CUDA_DEVICE"]
         env["BOLTZ_BACKEND"] = scorer_config.backend
         if scorer_config.backend == "nim":
             # Pass ALL NIM URLs for round-robin across GPU instances

@@ -18,8 +18,8 @@ uv run python cli/s0_fetch/fetch_all.py
 ```
 
 This downloads PDB structures, FASTA sequences, MSA data, calibration SMILES,
-ChEMBL actives, GNINA binary, builds the Docker image, and prepares PDBQT
-receptors. All HTTP downloads use exponential-backoff retry
+ChEMBL actives, GNINA binary, builds the FREED++ Docker image, and prepares
+PDBQT receptors. All HTTP downloads use exponential-backoff retry
 (`dualdocking.data.http_utils`). Supports flags:
 
 | Flag | Effect |
@@ -31,13 +31,17 @@ receptors. All HTTP downloads use exponential-backoff retry
 | `--verify-only` | Check completeness without downloading |
 | `--dry-run` | Print commands without executing |
 
+Stage 0 builds `dualdocking/freedpp:latest` only. Optional images
+`dualdocking/gnina:latest` and `dualdocking/md:latest` are built manually
+(see [setup.md](setup.md)).
+
 ### What gets fetched
 
 | Step | What | Destination |
 |------|------|-------------|
 | Python packages | PyPI, GitHub | `.venv/` |
 | FREED++ data | GitHub | `docker/freedpp/data/` |
-| Docker image | NVIDIA, PyPI, conda | Docker cache |
+| FREED++ Docker image | NVIDIA, PyPI, conda | Docker cache |
 | Calibration SMILES | HuggingFace | `output/data/calibration/` |
 | Baseline ZINC | User URL (optional) | `output/data/baseline/` |
 | PDB structures | RCSB | `output/data/targets/` |
@@ -73,6 +77,35 @@ EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py \
 
 > **Note:** `--parallel 2` requires 2+ GPUs. On a single GPU, FREED++ (576 MiB) and
 > Boltz-2 (15.5 GB) compete for VRAM, causing OOM failures. Use `--parallel 1`.
+
+### GPU Affinity Rules (important)
+
+The scheduler assigns logical slots (`0..parallel-1`) and maps them to actual
+CUDA device tokens before running generate/score commands.
+
+- If `CUDA_VISIBLE_DEVICES` is unset: slot `0 -> GPU 0`, slot `1 -> GPU 1`, ...
+- If `CUDA_VISIBLE_DEVICES=1,3`: slot `0 -> GPU 1`, slot `1 -> GPU 3`
+- Each FREED++ container receives `FREEDPP_CUDA_DEVICE=<mapped_token>`
+- Docker launch uses `--gpus device=<mapped_token>` by default
+
+Examples:
+
+```bash
+# Use exactly one GPU
+CUDA_VISIBLE_DEVICES=0 \
+EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py \
+  --resume --parallel 1 --with-post --latex-mode draft
+
+# Use a subset of physical GPUs on a shared server
+CUDA_VISIBLE_DEVICES=2,5 \
+EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py \
+  --resume --parallel 2 --with-post --latex-mode draft
+```
+
+Advanced override:
+
+- `FREEDPP_DOCKER_GPUS` can force Docker `--gpus` (for example `all` or `device=1,3`)
+- Keep it unset for normal pipeline scheduling; use only for manual/debug runs
 
 Or split into stages:
 
@@ -116,7 +149,7 @@ Stages and dependencies:
 
 | Stage | Requires | Produces |
 |-------|----------|----------|
-| `fetch` | Internet | PDB, FASTA, SMILES, Docker image, ChEMBL actives, GNINA binary |
+| `fetch` | Internet | PDB, FASTA, SMILES, FREED++ Docker image, ChEMBL actives, GNINA binary |
 | `calibrate` | fetch outputs | `normalization.yaml`, calibration scores |
 | `generate` | calibrate outputs | `generated.parquet` per run |
 | `score` | generated molecules | `scored_joined.parquet` per run (configured scorer engine; default `boltz2`) |

@@ -61,7 +61,14 @@ def _import_patch_module() -> types.ModuleType:
 
     if PATCH_DIR not in sys.path:
         sys.path.insert(0, PATCH_DIR)
-    sys.modules.pop("dual_reward_patch", None)
+    for mod_name in (
+        "dual_reward_patch",
+        "dual_reward_patch_state",
+        "dual_reward_patch_gpu",
+        "dual_reward_patch_hooks",
+        "dual_reward_patch_deps",
+    ):
+        sys.modules.pop(mod_name, None)
 
     import importlib
 

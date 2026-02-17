@@ -27,6 +27,27 @@ Boltz-2 is installed from source via `pyproject.toml` (`boltz[cuda]` git depende
 It is the default built-in scorer engine, but scoring can be replaced via
 `configs/experiment.yaml` (`scorer.engine`).
 
+## Docker Images (Build Matrix)
+
+Build commands (from repo root):
+
+```bash
+# Required for Stage 1 generation
+docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
+
+# Optional: custom GNINA image for docker-based GNINA scoring script
+docker build -f docker/gnina/Dockerfile -t dualdocking/gnina:latest .
+
+# Optional: required only for MD runs with --docker
+docker build -f docker/md/Dockerfile -t dualdocking/md:latest .
+```
+
+| Image | Used by | Required |
+|------|---------|----------|
+| `dualdocking/freedpp:latest` | FREED++ generation backend | Yes |
+| `dualdocking/gnina:latest` | `cli/s4_score/score_gnina.py` with `--docker-image` override | No |
+| `dualdocking/md:latest` | `cli/s6_md/run_md.py --docker` | No (unless MD Docker mode) |
+
 ## Docker (FREED++ Generator)
 
 FREED++ requires Python 3.10 / PyTorch 1.12 / DGL 0.9 — incompatible with the main
@@ -44,6 +65,68 @@ Rebuild the image after any changes in `docker/freedpp/`.
 
 The default built-in generator backend is `freedpp`, configurable via
 `configs/experiment.yaml` (`generator.backend`).
+
+`cli/s0_fetch/fetch_all.py` can build this image automatically unless
+`--skip-docker-build` is passed.
+
+### FREED++ GPU Runtime (single vs multi-GPU)
+
+Pipeline tasks are assigned logical GPU slots (`0..N-1`) and converted to
+real device tokens before Docker launch.
+
+- If `CUDA_VISIBLE_DEVICES` is unset, slot `0` means physical GPU `0`, slot `1` means GPU `1`, etc.
+- If `CUDA_VISIBLE_DEVICES` is set (for example `1,3`), slot `0 -> 1`, slot `1 -> 3`.
+- FREED++ containers receive the resolved token via `FREEDPP_CUDA_DEVICE`.
+- Docker uses `--gpus device=<token>` by default (not `all`), so each task is pinned.
+
+Recommended launch patterns:
+
+```bash
+# Single GPU
+CUDA_VISIBLE_DEVICES=0 \
+EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py \
+  --resume --parallel 1 --with-post --latex-mode draft
+
+# Two selected GPUs on a larger host (use physical IDs 1 and 3)
+CUDA_VISIBLE_DEVICES=1,3 \
+EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py \
+  --resume --parallel 2 --with-post --latex-mode draft
+```
+
+Optional override:
+
+- `FREEDPP_DOCKER_GPUS` sets Docker `--gpus` value explicitly (examples: `all`, `device=0`, `device=1,3`).
+- Use this only when you intentionally want custom Docker GPU routing. In normal pipeline runs, leave it unset.
+
+Patch/runtime tuning env vars (inside FREED++ container):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FREEDPP_PREP_MP_START_METHOD` | `spawn` | multiprocessing start method for ligand prep |
+| `FREEDPP_FORCE_SPAWN` | `1` | force global multiprocessing start method to `spawn` |
+| `FREEDPP_PREP_MAX_WORKERS` | `8` | max ligand-prep worker processes |
+| `GPU_BATCH_CHUNK_SIZE` | `16` | ligands per UniDock `--gpu_batch` chunk |
+| `GPU_BATCH_TIMEOUT_SEC` | `600` | timeout per GPU batch chunk (seconds) |
+| `CORRUPT_SCORE_LOG_LIMIT` | `20` | max detailed "corrupt docking score" warnings |
+
+## Docker (GNINA Scorer, Optional)
+
+The primary GNINA workflow in this project uses the binary at `output/bin/gnina`
+(downloaded by Stage 0 fetch). A custom GNINA container is optional and mostly
+useful for isolated experiments with `cli/s4_score/score_gnina.py`.
+
+```bash
+# Build custom image from docker/gnina/Dockerfile
+docker build -f docker/gnina/Dockerfile -t dualdocking/gnina:latest .
+
+# Use the custom image in docker-based GNINA scoring
+uv run python cli/s4_score/score_gnina.py \
+  --pair CDK2_ERK2 --mode double --seed 42 \
+  --docker-image dualdocking/gnina:latest
+```
+
+If `GNINA_BINARY` is set, docker image selection is ignored by
+`dualdocking/scoring/gnina.py`.
 
 ## Calibration
 

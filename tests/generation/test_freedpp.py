@@ -242,6 +242,21 @@ class TestRunFreedppBranching:
         assert "REWARD_MODE=single_a" in cmd_str
         assert "DUALDOCKING_REWARD_MODES_PATH=/opt/reward_modes.yaml" in cmd_str
 
+    def test_run_freedpp_uses_cuda_device_for_docker_flag(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("FREEDPP_CUDA_DEVICE", "3")
+        cfg = GenerationConfig(target_id="CDK2", reward_mode="single_a")
+        cmd = self._run(cfg)
+        gpu_idx = cmd.index("--gpus")
+        assert cmd[gpu_idx + 1] == "device=3"
+
+    def test_run_freedpp_allows_explicit_docker_gpus_override(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("FREEDPP_CUDA_DEVICE", "0")
+        monkeypatch.setenv("FREEDPP_DOCKER_GPUS", "device=1,3")
+        cfg = GenerationConfig(target_id="CDK2", reward_mode="single_a")
+        cmd = self._run(cfg)
+        gpu_idx = cmd.index("--gpus")
+        assert cmd[gpu_idx + 1] == "device=1,3"
+
     def test_run_freedpp_can_disable_reward_modes_passthrough(self):
         cfg = GenerationConfig(
             target_id="CDK2",
@@ -351,10 +366,7 @@ def test_parse_training_log_basic(tmp_path: Path) -> None:
 def test_parse_training_log_bracket_format(tmp_path: Path) -> None:
     """Parse [epoch/total] format used by some FREED++ versions."""
     log = tmp_path / "freedpp.log"
-    log.write_text(
-        "[2026-01-01T00:00:00Z] [1/200] loss=1.5 reward=-3.0\n"
-        "[2026-01-01T00:01:00Z] [2/200] loss=1.2 reward=-4.5\n"
-    )
+    log.write_text("[2026-01-01T00:00:00Z] [1/200] loss=1.5 reward=-3.0\n[2026-01-01T00:01:00Z] [2/200] loss=1.2 reward=-4.5\n")
     records = parse_training_log(log)
     assert len(records) == 2
     assert records[0]["epoch"] == 1
@@ -376,20 +388,14 @@ def test_parse_training_log_missing_file(tmp_path: Path) -> None:
 def test_parse_training_log_no_metrics(tmp_path: Path) -> None:
     """Lines with epoch but no metrics are skipped."""
     log = tmp_path / "freedpp.log"
-    log.write_text(
-        "[2026-01-01T00:00:00Z] Epoch 1 — starting\n"
-        "[2026-01-01T00:01:00Z] Epoch 2 — starting\n"
-    )
+    log.write_text("[2026-01-01T00:00:00Z] Epoch 1 — starting\n[2026-01-01T00:01:00Z] Epoch 2 — starting\n")
     assert parse_training_log(log) == []
 
 
 def test_parse_training_log_duplicate_epoch(tmp_path: Path) -> None:
     """Later occurrence of same epoch updates the record."""
     log = tmp_path / "freedpp.log"
-    log.write_text(
-        "[2026-01-01T00:00:00Z] Epoch 1 loss=0.5\n"
-        "[2026-01-01T00:00:01Z] Epoch 1 reward=-7.0\n"
-    )
+    log.write_text("[2026-01-01T00:00:00Z] Epoch 1 loss=0.5\n[2026-01-01T00:00:01Z] Epoch 1 reward=-7.0\n")
     records = parse_training_log(log)
     assert len(records) == 1
     assert records[0]["epoch"] == 1

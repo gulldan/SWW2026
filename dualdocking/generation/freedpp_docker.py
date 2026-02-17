@@ -124,6 +124,31 @@ _EPOCH_RE = re.compile(
 )
 
 
+def _resolve_docker_gpu_flag(getenv: _GetEnvFn) -> str:
+    """Resolve Docker ``--gpus`` argument from environment variables.
+
+    Priority:
+    1. ``FREEDPP_DOCKER_GPUS`` explicit Docker value (for example ``all``,
+       ``device=0`` or ``device=1,3``).
+    2. ``FREEDPP_CUDA_DEVICE`` mapped to ``device=<token>``.
+    3. Fallback ``all``.
+
+    Args:
+        getenv: Environment lookup callback.
+
+    Returns:
+        Value for Docker ``--gpus`` flag.
+    """
+    explicit = (getenv("FREEDPP_DOCKER_GPUS", None) or "").strip()
+    if explicit:
+        return explicit
+
+    gpu_device = (getenv("FREEDPP_CUDA_DEVICE", None) or "").strip()
+    if gpu_device:
+        return f"device={gpu_device}"
+    return "all"
+
+
 def _result_returncode(result: object) -> int:
     """Safely extract integer return code from subprocess-like result.
 
@@ -282,8 +307,13 @@ def run_freedpp(  # noqa: PLR0913
     else:
         args = build_freedpp_args(config, pdbqt_a, center_a, size_a, commands)
 
-    gpu_device = getenv("FREEDPP_CUDA_DEVICE", None)
-    gpu_flag = f'"device={gpu_device}"' if gpu_device is not None else "all"
+    gpu_flag = _resolve_docker_gpu_flag(getenv)
+    patch_log_level = getenv("DUAL_REWARD_PATCH_LOG_LEVEL", "INFO") or "INFO"
+    prep_mp_start_method = getenv("FREEDPP_PREP_MP_START_METHOD", "spawn") or "spawn"
+    prep_max_workers = getenv("FREEDPP_PREP_MAX_WORKERS", "8") or "8"
+    force_spawn = getenv("FREEDPP_FORCE_SPAWN", "1") or "1"
+    default_python_warnings = "ignore:invalid escape sequence:SyntaxWarning"
+    python_warnings = getenv("PYTHONWARNINGS", default_python_warnings) or default_python_warnings
 
     docker_cmd: list[str] = [
         docker_bin,
@@ -293,6 +323,18 @@ def run_freedpp(  # noqa: PLR0913
         gpu_flag,
         "-e",
         "PYTHONUNBUFFERED=1",
+        "-e",
+        "DGLBACKEND=pytorch",
+        "-e",
+        f"PYTHONWARNINGS={python_warnings}",
+        "-e",
+        f"DUAL_REWARD_PATCH_LOG_LEVEL={patch_log_level}",
+        "-e",
+        f"FREEDPP_PREP_MP_START_METHOD={prep_mp_start_method}",
+        "-e",
+        f"FREEDPP_PREP_MAX_WORKERS={prep_max_workers}",
+        "-e",
+        f"FREEDPP_FORCE_SPAWN={force_spawn}",
         "-v",
         f"{workspace}:/workspace",
         "-e",

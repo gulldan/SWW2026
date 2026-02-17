@@ -22,6 +22,13 @@ import pytest
 # ---------------------------------------------------------------------------
 
 PATCH_DIR = str(Path(__file__).resolve().parent.parent.parent / "docker" / "freedpp")
+_PATCH_MODULES = (
+    "dual_reward_patch",
+    "dual_reward_patch_state",
+    "dual_reward_patch_gpu",
+    "dual_reward_patch_hooks",
+    "dual_reward_patch_deps",
+)
 
 _NORMALIZATION_YAML = "targets:\n  CDK2:\n    mean: -7.5\n    std: 1.0\n  ERK2:\n    mean: -6.0\n    std: 0.5\n"
 
@@ -112,10 +119,11 @@ def _setup_env(monkeypatch, tmp_path, *, reward_mode="single_a"):
 
 
 def _fresh_import(monkeypatch):
-    """Remove cached module and import fresh."""
+    """Remove cached modules and import fresh (facade + all submodules)."""
     if PATCH_DIR not in sys.path:
         sys.path.insert(0, PATCH_DIR)
-    monkeypatch.delitem(sys.modules, "dual_reward_patch", raising=False)
+    for name in _PATCH_MODULES:
+        monkeypatch.delitem(sys.modules, name, raising=False)
     return importlib.import_module("dual_reward_patch")
 
 
@@ -139,7 +147,8 @@ def _patch_module(tmp_path, monkeypatch):
 
     if PATCH_DIR in sys.path:
         sys.path.remove(PATCH_DIR)
-    sys.modules.pop("dual_reward_patch", None)
+    for name in _PATCH_MODULES:
+        sys.modules.pop(name, None)
 
 
 @pytest.fixture
@@ -154,7 +163,8 @@ def _integration_single_a(tmp_path, monkeypatch):
 
     if PATCH_DIR in sys.path:
         sys.path.remove(PATCH_DIR)
-    sys.modules.pop("dual_reward_patch", None)
+    for name in _PATCH_MODULES:
+        sys.modules.pop(name, None)
 
 
 @pytest.fixture
@@ -169,7 +179,8 @@ def _integration_double(tmp_path, monkeypatch):
 
     if PATCH_DIR in sys.path:
         sys.path.remove(PATCH_DIR)
-    sys.modules.pop("dual_reward_patch", None)
+    for name in _PATCH_MODULES:
+        sys.modules.pop(name, None)
 
 
 @pytest.fixture
@@ -184,7 +195,8 @@ def _integration_single_b(tmp_path, monkeypatch):
 
     if PATCH_DIR in sys.path:
         sys.path.remove(PATCH_DIR)
-    sys.modules.pop("dual_reward_patch", None)
+    for name in _PATCH_MODULES:
+        sys.modules.pop(name, None)
 
 
 # ---------------------------------------------------------------------------
@@ -345,9 +357,8 @@ class TestWriteRewardMetadata:
 
     def test_creates_parent_directory(self, tmp_path):
         nested = tmp_path / "deep" / "nested" / "reward_metadata.json"
-        self.mod._METADATA_PATH = nested
         self.mod._call_stats.update({"total": 10, "invalid_a": 1, "invalid_b": 0})
-        self.mod._write_reward_metadata()
+        self.mod._write_reward_metadata(path=nested)
         assert nested.exists()
         data = json.loads(nested.read_text())
         assert data["total_calls"] == 10
@@ -371,7 +382,8 @@ class TestPenaltyValidation:
         with pytest.raises(ValueError, match="positive finite"):
             _fresh_import(monkeypatch)
 
-        sys.modules.pop("dual_reward_patch", None)
+        for name in _PATCH_MODULES:
+            sys.modules.pop(name, None)
         if PATCH_DIR in sys.path:
             sys.path.remove(PATCH_DIR)
 
@@ -387,7 +399,8 @@ class TestPenaltyValidation:
         with pytest.raises(ValueError, match="positive finite"):
             _fresh_import(monkeypatch)
 
-        sys.modules.pop("dual_reward_patch", None)
+        for name in _PATCH_MODULES:
+            sys.modules.pop(name, None)
         if PATCH_DIR in sys.path:
             sys.path.remove(PATCH_DIR)
 
@@ -403,7 +416,8 @@ class TestPenaltyValidation:
         with pytest.raises(ValueError, match="positive finite"):
             _fresh_import(monkeypatch)
 
-        sys.modules.pop("dual_reward_patch", None)
+        for name in _PATCH_MODULES:
+            sys.modules.pop(name, None)
         if PATCH_DIR in sys.path:
             sys.path.remove(PATCH_DIR)
 
@@ -762,7 +776,8 @@ def _make_new_mode_fixture(mode_name, env_overrides=None):
 
         if PATCH_DIR in sys.path:
             sys.path.remove(PATCH_DIR)
-        sys.modules.pop("dual_reward_patch", None)
+        for name in _PATCH_MODULES:
+            sys.modules.pop(name, None)
 
     return _fixture
 

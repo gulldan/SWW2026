@@ -7,6 +7,10 @@ FROM nvidia/cuda:12.4.1-devel-ubuntu20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
+ENV DGLBACKEND=pytorch
+ENV FREEDPP_PREP_MP_START_METHOD=spawn
+ENV FREEDPP_PREP_MAX_WORKERS=8
+ENV FREEDPP_FORCE_SPAWN=1
 
 # ── System dependencies ──────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -95,6 +99,10 @@ COPY dualdocking/data/mol_prep.py /opt/mol_prep.py
 COPY dualdocking/reward/selectivity.py /opt/reward_selectivity.py
 COPY configs/reward_modes.yaml /opt/reward_modes.yaml
 COPY docker/freedpp/dual_reward_patch.py /opt/dual_reward_patch.py
+COPY docker/freedpp/dual_reward_patch_deps.py /opt/dual_reward_patch_deps.py
+COPY docker/freedpp/dual_reward_patch_state.py /opt/dual_reward_patch_state.py
+COPY docker/freedpp/dual_reward_patch_gpu.py /opt/dual_reward_patch_gpu.py
+COPY docker/freedpp/dual_reward_patch_hooks.py /opt/dual_reward_patch_hooks.py
 COPY docker/freedpp/run_with_patch.py /opt/run_with_patch.py
 COPY docker/freedpp/pdbfixer_add_h.py /opt/pdbfixer_add_h.py
 RUN chmod +x /opt/entrypoint.sh

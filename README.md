@@ -102,6 +102,30 @@ SWW2026/
 
 ---
 
+## Container Images
+
+Build from repo root:
+
+```bash
+# Required for generation (FREED++)
+docker build -f docker/freedpp/Dockerfile -t dualdocking/freedpp:latest .
+
+# Optional: custom GNINA image (for docker-based GNINA scoring script)
+docker build -f docker/gnina/Dockerfile -t dualdocking/gnina:latest .
+
+# Optional: MD validation runtime (required only for --docker MD runs)
+docker build -f docker/md/Dockerfile -t dualdocking/md:latest .
+```
+
+Notes:
+- `cli/s0_fetch/fetch_all.py` builds `dualdocking/freedpp:latest` automatically.
+- `cli/s0_fetch/fetch_all.py` downloads GNINA binary to `output/bin/gnina`; it does not build `dualdocking/gnina:latest`.
+- MD image is only needed for `cli/s6_md/run_md.py --docker`.
+
+Detailed setup and troubleshooting: [docs/setup.md](docs/setup.md).
+
+---
+
 ## Quick Start
 
 ```bash
@@ -124,6 +148,11 @@ uv run python cli/s2_calibrate/compute_normalization.py
 EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py \
   --resume --parallel 1 --with-post --latex-mode draft
 ```
+
+GPU routing note:
+- `--parallel` should match the number of GPUs you expose via `CUDA_VISIBLE_DEVICES`.
+- On shared servers, prefer explicit masks (example: `CUDA_VISIBLE_DEVICES=1,3 --parallel 2`).
+- Detailed GPU affinity rules and FREED++ runtime env vars: [docs/setup.md](docs/setup.md) and [docs/pipeline.md](docs/pipeline.md).
 
 Results land in `output/results/` and `report/`. See [Pipeline](docs/pipeline.md) for stage-by-stage details.
 

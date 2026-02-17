@@ -131,6 +131,28 @@ cli/s3_generate/generate.py
       -> list[str] SMILES
 ```
 
+### Dual Reward Patch (inside Docker)
+
+The FREED++ container applies a monkey-patch (`dual_reward_patch`) on import
+that replaces `DockingVina.docking` and `DockingVina.__call__` to support
+dual-target reward modes. The patch is split into four helper modules plus a
+thin facade:
+
+| Module | Responsibility |
+|--------|----------------|
+| `dual_reward_patch_deps.py` | Compatibility imports: tries `dualdocking.*` first, falls back to flat copies under `/opt`. |
+| `dual_reward_patch_state.py` | Runtime state (counters, normalization, context dataclasses), z-score capping, PDBQT parsing, metadata writer. |
+| `dual_reward_patch_gpu.py` | GPU-batch docking via `unidock --gpu_batch`: ligand prep pool, chunked execution, result cache. |
+| `dual_reward_patch_hooks.py` | DockingVina monkey-patches: `_build_rdkit_docking`, `_build_dual_call`, CacheAndPool GPU hook. |
+| `dual_reward_patch.py` | Facade: auto-applies the patch on import, delegates attribute lookups to submodules via `__getattr__`. |
+
+**Entry point:** `run_with_patch.py` conditionally imports `dual_reward_patch`
+when `REWARD_MODE` is set. The import triggers `_apply_dual_patch()`, which
+loads normalization stats, resolves the reward mode, and patches DockingVina.
+
+**Testing:** Tests (and the smoke script) mock `ffreed`, clear all five
+module names from `sys.modules`, and reimport to get fresh state per test.
+
 ### Modes
 
 Reward scalarizations are centralized in `dualdocking/reward/selectivity.py`.

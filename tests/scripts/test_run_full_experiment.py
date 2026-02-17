@@ -71,7 +71,7 @@ def test_run_cmd_sets_boltz_env_for_builtin_engine(tmp_path, monkeypatch) -> Non
         ),
     )
 
-    env = core_mod.build_env_for_task(config.scorer, gpu_id=1)
+    env = core_mod.build_env_for_task(config.scorer, gpu_id=1, base_env={})
 
     assert env["DUALDOCKING_SCORER_ENGINE"] == "boltz2"
     assert env["FREEDPP_CUDA_DEVICE"] == "1"
@@ -98,7 +98,7 @@ def test_run_cmd_clears_boltz_env_for_external_engine(tmp_path, monkeypatch) -> 
         scorer=ScorerConfig(engine="my_custom_scorer", backend="cli"),
     )
 
-    env = core_mod.build_env_for_task(config.scorer, gpu_id=0)
+    env = core_mod.build_env_for_task(config.scorer, gpu_id=0, base_env={})
 
     assert env["DUALDOCKING_SCORER_ENGINE"] == "my_custom_scorer"
     assert env["SCORER_CUDA_DEVICE"] == "0"
@@ -106,3 +106,25 @@ def test_run_cmd_clears_boltz_env_for_external_engine(tmp_path, monkeypatch) -> 
     assert "BOLTZ_NIM_URLS" not in env
     assert "BOLTZ_NIM_URL" not in env
     assert "BOLTZ_CUDA_DEVICE" not in env
+
+
+def test_build_env_for_task_maps_gpu_slot_via_cuda_visible_devices(tmp_path) -> None:
+    """Logical GPU slots should map to actual CUDA device tokens."""
+    from dualdocking.pipeline import core as core_mod
+    from dualdocking.pipeline.config import PipelineConfig, ScorerConfig
+
+    config = PipelineConfig(
+        project_root=tmp_path,
+        pairs={},
+        scorer=ScorerConfig(engine="boltz2", backend="cli"),
+    )
+
+    env = core_mod.build_env_for_task(
+        config.scorer,
+        gpu_id=1,
+        base_env={"CUDA_VISIBLE_DEVICES": "3,5"},
+    )
+
+    assert env["FREEDPP_CUDA_DEVICE"] == "5"
+    assert env["SCORER_CUDA_DEVICE"] == "5"
+    assert env["BOLTZ_CUDA_DEVICE"] == "5"

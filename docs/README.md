@@ -139,7 +139,7 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 | Bootstrap procedure, claim rules | `statistical_analysis_plan.md` (Sections 3-5) |
 | ChEMBL target IDs | `configs/pairs.yaml` (per-target `chembl_id` field) |
 | Cofactor handling and caveats | `selection_criteria.md` (Cofactor section) |
-| Docker image build | `setup.md` (Docker section) + `pipeline.md` (Stage 0) |
+| Docker image builds (`freedpp`, `gnina`, `md`) | `setup.md` (Docker sections) + `pipeline.md` (Stage 0 + MD section) |
 | Factor design (Disease/Structure/Cofactor) | `selection_criteria.md` (Factor Design section) |
 | FREED++ dual-target patch | `architecture.md` (Generation section) |
 | Per-target PDB, resolution, mutations | `receptor_qc.md` (Summary Table) |
