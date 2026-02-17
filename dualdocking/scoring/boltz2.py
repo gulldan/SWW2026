@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from loguru import logger
 
+from dualdocking.data.mol_prep import check_ligand_size, neutralize_smiles, parse_smiles
 from dualdocking.scoring.cache_io import load_cache, save_cache
 from dualdocking.utils.hardware import detect_primary_gpu_vram_gb
 
@@ -578,52 +579,20 @@ def _validate_smiles(smiles: str) -> bool:
 
     Returns:
         ``True`` if the SMILES parses and has at most
-        ``MAX_LIGAND_ATOMS`` heavy atoms.
+        ``MAX_LIGAND_ATOMS`` atoms.
     """
-    try:
-        from rdkit import Chem
-    except ImportError:
-        logger.warning("RDKit unavailable, skipping SMILES validation")
-        return True
-
-    mol = Chem.MolFromSmiles(smiles)
+    mol = parse_smiles(smiles)
     if mol is None:
         return False
-    return mol.GetNumAtoms() <= MAX_LIGAND_ATOMS
+    return check_ligand_size(mol, max_heavy=100, max_atoms=MAX_LIGAND_ATOMS, max_rotatable=None)
 
 
 def _neutralize_smiles(smiles: str) -> str:
     """Neutralize formal charges for Boltz-2 compatibility.
 
-    Boltz-2 v2.2.1 crashes on charged species (``[NH2+]``, ``[O-]``).
-    Strips protonation states while preserving molecular identity.
-
-    Args:
-        smiles: Input SMILES (potentially charged).
-
-    Returns:
-        Neutralized SMILES, or the original string if neutralization
-        fails or RDKit is unavailable.
+    Delegates to :func:`dualdocking.data.mol_prep.neutralize_smiles`.
     """
-    try:
-        from rdkit import Chem
-        from rdkit.Chem.MolStandardize import rdMolStandardize
-    except ImportError:
-        return smiles
-
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return smiles
-
-    try:
-        uncharger = rdMolStandardize.Uncharger()
-        mol = uncharger.uncharge(mol)
-    except Exception:
-        logger.debug("Neutralization failed for SMILES: {}", smiles)
-        return smiles
-
-    result = Chem.MolToSmiles(mol)
-    return result or smiles
+    return neutralize_smiles(smiles)
 
 
 def _write_boltz_yaml(

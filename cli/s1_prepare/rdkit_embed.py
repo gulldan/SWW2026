@@ -10,6 +10,12 @@ from __future__ import annotations
 import argparse
 import sys
 
+try:
+    from dualdocking.data.mol_prep import embed_mol_3d, parse_smiles
+except ImportError:
+    sys.path.insert(0, "/opt")
+    from mol_prep import embed_mol_3d, parse_smiles  # type: ignore[no-redef]
+
 
 def main() -> int:
     """Parse arguments, embed SMILES in 3D, and write SDF.
@@ -27,24 +33,19 @@ def main() -> int:
 
     try:
         from rdkit import Chem
-        from rdkit.Chem import AllChem
     except Exception as exc:
         sys.stderr.write(f"RDKit import failed: {exc}\n")
         return 2
 
-    mol = Chem.MolFromSmiles(args.smiles)
+    mol = parse_smiles(args.smiles)
     if mol is None:
         sys.stderr.write("RDKit failed to parse SMILES\n")
         return 3
 
-    mol = Chem.AddHs(mol)
-    params = AllChem.ETKDGv3()
-    params.randomSeed = args.seed
-    if AllChem.EmbedMolecule(mol, params) != 0:
+    mol = embed_mol_3d(mol, seed=args.seed, max_uff_iters=args.max_iters)
+    if mol is None:
         sys.stderr.write("RDKit 3D embedding failed\n")
         return 4
-
-    AllChem.UFFOptimizeMolecule(mol, maxIters=args.max_iters)
 
     writer = Chem.SDWriter(args.sdf)
     writer.write(mol)

@@ -17,13 +17,21 @@ import json
 import logging
 import os
 import re
+import sys
 import threading
-from contextlib import suppress
 from multiprocessing import Pool as MPPool
 from pathlib import Path
 from subprocess import TimeoutExpired, run
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any
+
+# mol_prep: try installed package first, fall back to /opt (Docker COPY).
+try:
+    from dualdocking.data.mol_prep import prepare_ligand_pdbqt
+except ImportError:
+    if "/opt" not in sys.path:
+        sys.path.insert(0, "/opt")
+    from mol_prep import prepare_ligand_pdbqt  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +59,10 @@ _MAX_ROTATABLE_BONDS = int(os.environ.get("MAX_ROTATABLE_BONDS", "12"))
 def _prepare_pdbqt_worker(args: tuple[str, int, str]) -> bool:
     """Worker for parallel ligand preparation via multiprocessing.Pool.map."""
     smiles, seed, outpath = args
-    return _prepare_ligand_rdkit(smiles, outpath, seed)
+    return prepare_ligand_pdbqt(
+        smiles, outpath, seed=seed,
+        max_heavy=_MAX_HEAVY_ATOMS, max_rotatable=_MAX_ROTATABLE_BONDS,
+    )
 
 
 def _run_gpu_batch(
@@ -323,58 +334,6 @@ def _coords(value: Any) -> list[float]:
     return parts
 
 
-def _prepare_ligand_rdkit(smiles: str, out_pdbqt: str, seed: int) -> bool:
-    try:
-        from meeko import MoleculePreparation, PDBQTWriterLegacy
-        from rdkit import Chem
-        from rdkit.Chem import AllChem
-    except Exception as exc:
-        logger.error("dual_reward_patch: RDKit/Meeko unavailable: %s", exc)
-        return False
-
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return False
-
-    # Reject molecules too large or flexible for UniDock GPU — these cause
-    # numerical overflow (corrupt scores in millions) and batch timeouts.
-    from rdkit.Chem import Descriptors
-
-    n_heavy = mol.GetNumHeavyAtoms()
-    n_rot = Descriptors.NumRotatableBonds(mol)
-    if n_heavy > _MAX_HEAVY_ATOMS or n_rot > _MAX_ROTATABLE_BONDS:
-        logger.debug(
-            "dual_reward_patch: rejecting oversized ligand (%d heavy, %d rot): %s",
-            n_heavy,
-            n_rot,
-            smiles,
-        )
-        return False
-
-    mol = Chem.AddHs(mol)
-
-    params = AllChem.ETKDGv3()
-    params.randomSeed = int(seed) if int(seed) >= 0 else 42
-    if AllChem.EmbedMolecule(mol, params) != 0:
-        return False
-
-    # Optimization can fail for some structures; embedded conformer is still usable.
-    with suppress(Exception):
-        AllChem.UFFOptimizeMolecule(mol, maxIters=200)
-
-    setups = MoleculePreparation().prepare(mol)
-    if not setups:
-        return False
-    pdbqt_text, ok, err = PDBQTWriterLegacy.write_string(setups[0])
-    if not ok:
-        logger.debug("dual_reward_patch: Meeko write failed: %s", err)
-        return False
-
-    with Path(out_pdbqt).open("w", encoding="utf-8") as f:
-        f.write(pdbqt_text)
-    return True
-
-
 _SCORE_MIN, _SCORE_MAX = -20.0, 10.0
 
 
@@ -488,7 +447,10 @@ def _apply_dual_patch() -> None:
             NamedTemporaryFile(mode="w", suffix=".pdbqt") as ligand,
             NamedTemporaryFile(mode="r+t", suffix=".pdbqt") as docking_file,
         ):
-            if not _prepare_ligand_rdkit(smile, ligand.name, seed):
+            if not prepare_ligand_pdbqt(
+                smile, ligand.name, seed=seed,
+                max_heavy=_MAX_HEAVY_ATOMS, max_rotatable=_MAX_ROTATABLE_BONDS,
+            ):
                 return error_val
 
             cmd = [

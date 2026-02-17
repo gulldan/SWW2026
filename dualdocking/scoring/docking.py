@@ -413,21 +413,16 @@ def write_sdf_from_smiles(
             return False, err or "RDKit embed failed in container"
         return True, ""
 
-    try:
-        from rdkit import Chem
-        from rdkit.Chem import AllChem
-    except Exception as exc:  # pragma: no cover - import error is fatal
-        return False, f"RDKit import failed: {exc}"
+    from rdkit import Chem
 
-    mol = Chem.MolFromSmiles(smiles)
+    from dualdocking.data.mol_prep import embed_mol_3d, parse_smiles
+
+    mol = parse_smiles(smiles)
     if mol is None:
         return False, "RDKit failed to parse SMILES"
-    mol = Chem.AddHs(mol)
-    params = AllChem.ETKDGv3()
-    params.randomSeed = seed
-    if AllChem.EmbedMolecule(mol, params) != 0:
+    mol = embed_mol_3d(mol, seed=seed)
+    if mol is None:
         return False, "RDKit 3D embedding failed"
-    AllChem.UFFOptimizeMolecule(mol, maxIters=200)
     sdf_path.parent.mkdir(parents=True, exist_ok=True)
     writer = Chem.SDWriter(str(sdf_path))
     writer.write(mol)

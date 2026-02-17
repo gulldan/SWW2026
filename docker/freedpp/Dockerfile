@@ -91,6 +91,7 @@ RUN wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C
 COPY docker/freedpp/data/zinc_crem.json docker/freedpp/data/alert_collections.csv /opt/freed/data/
 # ── Entrypoint & dual-target patch ──────────────────────────────────
 COPY docker/freedpp/entrypoint.sh /opt/entrypoint.sh
+COPY dualdocking/data/mol_prep.py /opt/mol_prep.py
 COPY docker/freedpp/dual_reward_patch.py /opt/dual_reward_patch.py
 COPY docker/freedpp/run_with_patch.py /opt/run_with_patch.py
 COPY docker/freedpp/pdbfixer_add_h.py /opt/pdbfixer_add_h.py

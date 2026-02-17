@@ -11,6 +11,7 @@ from dualdocking.data.filters import (
     FilterStats,
     compute_filters,
     filter_one,
+    filter_results_to_columns,
     lipinski,
     load_filter_config,
     pains_check,
@@ -118,6 +119,12 @@ class TestFilterOne:
         assert r.pains_matches > 0
         assert r.passes_all is False
 
+    def test_pains_disabled_marks_pass(self):
+        cfg = {**_DEFAULT_CFG, "pains": {"enabled": False}}
+        r = filter_one(_PAINS_MOL, cfg)
+        assert r.pains_matches > 0
+        assert r.passes_pains is True
+
 
 class TestComputeFilters:
     def test_batch(self):
@@ -127,9 +134,25 @@ class TestComputeFilters:
         assert isinstance(stats, FilterStats)
         assert stats.n_total == 3
         assert stats.n_valid == 2  # aspirin + rhodanine
-        # Aspirin passes all; rhodanine fails PAINS; invalid fails all
-        assert stats.n_pass_all >= 1
-        assert stats.n_pass_all <= 2
+        # Stats must match per-molecule pass flags exactly.
+        assert stats.n_pass_lipinski == sum(r.passes_lipinski for r in results)
+        assert stats.n_pass_qed == sum(r.passes_qed for r in results)
+        assert stats.n_pass_pains == sum(r.passes_pains for r in results)
+        assert stats.n_pass_sa == sum(r.passes_sa for r in results)
+        assert stats.n_pass_veber == sum(r.passes_veber for r in results)
+        assert stats.n_pass_all == sum(r.passes_all for r in results)
+
+    def test_empty_batch(self):
+        results, stats = compute_filters([], _DEFAULT_CFG)
+        assert results == []
+        assert stats.n_total == 0
+        assert stats.n_valid == 0
+        assert stats.n_pass_lipinski == 0
+        assert stats.n_pass_qed == 0
+        assert stats.n_pass_pains == 0
+        assert stats.n_pass_sa == 0
+        assert stats.n_pass_veber == 0
+        assert stats.n_pass_all == 0
 
     def test_stats_to_dict(self):
         _, stats = compute_filters([_ASPIRIN], _DEFAULT_CFG)
@@ -252,3 +275,30 @@ class TestLoadConfig:
         cfg = load_filter_config(cfg_path)
         assert cfg["lipinski"]["mw_max"] == 600.0
         assert cfg["qed"]["enabled"] is False
+
+    def test_missing_filters_key_returns_empty_dict(self, tmp_path: Path):
+        cfg_path = tmp_path / "filters.yaml"
+        cfg_path.write_text("not_filters:\n  x: 1\n")
+        cfg = load_filter_config(cfg_path)
+        assert cfg == {}
+
+
+class TestFilterResultsToColumns:
+    def test_exports_expected_columns(self):
+        results = [
+            filter_one(_ASPIRIN, _DEFAULT_CFG),
+            filter_one("NOT_A_MOLECULE", _DEFAULT_CFG),
+        ]
+        cols = filter_results_to_columns(results)
+        assert len(cols["passes_lipinski"]) == 2
+        assert len(cols["passes_qed"]) == 2
+        assert len(cols["passes_pains"]) == 2
+        assert len(cols["passes_sa"]) == 2
+        assert len(cols["passes_veber"]) == 2
+        assert len(cols["passes_all_filters"]) == 2
+        assert len(cols["mw"]) == 2
+        assert len(cols["logp"]) == 2
+        assert len(cols["qed_score"]) == 2
+        assert len(cols["sa_score"]) == 2
+        assert len(cols["rotatable_bonds"]) == 2
+        assert len(cols["tpsa"]) == 2

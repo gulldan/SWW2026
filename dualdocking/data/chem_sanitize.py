@@ -13,6 +13,8 @@ from loguru import logger
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 
+from dualdocking.data.mol_prep import parse_smiles
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -55,7 +57,7 @@ def canonicalize(smi: str) -> str | None:
     """
     if not smi or not smi.strip():
         return None
-    mol = Chem.MolFromSmiles(smi)
+    mol = parse_smiles(smi)
     if mol is None:
         return None
     canon = Chem.MolToSmiles(mol, canonical=True)
@@ -101,7 +103,7 @@ def sanitize_smiles(
             invalid_indices.append(idx)
             continue
 
-        mol = Chem.MolFromSmiles(canon)
+        mol = parse_smiles(canon)
         if mol is None:
             invalid_indices.append(idx)
             continue
