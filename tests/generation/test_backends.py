@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from dualdocking.generation.backends import list_generation_backends, resolve_generation_backend
+from dualdocking.generation.backends import GenerationRequest, list_generation_backends, resolve_generation_backend
 
 
 def test_builtin_freedpp_alias_from_legacy_name() -> None:
@@ -55,3 +56,41 @@ def test_external_generation_backend_missing_callable(monkeypatch: pytest.Monkey
 
     with pytest.raises(ValueError, match="must expose callable"):
         resolve_generation_backend({"backend": "test_external_gen_backend_missing"})
+
+
+def test_freedpp_backend_passes_reward_modes_passthrough_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Built-in FREED++ backend should pass reward-modes passthrough config."""
+    import dualdocking.generation.freedpp as freedpp_mod
+
+    captured: dict[str, object] = {}
+
+    def _fake_generate(config) -> list[str]:
+        captured["config"] = config
+        return ["CCO"]
+
+    monkeypatch.setattr(freedpp_mod, "generate", _fake_generate)
+
+    _backend_name, backend = resolve_generation_backend({"backend": "freedpp"})
+    request = GenerationRequest(
+        pair_id="CDK2_ERK2",
+        pair_config={"target_a": {"id": "CDK2"}, "target_b": {"id": "ERK2"}},
+        mode="single_a",
+        seed=42,
+        output_dir=Path("output"),
+        n_molecules=10,
+        epochs_override=None,
+        steps_per_epoch_override=None,
+        generator_config={
+            "freedpp": {
+                "pass_reward_modes_to_container": False,
+                "reward_modes_path_in_container": "/workspace/custom_reward_modes.yaml",
+            }
+        },
+        quality_gate={},
+    )
+    result = backend(request)
+    assert result == ["CCO"]
+
+    cfg = captured["config"]
+    assert getattr(cfg, "pass_reward_modes_to_container") is False
+    assert getattr(cfg, "reward_modes_path_in_container") == "/workspace/custom_reward_modes.yaml"

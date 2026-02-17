@@ -240,6 +240,28 @@ class TestRunFreedppBranching:
         cmd_str = " ".join(cmd)
         assert "receptor_a.pdbqt" in cmd_str
         assert "REWARD_MODE=single_a" in cmd_str
+        assert "DUALDOCKING_REWARD_MODES_PATH=/opt/reward_modes.yaml" in cmd_str
+
+    def test_run_freedpp_can_disable_reward_modes_passthrough(self):
+        cfg = GenerationConfig(
+            target_id="CDK2",
+            reward_mode="single_a",
+            pass_reward_modes_to_container=False,
+        )
+        cmd = self._run(cfg)
+        cmd_str = " ".join(cmd)
+        assert "DUALDOCKING_REWARD_MODES_PATH=" not in cmd_str
+
+    def test_run_freedpp_uses_custom_reward_modes_path(self):
+        cfg = GenerationConfig(
+            target_id="CDK2",
+            reward_mode="single_a",
+            pass_reward_modes_to_container=True,
+            reward_modes_path_in_container="/workspace/reward_modes.yaml",
+        )
+        cmd = self._run(cfg)
+        cmd_str = " ".join(cmd)
+        assert "DUALDOCKING_REWARD_MODES_PATH=/workspace/reward_modes.yaml" in cmd_str
 
     def test_run_freedpp_single_b_uses_receptor_b(self):
         cfg = GenerationConfig(target_id="CDK2", reward_mode="single_b", second_target_id="ERK2")

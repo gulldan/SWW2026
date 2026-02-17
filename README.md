@@ -195,6 +195,10 @@ Generator and scorer are configurable in `configs/experiment.yaml`.
 generator:
   # Legacy key also supported: name: "FREED++"
   backend: freedpp  # built-in alias; or package.module[:callable]
+  freedpp:
+    # Reward-mode config passthrough into container (model-dependent)
+    pass_reward_modes_to_container: true
+    reward_modes_path_in_container: /opt/reward_modes.yaml
 
 scorer:
   # Legacy key also supported: name: "Boltz-2"
@@ -205,6 +209,7 @@ scorer:
 Default behavior remains unchanged:
 - Generator: built-in `freedpp`
 - Scorer: built-in `boltz2` (`cli` or `nim` based on config)
+- FREED++ reward config path passthrough: enabled (`/opt/reward_modes.yaml`)
 
 ---
 
@@ -238,6 +243,20 @@ The two scorers are never mixed: FREED++ optimizes only `d_A, d_B`; Boltz-2 eval
 - **linear_equal**: RL reward = `-(z_A + z_B)` — equally weighted
 - **biased_a**: RL reward = `-(z_A + 0.3·z_B)` — target A priority
 - **selective_a**: RL reward = `-(z_A - z_B)` — maximize selectivity for A
+- **selective_weighted**: RL reward = `-(z_A - lambda_off * z_B)` — configurable off-target penalty
+
+All reward formulas are centralized in `dualdocking/reward/selectivity.py`,
+with built-in declarations in `configs/reward_modes.yaml`. The registry can be
+extended via `register_reward_mode(...)` or environment plugin loading
+(`DUALDOCKING_REWARD_PLUGINS`).
+
+Default mode parameters in `configs/reward_modes.yaml`:
+
+- `biased_a.weight_b = 0.3`
+- `selective_weighted.lambda_off = 1.0`
+- all other built-in modes have empty `default_params` (no tunable parameters)
+
+For schema, loading priority, and plugin mechanics, see [Reward Modes](docs/reward_modes.md).
 
 ### Target Pairs
 
@@ -274,7 +293,8 @@ Read in the order shown for fastest onboarding.
 | 7 | [Statistical Analysis Plan](docs/statistical_analysis_plan.md) | Frozen (v1.1) | Inference procedures, claim rules, code mapping |
 | 8 | [Receptor QC](docs/receptor_qc.md) | Reference | Per-target structural quality control |
 | 9 | [NIM Benchmark](docs/nim_benchmark.md) | Reference | Boltz-2 NIM backend benchmarks |
-| 10 | [Doc Index](docs/README.md) | Living | Source priority and conflict resolution rules |
+| 10 | [Reward Modes](docs/reward_modes.md) | Reference | Declarative reward registry, YAML schema, plugin extension |
+| 11 | [Doc Index](docs/README.md) | Living | Source priority and conflict resolution rules |
 
 **Source priority** (higher wins in conflicts): goal.md > configs/*.yaml > dualdocking/ > selection_criteria.md > report/ > README.md.
 

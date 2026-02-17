@@ -97,6 +97,18 @@ def load_metrics(config_dir: str | Path = "configs") -> dict[str, Any]:
     return _load_named_yaml(config_dir, "metrics.yaml")
 
 
+def load_reward_modes(config_dir: str | Path = "configs") -> dict[str, Any]:
+    """Load reward_modes.yaml configuration.
+
+    Args:
+        config_dir: Directory containing reward_modes.yaml, or direct path.
+
+    Returns:
+        Parsed reward mode configuration dict.
+    """
+    return _load_named_yaml(config_dir, "reward_modes.yaml")
+
+
 def collect_blocked_target_ids(pairs: dict[str, Any]) -> set[str]:
     """Return target IDs belonging to blocked pairs.
 

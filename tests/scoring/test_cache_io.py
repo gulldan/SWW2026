@@ -11,6 +11,8 @@ from pathlib import Path
 
 from dualdocking.scoring.cache_io import load_cache, save_cache
 
+_MP_CTX = multiprocessing.get_context("spawn")
+
 # ---------------------------------------------------------------------------
 # Basic roundtrip
 # ---------------------------------------------------------------------------
@@ -252,7 +254,7 @@ def test_concurrent_writes_no_corruption(tmp_path: Path):
 
     args_list = [(str(path), w * keys_per_worker, keys_per_worker) for w in range(workers)]
 
-    with multiprocessing.Pool(workers) as pool:
+    with _MP_CTX.Pool(workers) as pool:
         pool.map(_worker, args_list)
 
     loaded = load_cache(path)
@@ -280,7 +282,7 @@ def test_concurrent_writes_no_leftover_temps(tmp_path: Path):
     workers = 4
     args_list = [(str(path), w * 10, 10) for w in range(workers)]
 
-    with multiprocessing.Pool(workers) as pool:
+    with _MP_CTX.Pool(workers) as pool:
         pool.map(_worker, args_list)
 
     leftover = list(tmp_path.glob(".*tmp"))

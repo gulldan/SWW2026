@@ -12,9 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from dualdocking.reward import reward_mode_requires_secondary_target
 from dualdocking.utils.naming import canonicalize_name
 
-GenerationMode = Literal["single_a", "single_b", "double", "linear_equal", "biased_a", "selective_a"]
+GenerationMode = Literal["single_a", "single_b", "double", "linear_equal", "biased_a", "selective_a", "selective_weighted"]
 
 
 @dataclass(frozen=True)
@@ -108,15 +109,24 @@ def _cfg_str(cfg: Mapping[str, Any], key: str, default: str) -> str:
     return default
 
 
+def _cfg_str_maybe_empty(cfg: Mapping[str, Any], key: str, default: str) -> str:
+    """Read string value preserving empty/whitespace-stripped content."""
+    value = cfg.get(key, default)
+    if isinstance(value, str):
+        return value.strip()
+    return default
+
+
 def _freedpp_backend(request: GenerationRequest) -> list[str]:
     """Built-in FREED++ generation backend adapter."""
     from dualdocking.generation.freedpp import GenerationConfig, generate
 
     freedpp_cfg = _as_mapping(request.generator_config.get("freedpp"))
     use_model_cache_default = True
+    reward_modes_passthrough_default = True
 
     second_target_id: str | None = None
-    if request.mode in {"single_b", "double", "linear_equal", "biased_a", "selective_a"}:
+    if reward_mode_requires_secondary_target(request.mode):
         second_target_id = _target_id(request.pair_config, "target_b")
 
     gen_config = GenerationConfig(
@@ -141,6 +151,16 @@ def _freedpp_backend(request: GenerationRequest) -> list[str]:
         ),
         qg_max_invalid_fraction=_cfg_float(request.quality_gate, "max_invalid_fraction", 0.10),
         qg_max_timeout_fraction=_cfg_float(request.quality_gate, "max_timeout_fraction", 0.05),
+        pass_reward_modes_to_container=_cfg_bool(
+            freedpp_cfg,
+            "pass_reward_modes_to_container",
+            reward_modes_passthrough_default,
+        ),
+        reward_modes_path_in_container=_cfg_str_maybe_empty(
+            freedpp_cfg,
+            "reward_modes_path_in_container",
+            "/opt/reward_modes.yaml",
+        ),
     )
     return generate(gen_config)
 

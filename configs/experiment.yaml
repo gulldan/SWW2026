@@ -60,6 +60,8 @@ generator:
     training_timeout: 86400  # 24h
     box_padding: 10.0        # Å
     vina_program: unidock_gpu    # "qvina02" for CPU fallback
+    pass_reward_modes_to_container: true    # set false for model images with internal reward config
+    reward_modes_path_in_container: /opt/reward_modes.yaml
 
 # Reward run quality threshold (quality gate)
 quality_gate:

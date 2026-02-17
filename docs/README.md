@@ -51,7 +51,8 @@ Updated: 2026-02-15
 | 7 | [`architecture.md`](architecture.md) | Reference | Technical internals: pluggable generator/scorer backends, Boltz-2 CLI/NIM, FREED++ Docker, caching, troubleshooting. |
 | 8 | [`receptor_qc.md`](receptor_qc.md) | Reference | Per-target structural QC: resolution, chain, ligand, mutations, coverage. |
 | 9 | [`nim_benchmark.md`](nim_benchmark.md) | Reference | Boltz-2 CLI vs NIM backend: latency, score agreement, TensorRT notes. |
-| 10 | [`tasks.md`](tasks.md) | Living log | Task journal, execution plan, daily progress. |
+| 10 | [`reward_modes.md`](reward_modes.md) | Reference | Declarative reward registry (`configs/reward_modes.yaml`), runtime resolution, plugin extension. |
+| 11 | [`tasks.md`](tasks.md) | Living log | Task journal, execution plan, daily progress. |
 
 **Status definitions:**
 - **Operational spec** -- single source of truth; changes require explicit approval
@@ -129,6 +130,8 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 |-------|----------|
 | MD validation pipeline | `dualdocking/validation/md_*.py` (5 modules), `cli/s6_md/run_md.py`, [io_contracts.md](io_contracts.md) (Stage 5c) |
 | Generator/scorer backend selection | `configs/experiment.yaml` (`generator.backend`, `scorer.engine`) |
+| Reward config Docker passthrough (model-dependent) | `configs/experiment.yaml` (`generator.freedpp.pass_reward_modes_to_container`, `generator.freedpp.reward_modes_path_in_container`) |
+| Reward mode declarations and overrides | `configs/reward_modes.yaml` + `reward_modes.md` |
 | Binding box coordinates, grid sizes | `architecture.md` (Binding Box section) + `configs/pairs.yaml` |
 | Affinity thresholds (T_A, T_B) | `configs/metrics.yaml` (fixed at 0.0 = 1 uM) |
 | Boltz-2 cache format, context hashing | `architecture.md` (Caching section) |

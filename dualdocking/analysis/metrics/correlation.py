@@ -26,6 +26,13 @@ from dualdocking.analysis.metrics.common import load_scored_affinity
 _N_BOOTSTRAP = 5_000
 
 
+def _is_constant(arr: np.ndarray) -> bool:
+    """Return ``True`` when all values in *arr* are identical."""
+    if arr.size == 0:
+        return True
+    return bool(np.all(arr == arr[0]))
+
+
 @dataclass(frozen=True)
 class CorrelationConfig:
     """Configuration for proxy-final correlation analysis.
@@ -91,14 +98,19 @@ def bootstrap_correlation(
         return float("nan"), float("nan"), float("nan")
 
     corr_fn = sp_stats.spearmanr if method == "spearman" else sp_stats.pearsonr
-    observed = float(corr_fn(x, y).statistic)
+    observed = float("nan") if _is_constant(x) or _is_constant(y) else float(corr_fn(x, y).statistic)
 
     rng = np.random.default_rng(rng_seed)
     boot = np.empty(n_bootstrap, dtype=float)
     n = len(x)
     for i in range(n_bootstrap):
         idx = rng.integers(0, n, size=n)
-        boot[i] = float(corr_fn(x[idx], y[idx]).statistic)
+        x_boot = x[idx]
+        y_boot = y[idx]
+        if _is_constant(x_boot) or _is_constant(y_boot):
+            boot[i] = float("nan")
+            continue
+        boot[i] = float(corr_fn(x_boot, y_boot).statistic)
 
     ci_lo, ci_hi = np.nanpercentile(boot, [2.5, 97.5])
     return observed, float(ci_lo), float(ci_hi)

@@ -94,7 +94,7 @@ def _setup_env(monkeypatch, tmp_path, *, reward_mode="single_a"):
     monkeypatch.setenv("REWARD_METADATA_PATH", str(tmp_path / "reward_metadata.json"))
     monkeypatch.setenv("INVALID_Z_PENALTY", "4.0")
 
-    if reward_mode in {"double", "linear_equal", "biased_a", "selective_a"}:
+    if reward_mode in {"double", "linear_equal", "biased_a", "selective_a", "selective_weighted"}:
         dual_cfg_path = tmp_path / "dual_config.json"
         dual_cfg_path.write_text(
             json.dumps(
@@ -557,6 +557,15 @@ class TestDualCallDouble:
         assert self.mod._call_stats["timeout_b"] == 1
         assert self.mod._call_stats["invalid_b"] == 1
 
+    def test_primary_target_in_metadata_double(self):
+        """Metadata reports primary_target=both for dual-target modes."""
+        self.vina._scores = [-7.5, -6.0]
+        self.vina()
+        self.mod._write_reward_metadata()
+        data = json.loads(self.mod._METADATA_PATH.read_text())
+        assert data["primary_target"] == "both"
+        assert data["reward_mode"] == "double"
+
 
 # ---------------------------------------------------------------------------
 # Integration: _dual_call in single_b mode
@@ -736,7 +745,7 @@ class TestParseResultValidation:
 # ---------------------------------------------------------------------------
 
 
-def _make_new_mode_fixture(mode_name):
+def _make_new_mode_fixture(mode_name, env_overrides=None):
     """Factory: create a fixture for a new dual-target weight mode."""
 
     @pytest.fixture
@@ -744,6 +753,9 @@ def _make_new_mode_fixture(mode_name):
         FakeVina = _make_fake_docking_vina()
         _install_ffreed_mock(monkeypatch, FakeVina)
         _setup_env(monkeypatch, tmp_path, reward_mode=mode_name)
+        if env_overrides:
+            for key, value in env_overrides.items():
+                monkeypatch.setenv(key, value)
         mod = _fresh_import(monkeypatch)
         instance = FakeVina()
         yield mod, instance
@@ -758,6 +770,7 @@ def _make_new_mode_fixture(mode_name):
 _integration_linear_equal = _make_new_mode_fixture("linear_equal")
 _integration_biased_a = _make_new_mode_fixture("biased_a")
 _integration_selective_a = _make_new_mode_fixture("selective_a")
+_integration_selective_weighted = _make_new_mode_fixture("selective_weighted", {"REWARD_PARAMS_JSON": '{"lambda_off": 2.0}'})
 
 
 class TestDualCallLinearEqual:
@@ -832,6 +845,27 @@ class TestDualCallSelectiveA:
         self.vina._scores = [-7.5, -6.0]
         reward = self.vina()
         assert reward == pytest.approx(0.0)
+
+    def test_stats_tracked(self):
+        self.vina._scores = [-6.5, -5.0]
+        self.vina()
+        assert self.mod._call_stats["total"] == 1
+        assert self.mod._call_stats["invalid_a"] == 0
+        assert self.mod._call_stats["invalid_b"] == 0
+
+
+class TestDualCallSelectiveWeighted:
+    """Exercise _dual_call in selective_weighted mode: z_a - lambda_off*z_b."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, _integration_selective_weighted):
+        self.mod, self.vina = _integration_selective_weighted
+
+    def test_reward_value_with_lambda_two(self):
+        # z_a=1.0, z_b=2.0, lambda_off=2.0 -> 1.0 - 2.0*2.0 = -3.0
+        self.vina._scores = [-6.5, -5.0]
+        reward = self.vina()
+        assert reward == pytest.approx(-3.0)
 
     def test_stats_tracked(self):
         self.vina._scores = [-6.5, -5.0]

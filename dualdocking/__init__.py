@@ -24,6 +24,8 @@ config.load_metrics()
     Load hit thresholds from ``configs/metrics.yaml``.
 config.load_experiment()
     Load experiment parameters from ``configs/experiment.yaml``.
+config.load_reward_modes()
+    Load declarative reward modes from ``configs/reward_modes.yaml``.
 """
 
 __version__ = "0.1.0"

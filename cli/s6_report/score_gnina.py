@@ -285,11 +285,7 @@ def _score_target(
 
 @click.command()
 @click.option("--pair", required=True, help="Pair ID from configs/pairs.yaml")
-@click.option(
-    "--mode",
-    type=click.Choice(["single_a", "single_b", "double", "linear_equal", "biased_a", "selective_a"]),
-    required=True,
-)
+@click.option("--mode", type=str, required=True, help="Generation mode folder name (e.g. single_a, double)")
 @click.option("--seed", default=42, type=int)
 @click.option("--config", default="configs/pairs.yaml")
 @click.option("--experiment-config", default="configs/experiment.yaml")

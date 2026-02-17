@@ -133,6 +133,22 @@ cli/s3_generate/generate.py
 
 ### Modes
 
+Reward scalarizations are centralized in `dualdocking/reward/selectivity.py`.
+FREED++ and other generators should resolve modes through this shared registry
+instead of hard-coding formulas per backend.
+
+Built-in modes are declared in `configs/reward_modes.yaml` (declarative layer).
+At runtime the registry resolves the config path in this order:
+
+1. `DUALDOCKING_REWARD_MODES_PATH`
+2. `<module_dir>/reward_modes.yaml` (used in Docker fallback at `/opt/reward_modes.yaml`)
+3. `<repo_root>/configs/reward_modes.yaml`
+4. `<cwd>/configs/reward_modes.yaml`
+
+For FREED++ Docker runs, exporting `DUALDOCKING_REWARD_MODES_PATH` is
+configurable via `generator.freedpp.pass_reward_modes_to_container` and
+`generator.freedpp.reward_modes_path_in_container` in `configs/experiment.yaml`.
+
 **Pre-registered (primary hypothesis):**
 
 | Mode | Reward | Description |
@@ -148,10 +164,16 @@ cli/s3_generate/generate.py
 | `linear_equal` | `-(z_A + z_B)` | Equally weighted linear combination |
 | `biased_a` | `-(z_A + 0.3·z_B)` | Target A priority |
 | `selective_a` | `-(z_A - z_B)` | Maximize selectivity for A over B |
+| `selective_weighted` | `-(z_A - \lambda_{off}\cdot z_B)` | Configurable selectivity penalty |
 
 Where `z_X = (d_X - mu_X) / sigma_X` (per-target z-score from calibration).
 Z-scores are clamped to ±10 (`MAX_Z_ABS`) to prevent corrupt docking scores from
 dominating the RL gradient.
+
+Custom modes can be added without touching FREED++ internals:
+
+- Python API: `register_reward_mode(...)`
+- Plugin autoload: `DUALDOCKING_REWARD_PLUGINS="package.module[:register_reward_modes]"`
 
 ### Model Cache
 

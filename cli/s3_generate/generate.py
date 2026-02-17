@@ -1,4 +1,4 @@
-"""Launch FREED++ molecule generation in single_a, single_b, or double mode.
+"""Launch molecule generation for a selected reward mode.
 
 Usage::
 
@@ -219,11 +219,7 @@ def _master_config_version() -> str:
 
 @click.command()
 @click.option("--pair", required=True, help="Pair ID from configs/pairs.yaml")
-@click.option(
-    "--mode",
-    type=click.Choice(["single_a", "single_b", "double", "linear_equal", "biased_a", "selective_a"]),
-    required=True,
-)
+@click.option("--mode", type=str, required=True, help="Reward mode name from dualdocking.reward registry")
 @click.option("--n-molecules", default=None, type=int, help="Number of molecules (default from experiment.yaml)")
 @click.option("--seed", default=42, type=int)
 @click.option("--epochs", default=None, type=int, help="FREED++ epochs (default from experiment.yaml)")
@@ -248,7 +244,7 @@ def main(
 
     Args:
         pair: Pair identifier from ``configs/pairs.yaml``.
-        mode: Generation mode — ``single_a``, ``single_b``, or ``double``.
+        mode: Generation mode name from the shared reward registry.
         n_molecules: Override molecule count (default from experiment.yaml).
         seed: Random seed for reproducibility.
         epochs: Override FREED++ training epochs.
@@ -297,6 +293,20 @@ def main(
 
     backend_name, backend_generate = resolve_generation_backend(generator_cfg)
     logger.info("Generator backend: {}", backend_name)
+    from dualdocking.reward import get_reward_mode, list_reward_modes
+
+    try:
+        get_reward_mode(mode)
+    except KeyError:
+        if backend_name == "freedpp":
+            available = ", ".join(list_reward_modes())
+            logger.error("Unknown reward mode '{}'. Available: {}", mode, available)
+            sys.exit(2)
+        logger.warning(
+            "Mode '{}' is not in shared reward registry; external backend '{}' is responsible for mode semantics",
+            mode,
+            backend_name,
+        )
 
     request = GenerationRequest(
         pair_id=pair,

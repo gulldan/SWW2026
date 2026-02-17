@@ -28,6 +28,7 @@ All documents describe the **same experiment** and must stay consistent. When ch
 | `configs/pairs.yaml`    | `docs/selection_criteria.md`, `report/chapters/04_experimental_protocol.tex`     |
 | `configs/metrics.yaml`  | `docs/goal.md` (thresholds), `report/chapters/04_experimental_protocol.tex`      |
 | `configs/experiment.yaml` | `docs/goal.md`, `report/chapters/03_methods_notes.tex`                         |
+| `configs/reward_modes.yaml` | `docs/reward_modes.md`, `docs/architecture.md`, `README.md`                 |
 | `dualdocking/**/*.py`   | Corresponding `tests/test_*.py`, `docs/goal.md` if behavior changes            |
 | `docs/goal.md`          | `report/chapters/` (methods, protocol, limitations)                              |
 | `report/references.bib` | All `\cite{}` in `report/chapters/*.tex`                                         |
@@ -130,7 +131,7 @@ cli/                      # CLI entry points (organized by pipeline stage)
   pipeline/                   #   End-to-end orchestrators (full experiment, pilot, post)
   smoke/                      #   Smoke tests (Boltz-2 health check, reward capping)
 tests/                        # pytest suite, monkeypatch-heavy
-configs/                      # YAML: pairs.yaml, metrics.yaml, experiment.yaml
+configs/                      # YAML: pairs.yaml, metrics.yaml, experiment.yaml, reward_modes.yaml
 docker/freedpp/               # Dockerfile + dual_reward_patch.py monkey-patch
 docs/                         # goal.md (spec), selection_criteria.md, tasks.md
 report/                       # LaTeX manuscript (chapters/, figures/, templates/)
@@ -191,6 +192,10 @@ NIM and CLI backends produce separate cache contexts (different context hashes) 
 - `_build_freedpp_args` signature: `(config, pdbqt_a, center_a, size_a, commands)` — no workspace param
 - `INVALID_Z_PENALTY` is validated `> 0 && finite` at module load; negative values would invert reward
 - `REWARD_METADATA_PATH` needs `mkdir(parents=True)` — custom paths may have non-existent parents
+- Built-in reward mode defaults live in `configs/reward_modes.yaml` (fallback in code if YAML missing)
+- FREED++ reward-config passthrough to Docker is model-dependent and configurable via
+  `generator.freedpp.pass_reward_modes_to_container` and
+  `generator.freedpp.reward_modes_path_in_container` in `configs/experiment.yaml`
 - `pareto_mask` uses O(n log n) lexsort + sweep; handles ties with `−sb` tiebreak
 - Boltz-2 output is `log10(IC50 in μM)`, NOT pIC50
 

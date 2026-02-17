@@ -112,7 +112,7 @@ or both targets. Default backend is FREED++ (Docker).
 | File | Format | Source |
 |------|--------|--------|
 | `configs/pairs.yaml` | YAML | Config |
-| `configs/experiment.yaml` | YAML | Config (`budget.n_molecules`, `generator.backend`/`generator.name`, `generator.freedpp.*`, `quality_gate.*`) |
+| `configs/experiment.yaml` | YAML | Config (`budget.n_molecules`, `generator.backend`/`generator.name`, `generator.freedpp.*` incl. reward-mode passthrough toggles, `quality_gate.*`) |
 | `configs/normalization.yaml` | YAML | Stage 1 |
 | `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | Stage 0 |
 | `docker/freedpp/data/zinc_crem.json` | JSON | Stage 0 |
@@ -137,7 +137,7 @@ or both targets. Default backend is FREED++ (Docker).
 | `…/freedpp_workspace/normalization.yaml` | YAML | Copy of configs/normalization.yaml |
 | `…/freedpp_workspace/{receptor}.pdbqt` | PDBQT | Prepared docking receptor |
 | `…/freedpp_workspace/dual_config.json` | JSON | Second receptor config (double mode only) |
-| `…/freedpp_workspace/reward_metadata.json` | JSON | `total_calls`, `invalid_count_{a,b}`, `invalid_reward_fraction_{a,b}`, `timeout_count_{a,b}`, `timeout_fraction_{a,b}`, `reward_mode`, `run_valid` |
+| `…/freedpp_workspace/reward_metadata.json` | JSON | `total_calls`, `invalid_count_{a,b}`, `invalid_reward_fraction_{a,b}`, `timeout_count_{a,b}`, `timeout_fraction_{a,b}`, `reward_mode`, `reward_params`, `primary_target`, `run_valid` |
 | `…/freedpp_workspace/output/run/mols/sample_*.json` | JSON | Arrays of generated SMILES (primary format) |
 | `…/freedpp_workspace/output/run/mols/train_*.csv` | CSV | Per-epoch training molecules with docking scores |
 | `…/freedpp_workspace/*.log` | Text | Docker stdout/stderr log |
@@ -570,6 +570,7 @@ Boltz CLI model weights: controlled by `BOLTZ_CACHE` env var
 | `configs/calibration.yaml` | YAML | Fetch, Calibration |
 | `configs/normalization.yaml` | YAML | Generation, Scoring (produced by Stage 1) |
 | `configs/metrics.yaml` | YAML | Scoring, Analysis, Report |
+| `configs/reward_modes.yaml` | YAML | Shared reward-mode registry for generation backends |
 | `configs/filters.yaml` | YAML | Post-scoring drug-likeness filtering (Lipinski, QED, PAINS, SA, Veber) |
 | `configs/master_config.yaml` | YAML | LaTeX report |
 
@@ -581,7 +582,7 @@ Boltz CLI model weights: controlled by `BOLTZ_CACHE` env var
 |-------------|--------|
 | `{pair_id}` | e.g. `CDK2_ERK2`, `BACE1_GSK3B`, `AChE_BChE` |
 | `{target_id}` | e.g. `CDK2`, `ERK2`, `BACE1`, `GSK3B` |
-| `{mode}` | `single_a`, `single_b`, `double`, `linear_equal`, `biased_a`, `selective_a` |
+| `{mode}` | `single_a`, `single_b`, `double`, `linear_equal`, `biased_a`, `selective_a`, `selective_weighted` (or plugin-defined mode names) |
 | `{seed}` | `42`, `137`, `256`, `512`, `1024` (from experiment.yaml) |
 | `{ctx[:8]}` | First 8 chars of scoring context SHA-256 hash |
 | `{cache_key}` | Full SHA-256 hash of FREED++ config parameters |
