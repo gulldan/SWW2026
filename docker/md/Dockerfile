@@ -4,7 +4,7 @@
 # Requires: NVIDIA Container Toolkit for --gpus all
 
 # ── Stage 1: Build GROMACS from source with CUDA ─────────────────────
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS gromacs-builder
+FROM nvidia/cuda:12.8.0-devel-ubuntu24.04 AS gromacs-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -40,7 +40,7 @@ RUN wget -q "https://ftp.gromacs.org/gromacs/gromacs-${GROMACS_VERSION}.tar.gz" 
 
 
 # ── Stage 2: Runtime image ───────────────────────────────────────────
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.0-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8

@@ -145,7 +145,7 @@ line-ending = "auto"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
-addopts = "-v -n auto -m 'not benchmark'"
+addopts = "-v -n 8 -m 'not benchmark'"
 pythonpath = ["."]
 filterwarnings = [
     # scipy Boost _nct_cdf/_nct_sf: numerical divide-by-zero for extreme

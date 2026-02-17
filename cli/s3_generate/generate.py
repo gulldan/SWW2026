@@ -19,6 +19,8 @@ from pathlib import Path
 import click
 from loguru import logger
 
+from dualdocking.utils.master_config import read_master_config_field
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
@@ -130,22 +132,7 @@ def _master_config_field(path: str) -> str:
     Returns:
         String value at the path, or ``"unknown"`` if not found.
     """
-    master_path = PROJECT_ROOT / "configs" / "master_config.yaml"
-    if not master_path.exists():
-        return "unknown"
-    import yaml
-
-    data = yaml.safe_load(master_path.read_text())
-    value: str | None = data
-    for part in path.split("."):
-        if isinstance(value, dict):
-            value = value.get(part)
-        else:
-            value = None
-            break
-    if not value:
-        return "unknown"
-    return str(value)
+    return read_master_config_field(PROJECT_ROOT, path, default="unknown")
 
 
 def _docker_image_digest(image: str) -> str:

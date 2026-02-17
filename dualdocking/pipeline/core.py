@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from dualdocking.utils.nim import nim_url_ready
+
 if TYPE_CHECKING:
     from dualdocking.pipeline.config import ScorerConfig
 
@@ -204,20 +206,11 @@ def check_nim_health(urls: list[str], timeout: float = 5.0) -> list[str]:
     Returns:
         Subset of *urls* that responded as healthy.
     """
-    import urllib.request
-
     healthy: list[str] = []
     for url in urls:
-        health_url = f"{url.rstrip('/')}/v1/health/ready"
-        try:
-            req = urllib.request.Request(health_url)  # noqa: S310
-            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
-                body = resp.read().lower()
-            if b"false" not in body:
-                healthy.append(url)
-                logger.info("NIM health OK: {}", url)
-            else:
-                logger.warning("NIM not ready: {} (responded false)", url)
-        except Exception as exc:
-            logger.warning("NIM not reachable: {} ({})", url, exc)
+        if nim_url_ready(url, timeout=timeout):
+            healthy.append(url)
+            logger.info("NIM health OK: {}", url)
+        else:
+            logger.warning("NIM not reachable or not ready: {}", url)
     return healthy

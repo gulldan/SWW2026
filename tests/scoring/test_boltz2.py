@@ -151,6 +151,48 @@ def test_parse_affinity_missing(tmp_path):
         pass
 
 
+def test_parse_affinity_file(tmp_path):
+    affinity_path = tmp_path / "affinity_test.json"
+    affinity_path.write_text(json.dumps({"affinity_pred_value": -7.25}))
+    assert mod._parse_affinity_file(affinity_path) == pytest.approx(-7.25)
+
+
+def test_parse_affinity_file_missing(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        mod._parse_affinity_file(tmp_path / "missing.json")
+
+
+def test_require_msa_path_exists(tmp_path, monkeypatch):
+    monkeypatch.setattr(mod, "MSA_CACHE_DIR", tmp_path)
+    expected = tmp_path / "tgt.csv"
+    expected.write_text("msa")
+    assert mod._require_msa_path("tgt") == expected
+
+
+def test_require_msa_path_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(mod, "MSA_CACHE_DIR", tmp_path)
+    with pytest.raises(FileNotFoundError, match="Pre-computed MSA not found for tgt"):
+        mod._require_msa_path("tgt")
+
+
+def test_collect_valid_smiles_filters_and_neutralizes(monkeypatch):
+    monkeypatch.setattr(mod, "_validate_smiles", lambda smi: smi != "invalid")
+    monkeypatch.setattr(mod, "_neutralize_smiles", lambda smi: f"neutral:{smi}")
+    pairs = mod._collect_valid_smiles(
+        ["CCO", "invalid", "C[NH3+]"],
+        warning_template="Invalid SMILES (>{} atoms): {}",
+    )
+    assert pairs == [(0, "neutral:CCO"), (2, "neutral:C[NH3+]")]
+
+
+def test_nim_payload_has_expected_structure():
+    payload = mod._nim_payload("MKTAY", "CCO")
+    assert payload["polymers"] == [{"id": "A", "molecule_type": "protein", "sequence": "MKTAY"}]
+    assert payload["ligands"] == [{"id": "B", "smiles": "CCO", "predict_affinity": True}]
+    for key, value in mod._NIM_PREDICT_PARAMS.items():
+        assert payload[key] == value
+
+
 def test_save_cache_filters_nan(tmp_path, monkeypatch, _stable_context):
     """NaN values must not be persisted to disk."""
     monkeypatch.setattr(mod, "SCORE_CACHE_DIR", tmp_path)

@@ -691,15 +691,29 @@ class TestMakeIndex:
         tpr = tmp_path / "em.tpr"
         tpr.touch()
 
+        def _mock_make_ndx(*_args: object, **_kwargs: object) -> MagicMock:
+            ndx_path = tmp_path / "index.ndx"
+            ndx_path.write_text(
+                "[ Protein ]\n1 2 3\n"
+                "[ LIG ]\n4 5\n"
+                "[ SOL ]\n6 7\n"
+                "[ NA ]\n8\n",
+            )
+            return MagicMock(returncode=0)
+
         with patch("dualdocking.validation.md_setup._run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+            mock_run.side_effect = _mock_make_ndx
             ndx = _make_index(tpr, tmp_path, cmd_timeout=120)
 
         assert ndx == tmp_path / "index.ndx"
         mock_run.assert_called_once()
         kwargs = mock_run.call_args[1]
-        assert kwargs["input_text"] == "Protein | r LIG\nq\n"
+        assert kwargs["input_text"] == "q\n"
         assert "make_ndx" in mock_run.call_args[0][0]
+
+        content = ndx.read_text()
+        assert "[ Protein_LIG ]" in content
+        assert "[ Water_and_ions ]" in content
 
 
 # ── _preprocess_trajectory ───────────────────────────────────────────
