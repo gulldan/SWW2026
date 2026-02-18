@@ -144,6 +144,7 @@ def build_freedpp_args(
     auto_num_sub_proc: Callable[[], int],
     resolve_vina_path: Callable[[str], str],
     log: _LoggerLike,
+    checkpoint: str | None = None,
 ) -> list[str]:
     """Build CLI argument list for FREED++ ``main.py``.
 
@@ -156,6 +157,8 @@ def build_freedpp_args(
         auto_num_sub_proc: Callback for auto process-count selection.
         resolve_vina_path: Callback mapping ``vina_program`` to binary path.
         log: Logger-like instance.
+        checkpoint: Container path to a ``model_*.pth`` checkpoint for
+            resuming an interrupted training run.
 
     Returns:
         Argument vector for the FREED++ container command.
@@ -165,7 +168,7 @@ def build_freedpp_args(
         f"FREED++ num_sub_proc={num_sub_proc} (config={config.num_sub_proc}, auto={config.num_sub_proc == 0})",
     )
 
-    return [
+    args = [
         "--commands",
         commands,
         "--receptor",
@@ -201,3 +204,6 @@ def build_freedpp_args(
         "--num_modes",
         "1",
     ]
+    if checkpoint:
+        args.extend(["--checkpoint", checkpoint])
+    return args

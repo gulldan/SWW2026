@@ -104,7 +104,16 @@ SWW2026/
 
 ## Container Images
 
-Build from repo root:
+Build all images at once (recommended):
+
+```bash
+./scripts/build_docker_images.sh                    # build all, skip existing
+./scripts/build_docker_images.sh --force            # force-rebuild all
+./scripts/build_docker_images.sh --only freedpp     # build only freedpp
+./scripts/build_docker_images.sh --dry-run          # preview commands
+```
+
+Or build individually:
 
 ```bash
 # Required for generation (FREED++)
@@ -145,7 +154,7 @@ uv run python cli/s2_calibrate/dock_calibration.py
 uv run python cli/s2_calibrate/compute_normalization.py
 
 # 5. Run full experiment (offline from here)
-EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py \
+EXPERIMENT_RUN_ID=18022026 uv run python cli/pipeline/run_full_experiment.py \
   --resume --parallel 1 --with-post --latex-mode draft
 ```
 

@@ -186,3 +186,81 @@ pairs:
       pdb_id: 2V5Z
       organism: "Homo sapiens"
       binding_site: "Substrate pocket (adjacent to FAD cofactor)"
+
+  # --- Oncology kinase & epigenetic pairs ---
+
+  MEK1_MEK2:
+    description: "MEK selectivity - MEK1 vs MEK2 (MAPK pathway, ~80% protein ID, conserved allosteric pocket). Trametinib approved 2013."
+    boltz2_status: "ok"
+    set: "auxiliary"
+    target_a:
+      id: MEK1
+      name: "Dual specificity mitogen-activated protein kinase kinase 1 (MEK1)"
+      uniprot: Q02750
+      pdb_id: 7JUR
+      organism: "Homo sapiens"
+      binding_site: "Allosteric pocket (adjacent to ATP site)"
+    target_b:
+      id: MEK2
+      name: "Dual specificity mitogen-activated protein kinase kinase 2 (MEK2)"
+      uniprot: P36507
+      pdb_id: 3PP1
+      organism: "Homo sapiens"
+      binding_site: "Allosteric pocket (adjacent to ATP site)"
+
+  FGFR1_FGFR2:
+    description: "FGFR selectivity - FGFR1 vs FGFR2 (~90% kinase domain ID, highest in set). Erdafitinib approved 2024."
+    boltz2_status: "ok"
+    set: "auxiliary"
+    target_a:
+      id: FGFR1
+      name: "Fibroblast growth factor receptor 1"
+      uniprot: P11362
+      pdb_id: 5EW8
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, kinase domain"
+    target_b:
+      id: FGFR2
+      name: "Fibroblast growth factor receptor 2"
+      uniprot: P21802
+      pdb_id: 2PSQ
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, kinase domain"
+
+  EZH2_EZH1:
+    description: "PRC2 methyltransferase - EZH2 vs EZH1 (94% SET domain ID). EZH1 compensates EZH2 loss; valemetostat dual EZH1/2 approved JP 2022. WARNING: catalog lists same PDB (5LS6) for both - shared PRC2 architecture."
+    boltz2_status: "ok"
+    set: "auxiliary"
+    target_a:
+      id: EZH2
+      name: "Histone-lysine N-methyltransferase EZH2"
+      uniprot: Q15910
+      pdb_id: 5LS6
+      organism: "Homo sapiens"
+      binding_site: "SET domain catalytic site"
+    target_b:
+      id: EZH1
+      name: "Histone-lysine N-methyltransferase EZH1"
+      uniprot: Q92800
+      pdb_id: 5LS6
+      organism: "Homo sapiens"
+      binding_site: "SET domain catalytic site"
+
+  BRD4_BRD2:
+    description: "BET bromodomain - BRD4 vs BRD2 (85-92% BD1 ID, ~95% pocket conservation). JQ1 pan-BET inhibitor, I-BET762 Phase I."
+    boltz2_status: "ok"
+    set: "auxiliary"
+    target_a:
+      id: BRD4
+      name: "Bromodomain-containing protein 4"
+      uniprot: O60885
+      pdb_id: 3MXF
+      organism: "Homo sapiens"
+      binding_site: "BD1 bromodomain acetyl-lysine binding pocket"
+    target_b:
+      id: BRD2
+      name: "Bromodomain-containing protein 2"
+      uniprot: P25440
+      pdb_id: 3ONI
+      organism: "Homo sapiens"
+      binding_site: "BD1 bromodomain acetyl-lysine binding pocket"

@@ -31,9 +31,9 @@ PDBQT receptors. All HTTP downloads use exponential-backoff retry
 | `--verify-only` | Check completeness without downloading |
 | `--dry-run` | Print commands without executing |
 
-Stage 0 builds `dualdocking/freedpp:latest` only. Optional images
-`dualdocking/gnina:latest` and `dualdocking/md:latest` are built manually
-(see [setup.md](setup.md)).
+Stage 0 builds `dualdocking/freedpp:latest` only. To build all images
+(including optional gnina and md), use `./scripts/build_docker_images.sh`
+(see [setup.md](setup.md) for full options).
 
 ### What gets fetched
 

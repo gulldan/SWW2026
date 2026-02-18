@@ -267,6 +267,7 @@ def run_freedpp(  # noqa: PLR0913
     getenv: _GetEnvFn,
     tqdm_factory: _TqdmFactory,
     log: _LoggerLike,
+    extra_docker_args: list[str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run FREED++ inside Docker and stream logs with progress extraction.
 
@@ -382,6 +383,9 @@ def run_freedpp(  # noqa: PLR0913
             ]
         )
 
+    if extra_docker_args:
+        docker_cmd.extend(extra_docker_args)
+
     docker_cmd.append(config.docker_image)
     docker_cmd.extend(args)
 
@@ -392,8 +396,11 @@ def run_freedpp(  # noqa: PLR0913
     log_ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     log_path = workspace / f"freedpp_{config.reward_mode}_seed_{config.seed}_{run_id}_{log_ts}.log"
 
-    log.info(f"Starting FREED++: {' '.join(docker_cmd)}")
-    log.info(f"FREED++ log -> {log_path}")
+    # Build a short tag for log lines: [GPU 0 | single_a/seed_42]
+    tag = f"GPU {gpu_flag.removeprefix('device=')} | {config.reward_mode}/seed_{config.seed}"
+
+    log.info(f"[{tag}] Starting FREED++: {' '.join(docker_cmd)}")
+    log.info(f"[{tag}] Log -> {log_path}")
 
     epoch_bar: _ProgressLike | None = None
     log_file = None
@@ -419,7 +426,7 @@ def run_freedpp(  # noqa: PLR0913
         )
 
         if "train" in commands:
-            epoch_bar = tqdm_factory(total=config.epochs, desc="FREED++ training", unit="epoch")
+            epoch_bar = tqdm_factory(total=config.epochs, desc=f"FREED++ [{tag}]", unit="epoch")
 
         train_start = time.monotonic()
         last_epoch_logged = -1
@@ -450,7 +457,7 @@ def run_freedpp(  # noqa: PLR0913
                         sec_per_epoch = elapsed / epoch_num
                         remaining = (config.epochs - epoch_num) * sec_per_epoch
                         log.info(
-                            f"[FREED++] Epoch {epoch_num}/{config.epochs} — "
+                            f"[{tag}] Epoch {epoch_num}/{config.epochs} — "
                             f"{elapsed:.0f}s elapsed, ~{remaining / 60:.0f}m remaining ({sec_per_epoch:.1f}s/epoch)",
                         )
                 elif line_count % 500 == 0:
@@ -459,7 +466,7 @@ def run_freedpp(  # noqa: PLR0913
 
             low = stripped.lower()
             if any(keyword in low for keyword in ("error", "sample", "saving", "loss", "score", "result")):
-                log.info(f"[FREED++] {stripped}")
+                log.info(f"[{tag}] {stripped}")
             captured_lines.append(line)
 
         process.wait(timeout=config.training_timeout)
@@ -473,9 +480,9 @@ def run_freedpp(  # noqa: PLR0913
 
     if process is None or process.returncode != 0:
         return_code = process.returncode if process is not None and process.returncode is not None else -1
-        log.error(f"FREED++ failed (rc={return_code})")
-        log.error(f"output: {stdout_text[-2000:]}")
-        log.error(f"FREED++ log -> {log_path}")
+        log.error(f"[{tag}] FREED++ failed (rc={return_code})")
+        log.error(f"[{tag}] output: {stdout_text[-2000:]}")
+        log.error(f"[{tag}] log -> {log_path}")
         raise subprocess.CalledProcessError(return_code, docker_cmd, output=stdout_text)
 
     return subprocess.CompletedProcess(docker_cmd, process.returncode, stdout=stdout_text, stderr="")

@@ -7,6 +7,7 @@ introducing a stable backend interface and config-driven backend resolution.
 from __future__ import annotations
 
 import importlib
+import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -117,6 +118,16 @@ def _cfg_str_maybe_empty(cfg: Mapping[str, Any], key: str, default: str) -> str:
     return default
 
 
+def _resolve_epochs(request: GenerationRequest, freedpp_cfg: Mapping[str, Any]) -> int:
+    """Resolve epoch count: CLI override > env FREEDPP_EPOCHS > experiment.yaml > default."""
+    if request.epochs_override is not None:
+        return request.epochs_override
+    env_epochs = os.environ.get("FREEDPP_EPOCHS")
+    if env_epochs is not None:
+        return int(env_epochs)
+    return _cfg_int(freedpp_cfg, "epochs", 100)
+
+
 def _freedpp_backend(request: GenerationRequest) -> list[str]:
     """Built-in FREED++ generation backend adapter."""
     from dualdocking.generation.freedpp import GenerationConfig, generate
@@ -136,7 +147,7 @@ def _freedpp_backend(request: GenerationRequest) -> list[str]:
         output_dir=request.output_dir,
         reward_mode=request.mode,
         second_target_id=second_target_id,
-        epochs=request.epochs_override if request.epochs_override is not None else _cfg_int(freedpp_cfg, "epochs", 200),
+        epochs=_resolve_epochs(request, freedpp_cfg),
         num_sub_proc=_cfg_int(freedpp_cfg, "num_sub_proc", 12),
         starting_smile=_cfg_str(freedpp_cfg, "starting_smile", "c1([*:1])c([*:2])ccc([*:3])c1"),
         use_cache=_cfg_bool(freedpp_cfg, "use_model_cache", use_model_cache_default),

@@ -3,7 +3,7 @@
 # All single-target and double-target runs use the SAME budget
 # to ensure a fair comparison.
 #
-# For smoke tests: override epochs via CLI (--epochs 10) or env FREEDPP_EPOCHS=10.
+# For smoke tests: FREEDPP_EPOCHS=10 uv run python cli/pipeline/run_full_experiment.py ...
 
 budget:
   n_molecules: 1000          # molecules per generation run
@@ -52,7 +52,7 @@ pareto_analysis:
 generator:
   name: "FREED++"
   freedpp:
-    epochs: 200
+    epochs: 100
     num_sub_proc: 0            # 0 = auto-detect: 12 for 4090/24GB, 24 for H100/80GB
     starting_smile: "c1([*:1])c([*:2])ccc([*:3])c1"
     docker_image: "dualdocking/freedpp:latest"

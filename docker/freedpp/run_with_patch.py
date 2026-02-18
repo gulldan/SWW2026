@@ -39,4 +39,9 @@ if os.environ.get("REWARD_MODE"):
         sys.path.insert(0, "/opt")
     import dual_reward_patch  # noqa: F401 — applies monkey-patch on import
 
-runpy.run_module("ffreed.main", run_name="__main__")
+# Only run FREED++ main in the parent process.  When multiprocessing uses the
+# ``spawn`` start method, each child re-executes this script with __name__ set
+# to ``__mp_main__``.  Without this guard every child would re-run ffreed.main,
+# hit the "Experiment directory already exist!" check, and crash.
+if __name__ == "__main__":
+    runpy.run_module("ffreed.main", run_name="__main__")

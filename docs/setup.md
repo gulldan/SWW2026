@@ -29,7 +29,18 @@ It is the default built-in scorer engine, but scoring can be replaced via
 
 ## Docker Images (Build Matrix)
 
-Build commands (from repo root):
+Build all images at once (recommended):
+
+```bash
+./scripts/build_docker_images.sh                    # build all, skip existing
+./scripts/build_docker_images.sh --force            # force-rebuild all
+./scripts/build_docker_images.sh --only freedpp     # build only freedpp
+./scripts/build_docker_images.sh --no-md            # skip md image
+./scripts/build_docker_images.sh --cuda-arch 80     # A100 instead of RTX 4090
+./scripts/build_docker_images.sh --dry-run          # preview commands
+```
+
+Or build individually (from repo root):
 
 ```bash
 # Required for Stage 1 generation

@@ -100,7 +100,7 @@ class GenerationConfig:
     second_target_id: str | None = None
 
     # FREED++-specific
-    epochs: int = 200
+    epochs: int = 100
     num_sub_proc: int = 0  # 0 = auto-detect based on GPU VRAM
     starting_smile: str = "c1([*:1])c([*:2])ccc([*:3])c1"
     use_cache: bool = True
@@ -214,6 +214,9 @@ def _build_freedpp_args(
     )
 
 
+_RUN_WITH_PATCH: Path = PROJECT_ROOT / "docker" / "freedpp" / "run_with_patch.py"
+
+
 def _run_freedpp(
     config: GenerationConfig,
     workspace: Path,
@@ -224,8 +227,39 @@ def _run_freedpp(
     center_b: str | None = None,
     size_b: str | None = None,
     commands: str = "train,sample",
+    checkpoint: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run FREED++ inside a Docker container."""
+    """Run FREED++ inside a Docker container.
+
+    Args:
+        checkpoint: Container path to ``model_*.pth`` for resuming training.
+    """
+
+    def _build_args(
+        cfg: GenerationConfig,
+        pdbqt: Path,
+        center: str,
+        size: str,
+        cmds: str = "train,sample",
+    ) -> list[str]:
+        return _model_helpers.build_freedpp_args(
+            cfg,
+            pdbqt,
+            center,
+            size,
+            commands=cmds,
+            auto_num_sub_proc=_auto_num_sub_proc,
+            resolve_vina_path=_resolve_vina_path,
+            log=logger,
+            checkpoint=checkpoint,
+        )
+
+    # Mount the local run_with_patch.py so fixes take effect without
+    # rebuilding the Docker image.
+    extra: list[str] = []
+    if _RUN_WITH_PATCH.exists():
+        extra = ["-v", f"{_RUN_WITH_PATCH}:/opt/run_with_patch.py:ro"]
+
     return _docker_helpers.run_freedpp(
         config,
         workspace,
@@ -237,12 +271,13 @@ def _run_freedpp(
         size_b=size_b,
         commands=commands,
         docker_bin=DOCKER_BIN,
-        build_freedpp_args=_build_freedpp_args,
+        build_freedpp_args=_build_args,
         popen=subprocess.Popen,
         pipe=subprocess.PIPE,
         getenv=os.getenv,
         tqdm_factory=tqdm,
         log=logger,
+        extra_docker_args=extra,
     )
 
 
@@ -350,7 +385,10 @@ def generate(config: GenerationConfig) -> list[str]:
         )
         pbar.update(1)
 
-    # 6. Determine commands
+    # 6. Determine commands + resume logic
+    checkpoint: str | None = None
+    skip_freedpp = False
+
     if cached_model is not None:
         model_target = workspace / "output" / "run"
         if not model_target.exists():
@@ -359,46 +397,74 @@ def generate(config: GenerationConfig) -> list[str]:
         logger.info("Using cached model ({}) -> sample only", key)
     else:
         commands = "train,sample"
+        output_run = workspace / "output" / "run"
 
-        # Clear stale output from a previously interrupted run
-        stale_output = workspace / "output" / "run"
-        if stale_output.exists():
-            logger.warning("Found stale output from interrupted run: {}", stale_output)
-            shutil.rmtree(stale_output, ignore_errors=True)
+        if output_run.exists():
+            # Check if previous run already produced valid samples
+            mols_dir = output_run / "mols"
+            has_samples = mols_dir.exists() and any(mols_dir.glob("sample_*"))
 
-            # Fallback: Docker (root-owned files)
-            if stale_output.exists():
-                logger.info("Removing root-owned files via Docker...")
-                subprocess.run(  # noqa: S603
-                    [
-                        DOCKER_BIN,
-                        "run",
-                        "--rm",
-                        "-v",
-                        f"{workspace}:/ws",
-                        "alpine",
-                        "rm",
-                        "-rf",
-                        "/ws/output/run",
-                    ],
-                    check=False,
-                    timeout=30,
-                )
-            logger.info("Stale output removed")
+            if has_samples:
+                skip_freedpp = True
+                logger.info("Previous FREED++ run has valid output — reusing")
+            else:
+                # Look for training checkpoints to resume from
+                checkpoints = sorted(output_run.rglob("model_*.pth"))
+                if checkpoints:
+                    latest_ckpt = checkpoints[-1]
+                    # Convert host path to container path
+                    rel = latest_ckpt.relative_to(workspace)
+                    checkpoint = f"/workspace/{rel}"
+                    logger.info("Resuming training from checkpoint: {}", checkpoint)
+                else:
+                    # No useful data — clean up and start fresh
+                    logger.warning("Found stale output from interrupted run: {}", output_run)
+                    shutil.rmtree(output_run, ignore_errors=True)
+
+                    # Fallback: Docker (root-owned files)
+                    if output_run.exists():
+                        logger.info("Removing root-owned files via Docker...")
+                        subprocess.run(  # noqa: S603
+                            [
+                                DOCKER_BIN,
+                                "run",
+                                "--rm",
+                                "-v",
+                                f"{workspace}:/ws",
+                                "alpine",
+                                "rm",
+                                "-rf",
+                                "/ws/output/run",
+                            ],
+                            check=False,
+                            timeout=30,
+                        )
+
+                    if output_run.exists():
+                        raise RuntimeError(
+                            f"Failed to remove stale output directory: {output_run}. "
+                            "Try removing it manually: "
+                            f"sudo rm -rf '{output_run}'"
+                        )
+                    logger.info("Stale output removed")
 
     # 7. Run FREED++
-    pbar.set_postfix_str(f"FREED++ ({commands})")
-    _run_freedpp(
-        config,
-        workspace,
-        pdbqt_a,
-        center_a,
-        size_a,
-        pdbqt_b,
-        center_b,
-        size_b,
-        commands=commands,
-    )
+    if not skip_freedpp:
+        pbar.set_postfix_str(f"FREED++ ({commands})")
+        _run_freedpp(
+            config,
+            workspace,
+            pdbqt_a,
+            center_a,
+            size_a,
+            pdbqt_b,
+            center_b,
+            size_b,
+            commands=commands,
+            checkpoint=checkpoint,
+        )
+    else:
+        pbar.set_postfix_str("FREED++ (reusing)")
     pbar.update(1)
 
     # 8. Parse output
