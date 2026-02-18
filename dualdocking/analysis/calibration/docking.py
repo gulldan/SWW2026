@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import random
+import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
@@ -292,14 +294,78 @@ def run_calibration_docking(  # noqa: PLR0913
         }
         (scores_root / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
-        for target in target_ids:
-            _dock_target(
-                target, scores_root, receptors_dir, work_dir, runner, binary,
+        n_gpus = _detect_gpu_count() if use_docker and gpus == "all" else 1
+        if n_gpus > 1 and len(target_ids) > 1 and not dry_run:
+            logger.info("Parallel calibration docking: {} targets across {} GPUs", len(target_ids), n_gpus)
+            _dock_targets_parallel(
+                target_ids, n_gpus, docker_image, project_root,
+                scores_root, receptors_dir, work_dir, binary,
                 params, ligand_paths, use_unidock_batch, batch_size, seed,
-                overwrite, dry_run, project_root,
+                overwrite, dry_run,
             )
+        else:
+            for target in target_ids:
+                _dock_target(
+                    target, scores_root, receptors_dir, work_dir, runner, binary,
+                    params, ligand_paths, use_unidock_batch, batch_size, seed,
+                    overwrite, dry_run, project_root,
+                )
 
     return manifest
+
+
+def _detect_gpu_count() -> int:
+    """Detect number of available NVIDIA GPUs."""
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--list-gpus"],  # noqa: S603, S607
+            capture_output=True, text=True, check=True,
+        )
+        return max(1, len(result.stdout.strip().splitlines()))
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return 1
+
+
+def _dock_targets_parallel(  # noqa: PLR0913
+    target_ids: list[str],
+    n_gpus: int,
+    docker_image: str,
+    project_root: Path,
+    scores_root: Path,
+    receptors_dir: Path,
+    work_dir: Path,
+    binary: str,
+    params: DockingParams,
+    ligand_paths: list[Path],
+    use_unidock_batch: bool,
+    batch_size: int,
+    seed: int,
+    overwrite: bool,
+    dry_run: bool,
+) -> None:
+    """Dock targets in parallel across GPUs, one container per GPU."""
+    # Round-robin distribute targets across GPUs
+    gpu_targets: list[list[str]] = [[] for _ in range(n_gpus)]
+    for i, target in enumerate(target_ids):
+        gpu_targets[i % n_gpus].append(target)
+
+    def dock_on_gpu(gpu_idx: int) -> None:
+        targets = gpu_targets[gpu_idx]
+        if not targets:
+            return
+        with DockerRunner(docker_image, project_root, gpus=f'"device={gpu_idx}"') as gpu_runner:
+            for target in targets:
+                _dock_target(
+                    target, scores_root, receptors_dir, work_dir,
+                    gpu_runner, binary, params, ligand_paths,
+                    use_unidock_batch, batch_size, seed,
+                    overwrite, dry_run, project_root,
+                )
+
+    with ThreadPoolExecutor(max_workers=n_gpus) as pool:
+        futures = [pool.submit(dock_on_gpu, i) for i in range(n_gpus)]
+        for f in futures:
+            f.result()
 
 
 def _prepare_ligands_parallel(  # noqa: PLR0913

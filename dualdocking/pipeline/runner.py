@@ -201,9 +201,9 @@ class PipelineRunner:
 
     def run_generate_and_score(
         self,
-        pair: str | None = None,
+        pairs: list[str] | None = None,
         mode: str | None = None,
-        seed: int | None = None,
+        seeds: list[int] | None = None,
         *,
         resume: bool | None = None,
         parallel: int | None = None,
@@ -212,9 +212,9 @@ class PipelineRunner:
         """Run generate + score for specified tasks.
 
         Args:
-            pair: Optional pair filter (``None`` = all pairs).
+            pairs: Optional pair filter list (``None`` = all pairs).
             mode: Optional mode filter (``None`` = all modes).
-            seed: Optional single seed (``None`` = all seeds from config).
+            seeds: Optional seed filter list (``None`` = all seeds from config).
             resume: Whether to skip generation if ``generated`` exists
                 (defaults to ``config.resume``).
             parallel: Number of parallel tasks (defaults to ``config.parallel``).
@@ -225,8 +225,7 @@ class PipelineRunner:
         log_path = log_path or self.get_log_path("generate_score")
 
         # Build task list with filters
-        seed_list = [seed] if seed is not None else None
-        tasks = self.config.generate_tasks(pair_filter=pair, seed_filter=seed_list)
+        tasks = self.config.generate_tasks(pair_filter=pairs, seed_filter=seeds)
 
         # Filter by mode if specified
         if mode is not None:
@@ -344,8 +343,8 @@ class PipelineRunner:
 
         # Run generate + score
         self.run_generate_and_score(
-            pair=None if pairs is None else ",".join(pairs),
-            seed=None,
+            pairs=pairs,
+            seeds=seeds,
             resume=resume,
             parallel=parallel,
             log_path=log_path,
@@ -356,7 +355,7 @@ class PipelineRunner:
             logger.info("[POST] Starting post-processing pipeline")
             log_to_file(log_path, f"[{utc_timestamp()}] POST-START")
 
-            post_cmds = stages.build_analyze_commands() + stages.build_report_commands(latex_mode)
+            post_cmds = stages.build_analyze_commands(pairs=unique_pairs, seeds=seeds) + stages.build_report_commands(latex_mode)
             post_names = [
                 "aggregate",
                 "metrics",

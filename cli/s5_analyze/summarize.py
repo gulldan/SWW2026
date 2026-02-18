@@ -221,6 +221,7 @@ def _build_report(
 @click.option("--config", default="configs/pairs.yaml", help="Target pair config")
 @click.option("--thresholds", default="configs/metrics.yaml", help="Hit thresholds")
 @click.option("--output", default="report/summary.txt", help="Output file")
+@click.option("--pair", multiple=True, default=None, help="Filter to specific pair(s). Default: all.")
 def main(
     input_path: str,
     metrics_path: str,
@@ -228,6 +229,7 @@ def main(
     config: str,
     thresholds: str,
     output: str,
+    pair: tuple[str, ...],
 ) -> None:
     """Generate a plain-text summary report from aggregated experiment data.
 
@@ -248,6 +250,8 @@ def main(
         sys.exit(1)
 
     df = pd.read_parquet(in_path)
+    if pair:
+        df = df[df["pair"].isin(pair)]
 
     metrics_file = PROJECT_ROOT / metrics_path
     stats_file = PROJECT_ROOT / stats_path

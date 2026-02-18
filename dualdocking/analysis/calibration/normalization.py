@@ -163,8 +163,13 @@ def compute_normalization(  # noqa: PLR0913
         "targets": {},
     }
 
+    skipped: list[str] = []
     for tid in target_ids:
-        scores = load_scores(scores_path, tid)
+        try:
+            scores = load_scores(scores_path, tid)
+        except FileNotFoundError:
+            skipped.append(tid)
+            continue
         stats = bootstrap_stability_check(scores, n_bootstrap=1000)
         normalization["targets"][tid] = {
             "mean": float(stats["mean"]),
@@ -175,6 +180,8 @@ def compute_normalization(  # noqa: PLR0913
             "stable_mean": bool(stats["stable_mean"]),
             "stable_std": bool(stats["stable_std"]),
         }
+    if skipped:
+        logger.info("Skipped {} target(s) without scores: {}", len(skipped), ", ".join(skipped))
 
     out_path = project_root / output
     out_path.parent.mkdir(parents=True, exist_ok=True)

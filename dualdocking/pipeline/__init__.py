@@ -18,7 +18,7 @@ Example::
         seeds=[42, 137],
     )
     runner = PipelineRunner(config)
-    runner.run_generate_and_score(pair="CDK2_ERK2", mode="double", seed=42)
+    runner.run_generate_and_score(pairs=["CDK2_ERK2"], mode="double", seeds=[42])
 """
 
 from dualdocking.pipeline.config import PipelineConfig, ScorerConfig, StageTask

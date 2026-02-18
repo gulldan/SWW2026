@@ -26,7 +26,7 @@ Stage 0: Fetch                   Generation (FREED++)               Scoring (Bol
                                                            LaTeX manuscript + figures
 ```
 
-**75 runs total**: 5 core pairs x 3 modes x 5 seeds. Auxiliary pairs (3) for robustness checks.
+**75 runs total** (core): 5 core pairs x 3 modes x 5 seeds. Auxiliary pairs (7) for robustness checks.
 
 ---
 
@@ -156,6 +156,11 @@ uv run python cli/s2_calibrate/compute_normalization.py
 # 5. Run full experiment (offline from here)
 EXPERIMENT_RUN_ID=18022026 uv run python cli/pipeline/run_full_experiment.py \
   --resume --parallel 1 --with-post --latex-mode draft
+
+# Run specific pairs only (pair filter applies to all stages including analysis)
+EXPERIMENT_RUN_ID=18022026 uv run python cli/pipeline/run_full_experiment.py \
+  --pair EGFR_HER2 --pair MEK1_MEK2 --seeds 42 \
+  --resume --parallel 2 --with-post --latex-mode draft
 ```
 
 GPU routing note:
@@ -181,12 +186,23 @@ uv run python cli/s6_md/run_md.py --pair CDK2_ERK2              # run (50 ns, au
 Verify the setup works end-to-end with a minimal run:
 
 ```bash
+# Quick smoke test: 10 epochs, 1 seed, 1 pair (takes ~15-20 min with GPU)
+FREEDPP_EPOCHS=10 EXPERIMENT_RUN_ID=smoke uv run python cli/pipeline/run_full_experiment.py \
+  --pair CDK2_ERK2 --seeds 42 --resume --parallel 1 --with-post --latex-mode draft
+
 # Generate 10 molecules for one pair, 2 epochs (takes ~2 minutes with GPU)
 uv run python cli/s3_generate/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
 
 # Boltz-2 health check
 uv run dd-smoke
 ```
+
+Environment variables for FREED++:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `FREEDPP_EPOCHS` | from config (100) | Override epoch count (e.g. `10` for smoke tests) |
+| `FREEDPP_NUM_SUB_PROC` | auto-detect | Override concurrent docking subprocesses |
 
 ---
 
@@ -303,7 +319,7 @@ Defined in `configs/pairs.yaml`. Each pair has a `set` field:
 | Set | Count | Purpose | Pairs |
 |-----|-------|---------|-------|
 | **core** | 5 | Primary hypothesis test | CDK2_ERK2, AChE_BChE, BACE1_GSK3B, AChE_BACE1, GSK3B_CDK5 |
-| **auxiliary** | 3 | Robustness / sensitivity | EGFR_HER2, BACE1_CDK5, AChE_MAOB |
+| **auxiliary** | 7 | Robustness / sensitivity | EGFR_HER2, BACE1_CDK5, AChE_MAOB, MEK1_MEK2, FGFR1_FGFR2, EZH2_EZH1, BRD4_BRD2 |
 | **blocked** | 1 | Excluded (non-human PDB) | COX1_COX2 |
 
 ### Hit Definition

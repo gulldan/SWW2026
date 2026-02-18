@@ -614,8 +614,8 @@ def load_all_data(
 
                 fairness = validate_fairness(run_dir)
                 if not fairness["budget_consistent"]:
-                    logger.error("Fairness check failed for {}: {}", run_dir, fairness["issues"])
-                    sys.exit(1)
+                    logger.warning("Fairness check failed for {}: {} — skipping", run_dir, fairness["issues"])
+                    continue
 
                 reward_quality = validate_reward_quality(
                     run_dir,

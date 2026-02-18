@@ -23,6 +23,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 @click.option("--output-csv", default="report/data/threshold_sensitivity.csv")
 @click.option("--output-json", default="report/data/threshold_sensitivity.json")
 @click.option("--allow-incomplete/--no-allow-incomplete", default=True)
+@click.option("--pair", multiple=True, default=None, help="Filter to specific pair(s). Default: all.")
+@click.option("--seeds", "seeds_override", default=None, help="Comma-separated seed list override. Default: all from config.")
 def main(
     results_root: str,
     pairs_config: str,
@@ -31,14 +33,19 @@ def main(
     output_csv: str,
     output_json: str,
     allow_incomplete: bool,
+    pair: tuple[str, ...],
+    seeds_override: str | None,
 ) -> None:
     """Run threshold sensitivity analysis across pre-registered thresholds."""
     from dualdocking.analysis.metrics.sensitivity import SensitivityConfig, run_sensitivity
     from dualdocking.config import load_experiment, load_metrics, load_pairs
 
     pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
+    if pair:
+        pairs = {pid: cfg for pid, cfg in pairs.items() if pid in pair}
     exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
     metrics_cfg = load_metrics(PROJECT_ROOT / metrics_config)
+    seeds = [int(s) for s in seeds_override.split(",")] if seeds_override else exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
 
     sensitivity_thresholds: list[float] = metrics_cfg.get("sensitivity_thresholds", [-1.0, 0.0, 1.0])
 
@@ -46,7 +53,7 @@ def main(
         project_root=PROJECT_ROOT,
         pairs=pairs,
         modes=exp_cfg.get("modes", ["single_a", "single_b", "double"]),
-        seeds=exp_cfg.get("seeds", [42, 137, 256, 512, 1024]),
+        seeds=seeds,
         metrics_cfg=metrics_cfg,
         exp_cfg=exp_cfg,
         quality_gate=exp_cfg.get("quality_gate", {}),

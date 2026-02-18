@@ -61,6 +61,11 @@ uv run python cli/s2_calibrate/validate_redocking.py         # SCI-04: RMSD chec
 uv run python cli/s2_calibrate/enrichment_benchmark.py        # SCI-05: AUROC/BEDROC
 ```
 
+Calibration docking automatically parallelizes across GPUs when multiple are
+available — each target gets its own Docker container pinned to a specific GPU.
+Targets without existing score files are skipped by `compute_normalization.py`
+(incremental calibration).
+
 ## Stage 1 + 2: Full Experiment (offline)
 
 Orchestrated run — generation, scoring, and analysis:
@@ -119,10 +124,33 @@ EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_post_pipeline.py --latex-
 
 ### Filtering
 
+The `--pair` and `--seeds` filters apply to **all** pipeline stages including
+post-processing (aggregate, metrics, sensitivity, correlation, summarize).
+
 ```bash
 # Single pair, subset of seeds
 uv run python cli/pipeline/run_full_experiment.py --pair CDK2_ERK2 --seeds 42,137 --resume --with-post
+
+# Multiple pairs, single seed, smoke test epochs
+FREEDPP_EPOCHS=10 uv run python cli/pipeline/run_full_experiment.py \
+  --pair EGFR_HER2 --pair MEK1_MEK2 --pair BRD4_BRD2 \
+  --seeds 42 --parallel 2 --resume --with-post --latex-mode draft
 ```
+
+### Training Resume
+
+FREED++ automatically resumes from checkpoints when a previous run was interrupted:
+- If output samples exist → skip (reuse previous results)
+- If checkpoint files (`model_*.pth`) exist → resume training from latest checkpoint
+- Otherwise → clean start
+
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `FREEDPP_EPOCHS` | from config (100) | Override epoch count (e.g. `10` for smoke tests) |
+| `FREEDPP_NUM_SUB_PROC` | auto-detect by VRAM | Concurrent docking subprocesses |
+| `EXPERIMENT_RUN_ID` | — | Run identifier for logs and manifests |
 
 ## Stage Runner
 
@@ -232,18 +260,18 @@ uv run python cli/s4_score/score.py --pair CDK2_ERK2 --mode double
 uv run python cli/s4_score/score.py --pair CDK2_ERK2 --mode double \
   --molecules my_compounds.csv
 
-# Analyze
-uv run python cli/s5_analyze/aggregate.py
-uv run python cli/s5_analyze/compute_metrics.py
+# Analyze (filter to same pair)
+uv run python cli/s5_analyze/aggregate.py --pair CDK2_ERK2
+uv run python cli/s5_analyze/compute_metrics.py --pair CDK2_ERK2
 uv run python cli/s6_report/plot_results.py
 uv run python cli/s6_report/render_molecules.py
-uv run python cli/s5_analyze/summarize.py
+uv run python cli/s5_analyze/summarize.py --pair CDK2_ERK2
 ```
 
 ## Full Matrix (all pairs)
 
 ```bash
-for pair in CDK2_ERK2 AChE_BChE BACE1_GSK3B AChE_BACE1 GSK3B_CDK5 EGFR_HER2 BACE1_CDK5 AChE_MAOB; do
+for pair in CDK2_ERK2 AChE_BChE BACE1_GSK3B AChE_BACE1 GSK3B_CDK5 EGFR_HER2 BACE1_CDK5 AChE_MAOB MEK1_MEK2 FGFR1_FGFR2 EZH2_EZH1 BRD4_BRD2; do
   for mode in single_a single_b double linear_equal biased_a selective_a; do
     uv run python cli/s3_generate/generate.py --pair $pair --mode $mode
     uv run python cli/s4_score/score.py --pair $pair --mode $mode

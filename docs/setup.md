@@ -113,6 +113,8 @@ Patch/runtime tuning env vars (inside FREED++ container):
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `FREEDPP_EPOCHS` | from config (100) | Override epoch count (e.g. `10` for smoke tests) |
+| `FREEDPP_NUM_SUB_PROC` | auto-detect by VRAM | Override concurrent docking subprocesses |
 | `FREEDPP_PREP_MP_START_METHOD` | `spawn` | multiprocessing start method for ligand prep |
 | `FREEDPP_FORCE_SPAWN` | `1` | force global multiprocessing start method to `spawn` |
 | `FREEDPP_PREP_MAX_WORKERS` | `8` | max ligand-prep worker processes |

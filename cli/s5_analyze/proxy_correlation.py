@@ -22,25 +22,32 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 @click.option("--experiment-config", default="configs/experiment.yaml")
 @click.option("--output-csv", default="report/data/proxy_final_corr.csv")
 @click.option("--output-json", default="report/data/proxy_final_corr.json")
+@click.option("--pair", multiple=True, default=None, help="Filter to specific pair(s). Default: all.")
+@click.option("--seeds", "seeds_override", default=None, help="Comma-separated seed list override. Default: all from config.")
 def main(
     results_root: str,
     pairs_config: str,
     experiment_config: str,
     output_csv: str,
     output_json: str,
+    pair: tuple[str, ...],
+    seeds_override: str | None,
 ) -> None:
     """Compute proxy (docking) vs final (Boltz-2) correlation per pair/mode."""
     from dualdocking.analysis.metrics.correlation import CorrelationConfig, run_correlation
     from dualdocking.config import load_experiment, load_pairs
 
     pairs = load_pairs(PROJECT_ROOT / pairs_config)["pairs"]
+    if pair:
+        pairs = {pid: cfg for pid, cfg in pairs.items() if pid in pair}
     exp_cfg = load_experiment(PROJECT_ROOT / experiment_config)
+    seeds = [int(s) for s in seeds_override.split(",")] if seeds_override else exp_cfg.get("seeds", [42, 137, 256, 512, 1024])
 
     cfg = CorrelationConfig(
         project_root=PROJECT_ROOT,
         pairs=pairs,
         modes=exp_cfg.get("modes", ["single_a", "single_b", "double"]),
-        seeds=exp_cfg.get("seeds", [42, 137, 256, 512, 1024]),
+        seeds=seeds,
         results_root=Path(results_root),
     )
     result = run_correlation(cfg)

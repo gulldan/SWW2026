@@ -148,7 +148,7 @@ def test_load_pairs_production_yaml(monkeypatch):
     result = load_pairs("configs")
     active = [k for k, v in result["pairs"].items() if v.get("set") != "blocked"]
     blocked = [k for k, v in result["pairs"].items() if v.get("set") == "blocked"]
-    assert len(active) == 8
+    assert len(active) == 12
     assert len(blocked) == 1
     assert "COX1_COX2" in blocked
 

@@ -115,19 +115,38 @@ def build_score_command(task: StageTask, molecules: str | None = None) -> list[s
     return cmd
 
 
-def build_analyze_commands() -> list[list[str]]:
+def _pair_args(pairs: list[str] | None) -> list[str]:
+    """Build ``--pair X --pair Y`` CLI fragment from pair filter list."""
+    if not pairs:
+        return []
+    args: list[str] = []
+    for p in pairs:
+        args.extend(["--pair", p])
+    return args
+
+
+def build_analyze_commands(
+    pairs: list[str] | None = None,
+    seeds: list[int] | None = None,
+) -> list[list[str]]:
     """Build commands to run the analysis stage.
+
+    Args:
+        pairs: Optional pair filter list. When set, only these pairs are analyzed.
+        seeds: Optional seed filter list. When set, only these seeds are analyzed.
 
     Returns:
         List of command token lists for aggregate, metrics, sensitivity,
         correlation, and summarize cli.
     """
+    pa = _pair_args(pairs)
+    sa = ["--seeds", ",".join(str(s) for s in seeds)] if seeds else []
     return [
-        ["uv", "run", "python", "cli/s5_analyze/aggregate.py"],
-        ["uv", "run", "python", "cli/s5_analyze/compute_metrics.py"],
-        ["uv", "run", "python", "cli/s5_analyze/threshold_sensitivity.py"],
-        ["uv", "run", "python", "cli/s5_analyze/proxy_correlation.py"],
-        ["uv", "run", "python", "cli/s5_analyze/summarize.py"],
+        ["uv", "run", "python", "cli/s5_analyze/aggregate.py", *pa, *sa],
+        ["uv", "run", "python", "cli/s5_analyze/compute_metrics.py", *pa, *sa],
+        ["uv", "run", "python", "cli/s5_analyze/threshold_sensitivity.py", *pa, *sa],
+        ["uv", "run", "python", "cli/s5_analyze/proxy_correlation.py", *pa, *sa],
+        ["uv", "run", "python", "cli/s5_analyze/summarize.py", *pa],
     ]
 
 
