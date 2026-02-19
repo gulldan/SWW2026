@@ -179,11 +179,19 @@ def build_env_for_task(
             env["BOLTZ_CUDA_DEVICE"] = env["SCORER_CUDA_DEVICE"]
         env["BOLTZ_BACKEND"] = scorer_config.backend
         if scorer_config.backend == "nim":
-            # Pass ALL NIM URLs for round-robin across GPU instances
             nim_urls = scorer_config.nim_urls
             if nim_urls:
-                env["BOLTZ_NIM_URLS"] = ",".join(nim_urls)
-                env["BOLTZ_NIM_URL"] = nim_urls[0]  # Fallback for single-URL code
+                if gpu_id is not None and gpu_id < len(nim_urls):
+                    # Pin scoring process to the NIM instance on its own GPU.
+                    # Prevents cross-GPU contention: each NIM handles only
+                    # NIM_CONCURRENCY requests instead of NIM_CONCURRENCY × N_processes.
+                    local_url = nim_urls[gpu_id]
+                    env["BOLTZ_NIM_URLS"] = local_url
+                    env["BOLTZ_NIM_URL"] = local_url
+                else:
+                    # No GPU assignment or more GPUs than NIMs — use all URLs
+                    env["BOLTZ_NIM_URLS"] = ",".join(nim_urls)
+                    env["BOLTZ_NIM_URL"] = nim_urls[0]
         else:
             env.pop("BOLTZ_NIM_URLS", None)
             env.pop("BOLTZ_NIM_URL", None)

@@ -76,7 +76,20 @@ def _canonical_engine_name(name: str) -> str:
 
 
 def _resolve_nim_urls(scorer_cfg: Mapping[str, Any]) -> list[str]:
-    """Extract NIM URLs from scorer config with sane defaults."""
+    """Extract NIM URLs from environment, scorer config, or defaults.
+
+    Resolution order:
+    1. ``BOLTZ_NIM_URLS`` env var (set by pipeline runner with auto-detected URLs)
+    2. ``scorer.nim.urls`` from experiment.yaml
+    3. Fallback: ``["http://localhost:8000"]``
+    """
+    # Environment takes priority (pipeline runner sets this based on GPU count)
+    env_urls_raw = os.environ.get("BOLTZ_NIM_URLS", "")
+    if env_urls_raw.strip():
+        env_urls = [u.strip() for u in env_urls_raw.split(",") if u.strip()]
+        if env_urls:
+            return env_urls
+
     nim_cfg = _as_mapping(scorer_cfg.get("nim"))
     raw_urls = nim_cfg.get("urls")
     urls: list[str] = []

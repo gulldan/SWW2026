@@ -104,7 +104,12 @@ _BOLTZ_NIM_URLS: list[str] = [u.strip() for u in os.getenv("BOLTZ_NIM_URLS", _BO
 _NIM_PREDICT_ENDPOINT = "/biology/mit/boltz2/predict"
 _NIM_HEALTH_ENDPOINT = "/v1/health/ready"
 _NIM_TIMEOUT = 300  # seconds per molecule via NIM
-_NIM_CONCURRENCY = int(os.getenv("NIM_CONCURRENCY", "1"))
+# Per-instance concurrency: how many parallel affinity requests to queue per NIM instance.
+# NIM processes 1-2 affinity predictions at a time; excess requests queue internally
+# with a 120s GPU-acquire timeout.  With pipeline GPU-pinning (each scoring process →
+# its own NIM), concurrency=2 keeps the queue short enough to avoid timeouts.
+# Override with NIM_CONCURRENCY env var if needed (try 3-4 if single-process).
+_NIM_CONCURRENCY = int(os.getenv("NIM_CONCURRENCY", "2"))
 _NIM_HEALTH_TIMEOUT = float(os.getenv("NIM_HEALTH_TIMEOUT", "2.0"))
 
 # Cached active NIM pool (configured URLs are probed once per process/config change).
