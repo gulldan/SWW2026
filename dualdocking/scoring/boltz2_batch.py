@@ -140,6 +140,7 @@ class _PredictBatchAsyncFn(Protocol):
         smiles_indices: list[tuple[int, str]],
         *,
         nim_urls: list[str] | None,
+        msa_content: str | None = None,
     ) -> Coroutine[object, object, list[tuple[int, float]]]:
         """Run async NIM batch prediction.
 
@@ -147,6 +148,7 @@ class _PredictBatchAsyncFn(Protocol):
             sequence: Target amino-acid sequence.
             smiles_indices: ``(index, neutralized_smiles)`` tuples.
             nim_urls: Explicit NIM URL pool.
+            msa_content: Optional raw CSV content from ColabFold MSA file.
 
         Returns:
             Coroutine that resolves to ``(index, score)`` tuples.
@@ -162,6 +164,7 @@ def score_batch_nim(
     predict_batch_async: _PredictBatchAsyncFn,
     nim_concurrency: int,
     log: _LoggerLike,
+    msa_content: str | None = None,
 ) -> list[float]:
     """Score molecules via NIM backend with async round-robin requests.
 
@@ -173,6 +176,7 @@ def score_batch_nim(
         predict_batch_async: Async batch predictor function.
         nim_concurrency: Per-instance concurrency cap.
         log: Logger-like instance.
+        msa_content: Optional raw CSV content from ColabFold MSA file.
 
     Returns:
         Score list aligned with ``smiles_list``. Invalid/failed entries are NaN.
@@ -197,14 +201,14 @@ def score_batch_nim(
 
     results: list[tuple[int, float]]
     if loop is not None and loop.is_running():
-        coro = predict_batch_async(sequence, valid_pairs, nim_urls=nim_urls)
+        coro = predict_batch_async(sequence, valid_pairs, nim_urls=nim_urls, msa_content=msa_content)
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             results = cast(
                 "list[tuple[int, float]]",
                 pool.submit(asyncio.run, coro).result(),
             )
     else:
-        results = asyncio.run(predict_batch_async(sequence, valid_pairs, nim_urls=nim_urls))
+        results = asyncio.run(predict_batch_async(sequence, valid_pairs, nim_urls=nim_urls, msa_content=msa_content))
 
     for idx, score in results:
         scores[idx] = score

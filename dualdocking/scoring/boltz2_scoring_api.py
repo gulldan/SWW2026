@@ -230,6 +230,7 @@ def score_batch(  # noqa: PLR0913
     backend: str,
     load_sequence: Callable[[str], str],
     require_msa_path: Callable[[str], Path],
+    get_msa_path: Callable[[str], Path | None],
     sequence_content_hash: Callable[[str], str],
     msa_content_hash: Callable[[Path | None], str],
     scoring_context_hash: Callable[[], str],
@@ -249,7 +250,8 @@ def score_batch(  # noqa: PLR0913
         batch_size: Number of molecules per sub-batch.
         backend: Active backend (``"cli"`` or ``"nim"``).
         load_sequence: FASTA loading callback.
-        require_msa_path: MSA lookup callback.
+        require_msa_path: MSA lookup callback (raises if missing).
+        get_msa_path: Optional MSA path lookup (returns ``None`` if absent).
         sequence_content_hash: Sequence hashing callback.
         msa_content_hash: MSA hashing callback.
         scoring_context_hash: Context-hash callback.
@@ -264,7 +266,7 @@ def score_batch(  # noqa: PLR0913
     """
 
     sequence = load_sequence(target_id)
-    msa_path = None if backend == "nim" else require_msa_path(target_id)
+    msa_path = get_msa_path(target_id) if backend == "nim" else require_msa_path(target_id)
 
     seq_hash = sequence_content_hash(sequence)
     msa_hash = msa_content_hash(msa_path)

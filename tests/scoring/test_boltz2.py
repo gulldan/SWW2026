@@ -517,6 +517,7 @@ class _NimHandler(BaseHTTPRequestHandler):
     response_body: dict | None = None
     status_code: int = 200
     health_ready: bool = True
+    last_payload: dict | None = None
 
     def do_GET(self):
         if self.path == "/v1/health/ready":
@@ -530,7 +531,8 @@ class _NimHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
-        _payload = self.rfile.read(length)
+        raw = self.rfile.read(length)
+        _NimHandler.last_payload = json.loads(raw) if raw else None
         self.send_response(self.status_code)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
@@ -548,6 +550,7 @@ def nim_server(monkeypatch):
     _NimHandler.response_body = None
     _NimHandler.status_code = 200
     _NimHandler.health_ready = True
+    _NimHandler.last_payload = None
 
     server = HTTPServer(("127.0.0.1", 0), _NimHandler)
     port = server.server_address[1]
@@ -808,3 +811,118 @@ class TestNimRetry:
         assert math.isnan(score)
         assert attempt_counter["n"] == 1  # no retries on 4xx
         _NimHandler.do_POST = _orig
+
+
+class TestNimMsa:
+    """Test MSA support for NIM backend."""
+
+    def test_nim_payload_without_msa(self):
+        payload = mod._nim_payload("MKTAY", "CCO")
+        polymer = payload["polymers"][0]
+        assert "msa" not in polymer
+
+    def test_nim_payload_with_msa(self):
+        csv_content = "header\nACGT\nTGCA\n"
+        payload = mod._nim_payload("MKTAY", "CCO", csv_content)
+        polymer = payload["polymers"][0]
+        assert "msa" in polymer
+        assert polymer["msa"] == {
+            "colabfold": {"csv": {"format": "csv", "alignment": csv_content}},
+        }
+
+    def test_score_batch_internal_nim_reads_msa_file(self, tmp_path, nim_server):
+        msa_file = tmp_path / "tgt.csv"
+        msa_file.write_text("header\nACGT\n")
+
+        _NimHandler.response_body = {
+            "affinities": {"B": {"affinity_pred_value": [-5.0]}},
+        }
+
+        scores = _score_batch_internal_nim("tgt", ["CCO"], "MKTAY", msa_file)
+        assert len(scores) == 1
+        assert not math.isnan(scores[0])
+
+        # Verify MSA was included in the request
+        assert _NimHandler.last_payload is not None
+        polymer = _NimHandler.last_payload["polymers"][0]
+        assert "msa" in polymer
+        assert polymer["msa"]["colabfold"]["csv"]["alignment"] == "header\nACGT\n"
+
+    def test_score_batch_internal_nim_no_msa(self, nim_server):
+        _NimHandler.response_body = {
+            "affinities": {"B": {"affinity_pred_value": [-5.0]}},
+        }
+
+        scores = _score_batch_internal_nim("tgt", ["CCO"], "MKTAY", None)
+        assert len(scores) == 1
+        assert not math.isnan(scores[0])
+
+        # Verify no MSA in the request
+        assert _NimHandler.last_payload is not None
+        polymer = _NimHandler.last_payload["polymers"][0]
+        assert "msa" not in polymer
+
+    def test_score_batch_nim_loads_msa_when_available(self, tmp_path, monkeypatch, nim_server):
+        """E2E: score_batch() with NIM loads MSA from disk."""
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        score_cache_dir = cache_dir / "boltz_scores"
+        score_cache_dir.mkdir()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        msa_dir = tmp_path / "msa"
+        msa_dir.mkdir()
+
+        monkeypatch.setattr(mod, "CACHE_DIR", cache_dir)
+        monkeypatch.setattr(mod, "SCORE_CACHE_DIR", score_cache_dir)
+        monkeypatch.setattr(mod, "DATA_DIR", data_dir)
+        monkeypatch.setattr(mod, "MSA_CACHE_DIR", msa_dir)
+
+        (data_dir / "tgt.fasta").write_text(">tgt\nMKTAY\n")
+        (msa_dir / "tgt.csv").write_text("header\nSEQ1\nSEQ2\n")
+
+        _NimHandler.response_body = {
+            "affinities": {"B": {"affinity_pred_value": [-6.0]}},
+        }
+
+        scores = mod.score_batch("tgt", ["CCO"])
+        assert len(scores) == 1
+        assert scores[0] == pytest.approx(-6.0)
+
+        # Verify MSA was sent
+        assert _NimHandler.last_payload is not None
+        polymer = _NimHandler.last_payload["polymers"][0]
+        assert "msa" in polymer
+        assert polymer["msa"]["colabfold"]["csv"]["alignment"] == "header\nSEQ1\nSEQ2\n"
+
+    def test_score_batch_nim_graceful_without_msa(self, tmp_path, monkeypatch, nim_server):
+        """E2E: score_batch() with NIM works when MSA file absent."""
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        score_cache_dir = cache_dir / "boltz_scores"
+        score_cache_dir.mkdir()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        msa_dir = tmp_path / "msa"
+        msa_dir.mkdir()
+
+        monkeypatch.setattr(mod, "CACHE_DIR", cache_dir)
+        monkeypatch.setattr(mod, "SCORE_CACHE_DIR", score_cache_dir)
+        monkeypatch.setattr(mod, "DATA_DIR", data_dir)
+        monkeypatch.setattr(mod, "MSA_CACHE_DIR", msa_dir)
+
+        (data_dir / "tgt.fasta").write_text(">tgt\nMKTAY\n")
+        # No MSA file created — _get_msa_path should return None
+
+        _NimHandler.response_body = {
+            "affinities": {"B": {"affinity_pred_value": [-4.0]}},
+        }
+
+        scores = mod.score_batch("tgt", ["CCO"])
+        assert len(scores) == 1
+        assert scores[0] == pytest.approx(-4.0)
+
+        # Verify no MSA in request
+        assert _NimHandler.last_payload is not None
+        polymer = _NimHandler.last_payload["polymers"][0]
+        assert "msa" not in polymer

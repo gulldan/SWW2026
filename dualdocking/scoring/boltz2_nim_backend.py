@@ -41,9 +41,10 @@ def predict_affinity_sync(
     predict_endpoint: str,
     request_timeout: float,
     max_retries: int,
-    payload_builder: Callable[[str, str], dict[str, Any]],
+    payload_builder: Callable[[str, str, str | None], dict[str, Any]],
     parse_affinity: Callable[[dict[str, Any], str], float],
     log: _LoggerLike,
+    msa_content: str | None = None,
 ) -> float:
     """Score one molecule via synchronous NIM HTTP requests.
 
@@ -57,13 +58,14 @@ def predict_affinity_sync(
         payload_builder: Function building request payload.
         parse_affinity: Function parsing response affinity.
         log: Logger-like instance.
+        msa_content: Optional raw CSV content from ColabFold MSA file.
 
     Returns:
         Predicted affinity score, or NaN on failure.
     """
 
     n_urls = len(nim_urls)
-    data = json.dumps(payload_builder(sequence, smiles)).encode()
+    data = json.dumps(payload_builder(sequence, smiles, msa_content)).encode()
 
     start_idx = random.randrange(n_urls) if n_urls > 1 else 0  # noqa: S311
     url_order = [(start_idx + i) % n_urls for i in range(max(n_urls, max_retries + 1))]
@@ -112,9 +114,10 @@ async def predict_batch_async(
     request_timeout: float,
     concurrency: int,
     max_retries: int,
-    payload_builder: Callable[[str, str], dict[str, Any]],
+    payload_builder: Callable[[str, str, str | None], dict[str, Any]],
     parse_affinity: Callable[[dict[str, Any], str], float],
     log: _LoggerLike,
+    msa_content: str | None = None,
 ) -> list[tuple[int, float]]:
     """Score a batch through async round-robin NIM requests.
 
@@ -129,6 +132,7 @@ async def predict_batch_async(
         payload_builder: Function building request payload.
         parse_affinity: Function parsing response affinity.
         log: Logger-like instance.
+        msa_content: Optional raw CSV content from ColabFold MSA file.
 
     Returns:
         List of ``(index, affinity)`` aligned to submitted indices.
@@ -157,7 +161,7 @@ async def predict_batch_async(
         Returns:
             Tuple of ``(idx, score)``.
         """
-        payload = payload_builder(sequence, smiles)
+        payload = payload_builder(sequence, smiles, msa_content)
         last_error: Exception | None = None
 
         for attempt in range(max_retries + 1):

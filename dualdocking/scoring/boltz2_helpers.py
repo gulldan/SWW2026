@@ -214,6 +214,7 @@ def nim_payload(
     smiles: str,
     *,
     predict_params: dict[str, int | float | str],
+    msa_content: str | None = None,
 ) -> dict[str, Any]:
     """Build NIM request payload for one protein-ligand pair.
 
@@ -221,12 +222,18 @@ def nim_payload(
         sequence: Protein sequence.
         smiles: Ligand SMILES.
         predict_params: Backend request parameters.
+        msa_content: Optional raw CSV content from ColabFold MSA file.
 
     Returns:
         Request payload dictionary.
     """
+    protein_entry: dict[str, Any] = {"id": "A", "molecule_type": "protein", "sequence": sequence}
+    if msa_content is not None:
+        protein_entry["msa"] = {
+            "colabfold": {"csv": {"format": "csv", "alignment": msa_content}},
+        }
     return {
-        "polymers": [{"id": "A", "molecule_type": "protein", "sequence": sequence}],
+        "polymers": [protein_entry],
         "ligands": [{"id": "B", "smiles": smiles, "predict_affinity": True}],
         **predict_params,
     }

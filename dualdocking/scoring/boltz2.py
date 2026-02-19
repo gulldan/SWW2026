@@ -119,14 +119,14 @@ _NIM_ACTIVE_URLS_TIME: float = 0.0
 _NIM_HEALTH_TTL: float = 120.0  # re-probe health every 2 minutes
 
 # NIM prediction params — mirrors _BOLTZ_CLI_ARGS_BASE values.
-# step_scale=1.5: boltz2 model default (CLI uses 1.5; NIM defaults to 1.638 if unset).
+# step_scale=1.638: boltz2 default used by both NIM and CLI.
 _NIM_PREDICT_PARAMS: dict[str, int | float | str] = {
     "recycling_steps": 3,
     "sampling_steps": 50,
     "diffusion_samples": 1,
     "sampling_steps_affinity": 50,
     "diffusion_samples_affinity": 1,
-    "step_scale": 1.5,
+    "step_scale": 1.638,
     "output_format": "mmcif",
 }
 
@@ -482,8 +482,8 @@ def _nim_health_check() -> bool:
 _NIM_MAX_RETRIES = 2  # total attempts = 1 + retries
 
 
-def _nim_payload(sequence: str, smiles: str) -> dict[str, Any]:
-    return _helpers.nim_payload(sequence, smiles, predict_params=_NIM_PREDICT_PARAMS)
+def _nim_payload(sequence: str, smiles: str, msa_content: str | None = None) -> dict[str, Any]:
+    return _helpers.nim_payload(sequence, smiles, predict_params=_NIM_PREDICT_PARAMS, msa_content=msa_content)
 
 
 def _nim_predict_affinity(sequence: str, smiles: str) -> float:
@@ -509,6 +509,7 @@ async def _nim_predict_batch_async(
     smiles_indices: list[tuple[int, str]],
     *,
     nim_urls: list[str] | None = None,
+    msa_content: str | None = None,
 ) -> list[tuple[int, float]]:
     return await _nim_backend.predict_batch_async(
         sequence,
@@ -521,6 +522,7 @@ async def _nim_predict_batch_async(
         payload_builder=_nim_payload,
         parse_affinity=_parse_nim_affinity,
         log=logger,
+        msa_content=msa_content,
     )
 
 
@@ -528,10 +530,11 @@ def _score_batch_internal_nim(
     target_id: str,  # noqa: ARG001
     smiles_list: list[str],
     sequence: str,
-    msa_path: Path | None,  # noqa: ARG001
+    msa_path: Path | None,
     *,
     device: str | None = None,  # noqa: ARG001
 ) -> list[float]:
+    msa_content = msa_path.read_text() if msa_path is not None else None
     return _batch_helpers.score_batch_nim(
         smiles_list,
         sequence,
@@ -540,6 +543,7 @@ def _score_batch_internal_nim(
         predict_batch_async=_nim_predict_batch_async,
         nim_concurrency=_NIM_CONCURRENCY,
         log=logger,
+        msa_content=msa_content,
     )
 
 
@@ -647,6 +651,7 @@ def score_batch(
         backend=_BOLTZ_BACKEND,
         load_sequence=_load_sequence,
         require_msa_path=_require_msa_path,
+        get_msa_path=_get_msa_path,
         sequence_content_hash=_sequence_content_hash,
         msa_content_hash=_msa_content_hash,
         scoring_context_hash=_scoring_context_hash,

@@ -78,8 +78,9 @@ def test_run_cmd_sets_boltz_env_for_builtin_engine(tmp_path, monkeypatch) -> Non
     assert env["SCORER_CUDA_DEVICE"] == "1"
     assert env["BOLTZ_CUDA_DEVICE"] == "1"
     assert env["BOLTZ_BACKEND"] == "nim"
-    assert env["BOLTZ_NIM_URLS"] == "http://localhost:8000,http://localhost:8001"
-    assert env["BOLTZ_NIM_URL"] == "http://localhost:8000"
+    # gpu_id=1 pins to the NIM instance at index 1 (per-GPU affinity)
+    assert env["BOLTZ_NIM_URLS"] == "http://localhost:8001"
+    assert env["BOLTZ_NIM_URL"] == "http://localhost:8001"
 
 
 def test_run_cmd_clears_boltz_env_for_external_engine(tmp_path, monkeypatch) -> None:
