@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from dualdocking.generation.freedpp import (
+from dualdocking.generation.freedpp.core import (
     GenerationConfig,
     _build_freedpp_args,
     _cache_key,
@@ -123,7 +123,7 @@ def test_resolve_pdb_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     pdb_path = pair_dir / "1hcl.pdb"
     pdb_path.write_text("ATOM ...")
 
-    import dualdocking.generation.freedpp as gen_mod
+    import dualdocking.generation.freedpp.core as gen_mod
 
     monkeypatch.setattr(gen_mod, "DATA_DIR", tmp_path)
 
@@ -141,7 +141,7 @@ def test_resolve_pdb_path_skips_fixed(tmp_path: Path, monkeypatch: pytest.Monkey
     (pair_dir / "1hcl.pdb").write_text("ATOM ...")
     (pair_dir / "1hcl.fixed.pdb").write_text("ATOM fixed ...")
 
-    import dualdocking.generation.freedpp as gen_mod
+    import dualdocking.generation.freedpp.core as gen_mod
 
     monkeypatch.setattr(gen_mod, "DATA_DIR", tmp_path)
 
@@ -151,7 +151,7 @@ def test_resolve_pdb_path_skips_fixed(tmp_path: Path, monkeypatch: pytest.Monkey
 
 def test_resolve_pdb_path_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Unknown target raises FileNotFoundError."""
-    import dualdocking.generation.freedpp as gen_mod
+    import dualdocking.generation.freedpp.core as gen_mod
 
     monkeypatch.setattr(gen_mod, "DATA_DIR", tmp_path)
 
@@ -219,8 +219,8 @@ class TestRunFreedppBranching:
             return real_popen(cmd, **kwargs)
 
         with (
-            patch("dualdocking.generation.freedpp.subprocess.Popen", side_effect=fake_popen),
-            patch("dualdocking.generation.freedpp.tqdm", side_effect=lambda *a, **kw: None),
+            patch("dualdocking.generation.freedpp.core.subprocess.Popen", side_effect=fake_popen),
+            patch("dualdocking.generation.freedpp.core.tqdm", side_effect=lambda *a, **kw: None),
         ):
             _run_freedpp(
                 config,
@@ -309,7 +309,7 @@ class TestRunFreedppBranching:
 
 def test_ensure_docker_image_uses_stage0_fetch_script(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Missing FREED data should trigger fetch via cli/s0_fetch/fetch_freed_fragments.py."""
-    import dualdocking.generation.freedpp as mod
+    import dualdocking.generation.freedpp.core as mod
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(mod, "DOCKER_BIN", "docker")

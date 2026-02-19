@@ -8,9 +8,9 @@ from pathlib import Path
 from dualdocking.analysis.fairness import validate_reward_quality
 
 
-def _write_metadata(run_dir: Path, **overrides: object) -> Path:
-    """Create freedpp_workspace/reward_metadata.json with sensible defaults."""
-    ws = run_dir / "freedpp_workspace"
+def _write_metadata(run_dir: Path, *, workspace: str = "freedpp_workspace", **overrides: object) -> Path:
+    """Create {workspace}/reward_metadata.json with sensible defaults."""
+    ws = run_dir / workspace
     ws.mkdir(parents=True, exist_ok=True)
     metadata = {
         "total_calls": 100,
@@ -98,3 +98,35 @@ class TestValidateRewardQuality:
         assert any("invalid_reward_fraction_a" in i for i in result["issues"])
         assert any("invalid_reward_fraction_b" in i for i in result["issues"])
         assert len([i for i in result["issues"] if "invalid_reward_fraction" in i]) == 2
+
+    def test_reinvent4_workspace(self, tmp_path: Path) -> None:
+        """Quality gate finds reward_metadata.json in reinvent4_workspace."""
+        _write_metadata(tmp_path, workspace="reinvent4_workspace")
+        result = validate_reward_quality(tmp_path)
+        assert result["run_valid"] is True
+        assert result["total_calls"] == 100
+
+    def test_workspace_key_present(self, tmp_path: Path) -> None:
+        """Output dict includes 'workspace' key with the workspace directory name."""
+        _write_metadata(tmp_path, workspace="freedpp_workspace")
+        result = validate_reward_quality(tmp_path)
+        assert result["workspace"] == "freedpp_workspace"
+
+    def test_workspace_key_none_when_missing(self, tmp_path: Path) -> None:
+        """No metadata -> workspace=None."""
+        result = validate_reward_quality(tmp_path)
+        assert result["workspace"] is None
+
+    def test_both_workspaces_uses_newest(self, tmp_path: Path) -> None:
+        """When both workspaces have metadata, the newest file wins."""
+        import time
+
+        # Write older metadata in freedpp_workspace
+        _write_metadata(tmp_path, workspace="freedpp_workspace", total_calls=50)
+        time.sleep(0.05)  # ensure distinct mtime
+        # Write newer metadata in reinvent4_workspace
+        _write_metadata(tmp_path, workspace="reinvent4_workspace", total_calls=200)
+
+        result = validate_reward_quality(tmp_path)
+        assert result["total_calls"] == 200
+        assert result["workspace"] == "reinvent4_workspace"

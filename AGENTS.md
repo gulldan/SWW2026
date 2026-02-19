@@ -76,7 +76,7 @@ uv run pytest tests/ -v
 uv run pytest tests/test_objectives.py -v
 
 # Linting (must pass with zero warnings)
-uv run ruff check dualdocking/ cli/ docker/
+uv run ruff check dualdocking/ cli/ docker/ scripts/
 
 # Type checking (must pass with zero errors)
 uv run ty check dualdocking/
@@ -99,10 +99,19 @@ dualdocking/                  # Core library (at project root, no src/ wrapper)
     cache_io.py               #     Atomic disk I/O (fcntl + temp-and-replace)
     binding_box.py            #     PDB binding site extraction
   generation/                 #   Molecule generation subpackage
-    freedpp.py                #     FREED++ Docker subprocess wrapper
+    backends.py               #     Generation backend registry (builtin freedpp/reinvent4 + external)
+    freedpp/                  #     FREED++ Docker-based generation subpackage
+      core.py                 #       Docker subprocess wrapper (GenerationConfig, generate())
+      docker.py               #       Docker container management
+      io.py                   #       Receptor prep & file I/O helpers
+      model.py                #       FREED++ model configuration
+    reinvent4/                #     REINVENT4 native Python generation subpackage
+      core.py                 #       Pipeline orchestration (generate(), cache, workspace)
+      scoring.py              #       Dual-target docking scoring + RewardStats tracking
+      config.py               #       TOML config generation for REINVENT4 CLI
   analysis/                   #   Statistical analysis subpackage
     statistical.py            #     Bootstrap, FDR, Cliff's delta
-    fairness.py               #     Fairness metrics
+    fairness.py               #     Fairness & quality gate (multi-workspace reward metadata)
     enrichment.py             #     Enrichment analysis
     diversity.py              #     Chemical diversity metrics
   data/                       #   Data handling subpackage
@@ -143,7 +152,7 @@ output/                       # Runtime data (gitignored)
 
 ### Data Flow
 
-Stage 0 (fetch) → Generation (FREED++, 3 modes × 5 pairs × 5 seeds) → Scoring (Boltz-2) → Aggregation → Metrics → Report
+Stage 0 (fetch) → Generation (FREED++ or REINVENT4, 3 modes × 5 pairs × 5 seeds) → Scoring (Boltz-2) → Aggregation → Metrics → Report
 
 ## Code Style & Conventions
 
@@ -184,6 +193,7 @@ NIM and CLI backends produce separate cache contexts (different context hashes) 
 - Tests use `monkeypatch` extensively to override module-level paths (`CACHE_DIR`, `DATA_DIR`)
 - **FakeDockingVina**: real class with `_scores: list[float]` for integration tests through `_dual_call`
 - **dual_reward_patch**: auto-applies on import — tests must mock `ffreed` BEFORE import and clean `sys.modules` AFTER
+- **REINVENT4 `_reward_stats`**: module-level singleton; tests must call `_reward_stats.reset()` (autouse fixture) to prevent cross-contamination
 - `load_pairs()` validates schema (requires `target_a.id`, `target_b.id`) — test fixtures must provide full structure
 - Harmonic/geometric means use shift for positive-domain requirement
 
@@ -198,6 +208,9 @@ NIM and CLI backends produce separate cache contexts (different context hashes) 
   `generator.freedpp.reward_modes_path_in_container` in `configs/experiment.yaml`
 - `pareto_mask` uses O(n log n) lexsort + sweep; handles ties with `−sb` tiebreak
 - Boltz-2 output is `log10(IC50 in μM)`, NOT pIC50
+- **Quality gate workspace resolution**: `validate_reward_quality()` in `fairness.py` picks the newest `reward_metadata.json` when both `freedpp_workspace/` and `reinvent4_workspace/` exist (mtime-based); output dict includes a `"workspace"` key
+- **REINVENT4 `RewardStats`**: `scoring.py` accumulates per-molecule outcomes via module-level `_reward_stats` singleton; `core.py:generate()` calls `reset()` before and `write_metadata()` after training
+- **REINVENT4 plugin check**: `_install_scoring_plugin()` raises `ImportError` (fail-fast) if the plugin is not importable
 
 ## Security & Boundaries
 

@@ -1,6 +1,6 @@
 # Dual-Target Docking
 
-Single-target vs dual-target RL molecule generation using **FREED++** (generator) and **Boltz-2** (scorer).
+Single-target vs dual-target RL molecule generation using **FREED++** or **REINVENT4** (generators) and **Boltz-2** (scorer).
 
 **Hypothesis.** RL optimized for worst-case dual-target docking (`max(d_A, d_B)`) produces molecules with higher dual hit-rate than single-target optimization, evaluated by an orthogonal Boltz-2 affinity surrogate.
 
@@ -9,7 +9,7 @@ Single-target vs dual-target RL molecule generation using **FREED++** (generator
 ## Data Flow
 
 ```
-Stage 0: Fetch                   Generation (FREED++)               Scoring (Boltz-2)
+Stage 0: Fetch              Generation (FREED++ / REINVENT4)        Scoring (Boltz-2)
 ---------------------     ----------------------------      --------------------------
  PDB structures                                               Boltz-2 affinity (a_A, a_B)
  UniProt FASTA          ->  For each of 5 core pairs:    ->   per molecule, both targets
@@ -42,12 +42,20 @@ SWW2026/
 |   |   |-- boltz2.py           Boltz-2 affinity scorer with disk cache + NIM backend
 |   |   |-- cache_io.py         Process-safe JSON cache (fcntl.flock + atomic temp-and-replace)
 |   |   +-- binding_box.py      PDB binding-site extraction from co-crystallized ligands
-|   |-- generation/             FREED++ molecule generation
-|   |   |-- backends.py         Generation backend registry (builtin freedpp + external backends)
-|   |   +-- freedpp.py          Docker subprocess wrapper (GenerationConfig, generate())
+|   |-- generation/             Molecule generation (multi-backend)
+|   |   |-- backends.py         Generation backend registry (builtin freedpp/reinvent4 + external)
+|   |   |-- freedpp/            FREED++ Docker-based generation subpackage
+|   |   |   |-- core.py         Docker subprocess wrapper (GenerationConfig, generate())
+|   |   |   |-- docker.py       Docker container management
+|   |   |   |-- io.py           Receptor prep & file I/O helpers
+|   |   |   +-- model.py        FREED++ model configuration
+|   |   +-- reinvent4/          REINVENT4 native Python generation subpackage
+|   |       |-- core.py         Pipeline orchestration (generate(), cache, workspace)
+|   |       |-- scoring.py      Dual-target docking scoring, RewardStats tracking
+|   |       +-- config.py       TOML config generation for REINVENT4 CLI
 |   |-- analysis/               Post-hoc statistical analysis
 |   |   |-- statistical.py      Hierarchical bootstrap, FDR correction, Cliff's delta
-|   |   |-- fairness.py         Generation budget and duplication checks
+|   |   |-- fairness.py         Generation budget, duplication, and reward quality gate
 |   |   |-- enrichment.py       AUROC, BEDROC, enrichment factor for docking validation
 |   |   +-- diversity.py        Uniqueness, scaffold diversity, Tanimoto metrics
 |   |-- data/                   Molecular data ingestion and cleaning
@@ -197,12 +205,13 @@ uv run python cli/s3_generate/generate.py --pair CDK2_ERK2 --mode single_a --epo
 uv run dd-smoke
 ```
 
-Environment variables for FREED++:
+Environment variables for generation backends:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `FREEDPP_EPOCHS` | from config (100) | Override epoch count (e.g. `10` for smoke tests) |
-| `FREEDPP_NUM_SUB_PROC` | auto-detect | Override concurrent docking subprocesses |
+| `FREEDPP_EPOCHS` | from config (100) | Override FREED++ epoch count (e.g. `10` for smoke tests) |
+| `FREEDPP_NUM_SUB_PROC` | auto-detect | Override FREED++ concurrent docking subprocesses |
+| `REINVENT4_N_STEPS` | from config (500) | Override REINVENT4 RL step count |
 
 ---
 
@@ -248,11 +257,15 @@ Generator and scorer are configurable in `configs/experiment.yaml`.
 ```yaml
 generator:
   # Legacy key also supported: name: "FREED++"
-  backend: freedpp  # built-in alias; or package.module[:callable]
+  backend: freedpp  # built-in: freedpp | reinvent4; or package.module[:callable]
   freedpp:
     # Reward-mode config passthrough into container (model-dependent)
     pass_reward_modes_to_container: true
     reward_modes_path_in_container: /opt/reward_modes.yaml
+  reinvent4:
+    algorithm: dap
+    batch_size: 128
+    n_steps: 500
 
 scorer:
   # Legacy key also supported: name: "Boltz-2"
@@ -261,9 +274,11 @@ scorer:
 ```
 
 Default behavior remains unchanged:
-- Generator: built-in `freedpp`
+- Generator: built-in `freedpp` (Docker); alternative `reinvent4` (native Python)
 - Scorer: built-in `boltz2` (`cli` or `nim` based on config)
 - FREED++ reward config path passthrough: enabled (`/opt/reward_modes.yaml`)
+
+Both generators write `reward_metadata.json` into their workspace directory. The quality gate (`fairness.py:validate_reward_quality`) resolves the newest metadata when both workspaces exist.
 
 ---
 
@@ -378,6 +393,7 @@ uv run ruff format dualdocking/ cli/
 ## References
 
 - **FREED++**: Telepov et al., TMLR 2023 -- [arXiv:2401.09840](https://arxiv.org/abs/2401.09840). RL-based molecular generation with docking reward.
+- **REINVENT4**: Loeffler et al., J Cheminformatics 2024, [PMID 38383444](https://pubmed.ncbi.nlm.nih.gov/38383444/). SMILES-based RL with DAP loss and curriculum learning.
 - **Boltz-2**: Passaro et al., 2025 -- [bioRxiv (PMID 40667369)](https://github.com/jwohlwend/boltz). Structure-aware learned affinity predictor (Pearson 0.66 on 4-target FEP+).
 - **UniDock**: Yu et al. -- [dptech-corp/Uni-Dock](https://github.com/dptech-corp/Uni-Dock). GPU-accelerated molecular docking (Vina scoring function).
 - **RDKit**: [rdkit.org](https://www.rdkit.org/). Cheminformatics toolkit for molecular processing.

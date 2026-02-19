@@ -137,7 +137,8 @@ def validate_reward_quality(
 ) -> dict[str, Any]:
     """Validate reward quality for a single run directory.
 
-    Reads ``freedpp_workspace/reward_metadata.json`` and checks that
+    Searches ``freedpp_workspace/reward_metadata.json`` and
+    ``reinvent4_workspace/reward_metadata.json`` and checks that
     invalid/timeout fractions are within acceptable thresholds.
 
     Args:
@@ -150,10 +151,31 @@ def validate_reward_quality(
         per-target invalid/timeout fractions.
     """
     results_path = Path(results_dir)
-    metadata_path = results_path / "freedpp_workspace" / "reward_metadata.json"
+    workspace_names = ("freedpp_workspace", "reinvent4_workspace")
+
+    # Collect all existing metadata candidates with mtime.
+    candidates: list[tuple[Path, float]] = []
+    for ws_name in workspace_names:
+        candidate = results_path / ws_name / "reward_metadata.json"
+        if candidate.exists():
+            candidates.append((candidate, candidate.stat().st_mtime))
+
+    metadata_path: Path | None = None
+    if len(candidates) == 1:
+        metadata_path = candidates[0][0]
+    elif len(candidates) > 1:
+        # Use the newest metadata file when multiple workspaces exist.
+        candidates.sort(key=lambda c: c[1], reverse=True)
+        metadata_path = candidates[0][0]
+        logger.warning(
+            "Multiple reward_metadata.json found in {}; using newest: {}",
+            results_path,
+            metadata_path.parent.name,
+        )
+
     issues: list[str] = []
 
-    if not metadata_path.exists():
+    if metadata_path is None:
         return {
             "run_valid": False,
             "issues": ["reward_metadata.json not found"],
@@ -162,6 +184,7 @@ def validate_reward_quality(
             "invalid_fraction_b": 0.0,
             "timeout_fraction_a": 0.0,
             "timeout_fraction_b": 0.0,
+            "workspace": None,
         }
 
     try:
@@ -175,6 +198,7 @@ def validate_reward_quality(
             "invalid_fraction_b": 0.0,
             "timeout_fraction_a": 0.0,
             "timeout_fraction_b": 0.0,
+            "workspace": metadata_path.parent.name,
         }
 
     total_calls = int(raw.get("total_calls", 0))
@@ -208,4 +232,5 @@ def validate_reward_quality(
         "issues": issues,
         "total_calls": total_calls,
         **fracs,
+        "workspace": metadata_path.parent.name,
     }

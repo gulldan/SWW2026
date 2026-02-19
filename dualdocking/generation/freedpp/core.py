@@ -24,9 +24,9 @@ from loguru import logger
 from tqdm import tqdm
 
 from dualdocking.command_runner import run_project_command
-from dualdocking.generation import freedpp_docker as _docker_helpers
-from dualdocking.generation import freedpp_io as _io_helpers
-from dualdocking.generation import freedpp_model as _model_helpers
+from dualdocking.generation.freedpp import docker as _docker_helpers
+from dualdocking.generation.freedpp import io as _io_helpers
+from dualdocking.generation.freedpp import model as _model_helpers
 from dualdocking.reward import reward_mode_requires_secondary_target
 from dualdocking.scoring.binding_box import extract_binding_box
 from dualdocking.utils.hardware import detect_primary_gpu_vram_gb
@@ -35,7 +35,7 @@ from dualdocking.utils.hardware import detect_primary_gpu_vram_gb
 # Paths
 # ---------------------------------------------------------------------------
 
-PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent.parent
 DATA_DIR: Path = PROJECT_ROOT / "output" / "data" / "targets"
 CACHE_DIR: Path = PROJECT_ROOT / "output" / "cache" / "freedpp_models"
 

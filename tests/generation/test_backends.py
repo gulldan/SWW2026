@@ -19,6 +19,59 @@ def test_builtin_freedpp_alias_from_legacy_name() -> None:
     assert "freedpp" in list_generation_backends()
 
 
+def test_builtin_reinvent4_alias() -> None:
+    """REINVENT4 aliases should resolve to built-in reinvent4 backend."""
+    for name in ("REINVENT4", "reinvent4", "reinvent"):
+        backend_name, backend = resolve_generation_backend({"name": name})
+        assert backend_name == "reinvent4", f"Failed for name={name!r}"
+        assert callable(backend)
+    assert "reinvent4" in list_generation_backends()
+
+
+def test_reinvent4_backend_passes_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Built-in REINVENT4 backend should pass config parameters correctly."""
+    import dualdocking.generation.reinvent4 as reinvent4_mod
+
+    captured: dict[str, object] = {}
+
+    def _fake_generate(config) -> list[str]:
+        captured["config"] = config
+        return ["CCO"]
+
+    monkeypatch.setattr(reinvent4_mod, "generate", _fake_generate)
+
+    _backend_name, backend = resolve_generation_backend({"backend": "reinvent4"})
+    request = GenerationRequest(
+        pair_id="CDK2_ERK2",
+        pair_config={"target_a": {"id": "CDK2"}, "target_b": {"id": "ERK2"}},
+        mode="single_a",
+        seed=42,
+        output_dir=Path("output"),
+        n_molecules=10,
+        epochs_override=None,
+        steps_per_epoch_override=None,
+        generator_config={
+            "reinvent4": {
+                "algorithm": "dap",
+                "batch_size": 256,
+                "n_steps": 300,
+                "vina_program": "unidock",
+            }
+        },
+        quality_gate={},
+    )
+    result = backend(request)
+    assert result == ["CCO"]
+
+    cfg = captured["config"]
+    assert getattr(cfg, "algorithm") == "dap"
+    assert getattr(cfg, "batch_size") == 256
+    assert getattr(cfg, "n_steps") == 300
+    assert getattr(cfg, "vina_program") == "unidock"
+    assert getattr(cfg, "target_id") == "CDK2"
+    assert getattr(cfg, "reward_mode") == "single_a"
+
+
 def test_external_generation_backend_module_default_generate(monkeypatch: pytest.MonkeyPatch) -> None:
     """External backend spec `module` should use callable `generate`."""
     module = ModuleType("test_external_gen_backend")

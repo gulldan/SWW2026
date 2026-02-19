@@ -62,7 +62,15 @@ def _as_mapping(value: object) -> Mapping[str, Any]:
 
 def _canonical_backend_name(name: str) -> str:
     """Normalize backend names to canonical built-in keys."""
-    return canonicalize_name(name, {"freed": "freedpp", "freedpp": "freedpp"})
+    return canonicalize_name(
+        name,
+        {
+            "freed": "freedpp",
+            "freedpp": "freedpp",
+            "reinvent": "reinvent4",
+            "reinvent4": "reinvent4",
+        },
+    )
 
 
 def _target_id(pair_config: Mapping[str, Any], role: str) -> str:
@@ -224,4 +232,47 @@ def resolve_generation_backend(generator_cfg: Mapping[str, Any] | None) -> tuple
     return spec, _load_external_backend(spec)
 
 
+def _reinvent4_backend(request: GenerationRequest) -> list[str]:
+    """Built-in REINVENT4 generation backend adapter."""
+    from dualdocking.generation.reinvent4 import Reinvent4GenerationConfig, generate
+
+    r4_cfg = _as_mapping(request.generator_config.get("reinvent4"))
+    use_cache_default = True
+    use_diversity_filter_default = True
+
+    second_target_id: str | None = None
+    if reward_mode_requires_secondary_target(request.mode):
+        second_target_id = _target_id(request.pair_config, "target_b")
+
+    # REINVENT4 has flat n_steps (total RL steps) whereas FREED++ has
+    # epochs * steps_per_epoch.  The CLI --steps-per-epoch override is
+    # re-interpreted as total n_steps for REINVENT4.
+    n_steps = (
+        request.steps_per_epoch_override
+        if request.steps_per_epoch_override is not None
+        else _cfg_int(r4_cfg, "n_steps", 500)
+    )
+
+    gen_config = Reinvent4GenerationConfig(
+        target_id=_target_id(request.pair_config, "target_a"),
+        n_molecules=request.n_molecules,
+        seed=request.seed,
+        output_dir=request.output_dir,
+        reward_mode=request.mode,
+        second_target_id=second_target_id,
+        algorithm=_cfg_str(r4_cfg, "algorithm", "dap"),
+        generator_type=_cfg_str(r4_cfg, "generator_type", "reinvent"),
+        batch_size=_cfg_int(r4_cfg, "batch_size", 128),
+        n_steps=n_steps,
+        use_cache=_cfg_bool(r4_cfg, "use_cache", use_cache_default),
+        use_diversity_filter=_cfg_bool(r4_cfg, "use_diversity_filter", use_diversity_filter_default),
+        prior_model=_cfg_str_maybe_empty(r4_cfg, "prior_model", ""),
+        box_padding=_cfg_float(r4_cfg, "box_padding", 10.0),
+        vina_program=_cfg_str(r4_cfg, "vina_program", "unidock"),
+        training_timeout=_cfg_int(r4_cfg, "training_timeout", 86400),
+    )
+    return generate(gen_config)
+
+
 register_generation_backend("freedpp", _freedpp_backend)
+register_generation_backend("reinvent4", _reinvent4_backend)

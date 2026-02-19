@@ -48,7 +48,8 @@ pareto_analysis:
   ref_point_a: 2.0              # reference point (worse): 100 μM -> 2.0 (= T + 2)
   ref_point_b: 2.0
 
-# Generator settings (FREED++)
+# Generator settings
+# Set generator.name to "FREED++" or "REINVENT4" to switch backends.
 generator:
   name: "FREED++"
   freedpp:
@@ -62,6 +63,17 @@ generator:
     vina_program: unidock_gpu    # "qvina02" for CPU fallback
     pass_reward_modes_to_container: true    # set false for model images with internal reward config
     reward_modes_path_in_container: /opt/reward_modes.yaml
+  reinvent4:
+    algorithm: dap             # DAP learning strategy (recommended by REINVENT4 authors)
+    generator_type: reinvent   # cache key only; architecture follows the prior model
+    batch_size: 128
+    n_steps: 500
+    use_cache: true
+    use_diversity_filter: true
+    prior_model: ""            # empty = built-in ChEMBL prior
+    box_padding: 10.0          # Å
+    vina_program: unidock      # native UniDock (not GPU batch mode)
+    training_timeout: 86400    # 24h
 
 # Reward run quality threshold (quality gate)
 quality_gate:
