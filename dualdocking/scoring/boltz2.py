@@ -109,7 +109,7 @@ _NIM_TIMEOUT = 300  # seconds per molecule via NIM
 # with a 120s GPU-acquire timeout.  With pipeline GPU-pinning (each scoring process →
 # its own NIM), concurrency=2 keeps the queue short enough to avoid timeouts.
 # Override with NIM_CONCURRENCY env var if needed (try 3-4 if single-process).
-_NIM_CONCURRENCY = int(os.getenv("NIM_CONCURRENCY", "2"))
+_NIM_CONCURRENCY = int(os.getenv("NIM_CONCURRENCY", "1"))
 _NIM_HEALTH_TIMEOUT = float(os.getenv("NIM_HEALTH_TIMEOUT", "2.0"))
 
 # Cached active NIM pool (configured URLs are probed once per process/config change).
