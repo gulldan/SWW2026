@@ -37,6 +37,19 @@ thresholds:
   AChE_MAOB:           # AD, Hetero, cofactor-sensitive
     target_a: 0.0
     target_b: 0.0
+  # --- Oncology kinase & epigenetic (4 pairs) ---
+  MEK1_MEK2:
+    target_a: 0.0
+    target_b: 0.0
+  FGFR1_FGFR2:
+    target_a: 0.0
+    target_b: 0.0
+  EZH2_EZH1:
+    target_a: 0.0
+    target_b: 0.0
+  BRD4_BRD2:
+    target_a: 0.0
+    target_b: 0.0
   # --- Blocked ---
   COX1_COX2:           # non-human PDB
     target_a: 0.0
