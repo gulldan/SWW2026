@@ -38,26 +38,28 @@ COLORS = {
 # Okabe-Ito colorblind-safe
 CB_PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#F0E442", "#56B4E9"]
 
-matplotlib.rcParams.update({
-    "figure.dpi": 300,
-    "savefig.dpi": 300,
-    "font.family": "sans-serif",
-    "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
-    "font.size": 8,
-    "axes.titlesize": 9,
-    "axes.labelsize": 8,
-    "xtick.labelsize": 7,
-    "ytick.labelsize": 7,
-    "legend.fontsize": 7,
-    "axes.linewidth": 0.6,
-    "lines.linewidth": 0.8,
-    "patch.linewidth": 0.5,
-    "figure.facecolor": "white",
-    "axes.facecolor": "white",
-    "savefig.facecolor": "white",
-    "savefig.bbox": "tight",
-    "savefig.pad_inches": 0.05,
-})
+matplotlib.rcParams.update(
+    {
+        "figure.dpi": 300,
+        "savefig.dpi": 300,
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+        "font.size": 8,
+        "axes.titlesize": 9,
+        "axes.labelsize": 8,
+        "xtick.labelsize": 7,
+        "ytick.labelsize": 7,
+        "legend.fontsize": 7,
+        "axes.linewidth": 0.6,
+        "lines.linewidth": 0.8,
+        "patch.linewidth": 0.5,
+        "figure.facecolor": "white",
+        "axes.facecolor": "white",
+        "savefig.facecolor": "white",
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.05,
+    }
+)
 
 
 # ── Panel A: PyMOL 3D binding pose ──────────────────────────────────
@@ -168,13 +170,11 @@ def plot_rmsd(targets: dict[str, Path], out_dir: Path) -> None:
 
         # Backbone
         df = pd.read_csv(d / "rmsd_backbone.csv")
-        ax1.plot(df["time_ns"], df["rmsd_A"], color=color, lw=0.6,
-                 label=f"{target_name}", alpha=0.85)
+        ax1.plot(df["time_ns"], df["rmsd_A"], color=color, lw=0.6, label=f"{target_name}", alpha=0.85)
 
         # Ligand
         df = pd.read_csv(d / "rmsd_ligand.csv")
-        ax2.plot(df["time_ns"], df["rmsd_A"], color=color, lw=0.6,
-                 label=f"{target_name}", alpha=0.85)
+        ax2.plot(df["time_ns"], df["rmsd_A"], color=color, lw=0.6, label=f"{target_name}", alpha=0.85)
 
     ax1.set_xlabel("Time (ns)")
     ax1.set_ylabel("Backbone RMSD (\u00c5)")
@@ -204,8 +204,7 @@ def plot_rmsf(targets: dict[str, Path], out_dir: Path) -> None:
         color = COLORS[label]
         target_name = _load_target_name(d)
         df = pd.read_csv(d / "rmsf.csv")
-        ax.plot(df["residue"], df["rmsf_A"], color=color, lw=0.5,
-                label=f"{target_name}", alpha=0.8)
+        ax.plot(df["residue"], df["rmsf_A"], color=color, lw=0.5, label=f"{target_name}", alpha=0.8)
 
     ax.set_xlabel("Residue number")
     ax.set_ylabel("RMSF (\u00c5)")
@@ -288,14 +287,12 @@ def plot_rg_hbonds(targets: dict[str, Path], out_dir: Path) -> None:
 
         # Rg
         df = pd.read_csv(d / "radius_gyration.csv")
-        ax1.plot(df["time_ps"] / 1000, df["rg_A"], color=color, lw=0.6,
-                 label=f"{target_name}", alpha=0.85)
+        ax1.plot(df["time_ps"] / 1000, df["rg_A"], color=color, lw=0.6, label=f"{target_name}", alpha=0.85)
 
         # H-bonds
         df = pd.read_csv(d / "hbonds.csv")
         if not df.empty and "time_ns" in df.columns:
-            ax2.plot(df["time_ns"], df["n_hbonds"], color=color, lw=0.5,
-                     label=f"{target_name}", alpha=0.7)
+            ax2.plot(df["time_ns"], df["n_hbonds"], color=color, lw=0.5, label=f"{target_name}", alpha=0.7)
 
     ax1.set_xlabel("Time (ns)")
     ax1.set_ylabel("Radius of Gyration (\u00c5)")
@@ -323,17 +320,19 @@ def render_summary_table(targets: dict[str, Path], out_dir: Path) -> None:
         if not result_file.exists():
             continue
         r = json.loads(result_file.read_text())
-        rows.append({
-            "Target": f"{r['target']} ({label})",
-            "Ligand RMSD (\u00c5)": f"{r['mean_rmsd']:.2f} \u00b1 {r['max_rmsd']:.2f}",
-            "Backbone RMSD (\u00c5)": f"{r['backbone_rmsd_mean']:.2f}",
-            "RMSF pocket (\u00c5)": f"{r['rmsf_binding_pocket']:.2f}",
-            "Rg (\u00c5)": f"{r['rg_mean']:.1f} \u00b1 {r['rg_std']:.2f}",
-            "H-bonds": f"{r['mean_hbonds']:.1f}",
-            "Stable": "\u2713" if r["stable"] else "\u2717",
-            "Converged": "\u2713" if r["converged"] else "\u2717",
-            "MM-GBSA (kcal/mol)": f"{r['mmpbsa_dg']:.1f}" if not np.isnan(r.get("mmpbsa_dg", float("nan"))) else "\u2014",
-        })
+        rows.append(
+            {
+                "Target": f"{r['target']} ({label})",
+                "Ligand RMSD (\u00c5)": f"{r['mean_rmsd']:.2f} \u00b1 {r['max_rmsd']:.2f}",
+                "Backbone RMSD (\u00c5)": f"{r['backbone_rmsd_mean']:.2f}",
+                "RMSF pocket (\u00c5)": f"{r['rmsf_binding_pocket']:.2f}",
+                "Rg (\u00c5)": f"{r['rg_mean']:.1f} \u00b1 {r['rg_std']:.2f}",
+                "H-bonds": f"{r['mean_hbonds']:.1f}",
+                "Stable": "\u2713" if r["stable"] else "\u2717",
+                "Converged": "\u2713" if r["converged"] else "\u2717",
+                "MM-GBSA (kcal/mol)": f"{r['mmpbsa_dg']:.1f}" if not np.isnan(r.get("mmpbsa_dg", float("nan"))) else "\u2014",
+            }
+        )
 
     if not rows:
         return
@@ -374,10 +373,14 @@ def _load_target_name(target_dir: Path) -> str:
 def _add_panel_labels(fig: plt.Figure, axes: list, labels: list[str]) -> None:
     for ax, lbl in zip(axes, labels):
         ax.text(
-            -0.12, 1.08, lbl,
+            -0.12,
+            1.08,
+            lbl,
             transform=ax.transAxes,
-            fontsize=11, fontweight="bold",
-            va="top", ha="left",
+            fontsize=11,
+            fontweight="bold",
+            va="top",
+            ha="left",
         )
 
 
@@ -420,7 +423,8 @@ def main(pair: str, mode: str, mol: int, output_dir: str | None) -> None:
         if gro.exists():
             target_name = _load_target_name(d)
             render_binding_pose(
-                gro, xtc,
+                gro,
+                xtc,
                 out / f"panel_A_pose_{target_name}.png",
                 target_name,
             )

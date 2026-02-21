@@ -35,13 +35,26 @@ Stage 0: Fetch              Generation (FREED++ / REINVENT4)        Scoring (Bol
 ```
 SWW2026/
 |-- dualdocking/                Core Python library
+|   |-- api.py                  Programmatic API (run_full_experiment, run_stages, run_post_pipeline)
 |   |-- config.py               YAML config loading & validation (pairs, metrics, experiment)
+|   |-- command_runner.py       In-process dispatch + subprocess fallback for CLI scripts
+|   |-- script_dispatch.py      Click CLI entry point dispatcher
 |   |-- scoring/                Scoring & docking objectives
 |   |   |-- objectives.py       Multi-objective scalarizations (min, harmonic, Tchebycheff, Pareto, ...)
 |   |   |-- backends.py         Scoring backend registry (builtin boltz2 + external engines)
-|   |   |-- boltz2.py           Boltz-2 affinity scorer with disk cache + NIM backend
+|   |   |-- boltz2.py           Boltz-2 affinity scorer facade (CLI or NIM backend)
+|   |   |-- boltz2_batch.py     Batch processing for Boltz-2 scoring
+|   |   |-- boltz2_context.py   Execution context manager
+|   |   |-- boltz2_helpers.py   Boltz-2 utility functions
+|   |   |-- boltz2_nim_backend.py  NVIDIA NIM REST API client
+|   |   |-- boltz2_scoring_api.py  Scoring orchestration
+|   |   |-- boltz2_storage.py   Result storage & caching
+|   |   |-- boltz2_subprocess.py  Subprocess management
 |   |   |-- cache_io.py         Process-safe JSON cache (fcntl.flock + atomic temp-and-replace)
-|   |   +-- binding_box.py      PDB binding-site extraction from co-crystallized ligands
+|   |   |-- binding_box.py      PDB binding-site extraction from co-crystallized ligands
+|   |   |-- checkpoint.py       Scoring checkpoint recovery
+|   |   |-- docking.py          UniDock Docker integration & PDBQT preparation
+|   |   +-- gnina.py            GNINA CNN-based scoring (optional cross-validation)
 |   |-- generation/             Molecule generation (multi-backend)
 |   |   |-- backends.py         Generation backend registry (builtin freedpp/reinvent4 + external)
 |   |   |-- freedpp/            FREED++ Docker-based generation subpackage
@@ -57,42 +70,107 @@ SWW2026/
 |   |   |-- statistical.py      Hierarchical bootstrap, FDR correction, Cliff's delta
 |   |   |-- fairness.py         Generation budget, duplication, and reward quality gate
 |   |   |-- enrichment.py       AUROC, BEDROC, enrichment factor for docking validation
-|   |   +-- diversity.py        Uniqueness, scaffold diversity, Tanimoto metrics
+|   |   |-- diversity.py        Uniqueness, scaffold diversity, Tanimoto metrics
+|   |   |-- learning_curves.py  Learning curve analysis for generative models
+|   |   |-- mixed_effects.py    Linear mixed-effects modeling for paired targets
+|   |   |-- novelty.py          Scaffold and similarity-based novelty scoring
+|   |   |-- power_analysis.py   Statistical power and sample size calculations
+|   |   |-- rliable_metrics.py  Rliable aggregate statistics across seeds
+|   |   |-- wild_bootstrap.py   Wild bootstrap for time-series data
+|   |   |-- calibration/        Baseline calibration & validation
+|   |   |   |-- docking.py      UniDock integration for redocking & enrichment
+|   |   |   |-- enrichment.py   Enrichment benchmark (AUROC/BEDROC)
+|   |   |   |-- normalization.py  Z-score normalization & stability checks
+|   |   |   |-- power.py        Power analysis for statistical tests
+|   |   |   +-- redocking.py    Redocking validation (known ligand pose prediction)
+|   |   +-- metrics/            Modular metric computation
+|   |       |-- aggregation.py  Concatenate scored results across pairs/modes/seeds
+|   |       |-- common.py       Shared metric utilities
+|   |       |-- computation.py  Primary performance metrics (hit-rate, selectivity)
+|   |       |-- correlation.py  Correlation analysis between surrogates
+|   |       +-- sensitivity.py  Threshold sensitivity analysis
 |   |-- data/                   Molecular data ingestion and cleaning
 |   |   |-- chem_sanitize.py    SMILES validation, canonicalization & deduplication
 |   |   |-- baseline.py         ZINC calibration baseline stability checks
-|   |   +-- chembl_validation.py ChEMBL active retrieval, dual-active overlap, enrichment
+|   |   |-- chembl_validation.py  ChEMBL active retrieval, dual-active overlap, enrichment
+|   |   |-- filters.py          Molecular property filters (Lipinski, PAINS, etc.)
+|   |   |-- http_utils.py       HTTP retry logic & error handling
+|   |   |-- io_utils.py         Parquet/CSV I/O helpers
+|   |   |-- mol_prep.py         SMILES→3D→PDBQT molecule preparation
+|   |   |-- fetch/              External data source integration
+|   |   |   |-- docker.py       Docker container management for data tools
+|   |   |   |-- msa.py          Multiple sequence alignment fetching
+|   |   |   |-- pdb.py          PDB structure & UniProt FASTA download
+|   |   |   +-- smiles.py       SMILES file fetch (ZINC, ChEMBL, FREED fragments)
+|   |   +-- prep/               Data preparation pipelines
+|   |       |-- baseline.py     ZINC baseline splitting & sampling
+|   |       +-- targets.py      Target structure preparation
+|   |-- pipeline/               Orchestration & workflow management
+|   |   |-- checks.py           Pre-flight validation (environment, dependencies)
+|   |   |-- config.py           Pipeline stage configuration
+|   |   |-- core.py             Logging, subprocess execution, environment management
+|   |   |-- executor.py         Stage execution coordinator
+|   |   |-- runner.py           End-to-end pipeline runner
+|   |   +-- stages/             Atomic pipeline stages (fetch, prepare)
 |   |-- reporting/              Experiment provenance and manuscript
 |   |   |-- run_manifest.py     Run lifecycle tracking (JSON manifest with atomic I/O)
-|   |   +-- latex_report.py     Jinja2-to-LaTeX rendering and PDF compilation
+|   |   |-- latex_report.py     Jinja2-to-LaTeX rendering and PDF compilation
+|   |   +-- plots/              Plotting & figure generation
+|   |       |-- distributions.py  Hit-rate, potency, diversity distributions
+|   |       +-- molecules.py    Molecule structure visualization (2D depiction)
+|   |-- reward/                 Reward functions & scalarization
+|   |   +-- selectivity.py      Multi-objective reward modes (single_a, double, biased, etc.)
+|   |-- utils/                  Utilities
+|   |   |-- hardware.py         GPU/CPU detection & resource checking
+|   |   |-- hash_utils.py       Deterministic hashing for caching
+|   |   |-- io_atomic.py        Atomic file I/O (prevent corruption)
+|   |   |-- master_config.py    Master configuration merging
+|   |   |-- naming.py           Canonical naming conventions
+|   |   +-- nim.py              NVIDIA NIM API utilities
 |   +-- validation/             Post-hoc validation
+|       |-- audit.py            Claim traceability audit
 |       |-- md_config.py        MD configuration dataclasses, constants, GPU detection
+|       |-- md_docker.py        GROMACS Docker management
 |       |-- md_mdp.py           MDP file writers (EM, NVT, NPT, production)
 |       |-- md_setup.py         System preparation (PDB repair, ligand parameterization, topology)
 |       |-- md_analysis.py      Trajectory analysis (RMSD, RMSF, Rg, H-bonds, convergence)
 |       +-- md_pipeline.py      Orchestration (22 GROMACS commands, convergence assessment)
 |
-|-- cli/                    CLI entry points (organized by pipeline stage)
-|   |-- s0_fetch/               Data download (PDB, FASTA, FREED fragments, ZINC, ChEMBL)
-|   |-- s1_prepare/             Target preparation (PDB -> PDBQT, binding box, MSA)
-|   |-- s2_calibrate/           Calibration and validation (dock calibration, normalization, redocking)
+|-- cli/                        CLI entry points (organized by pipeline stage)
+|   |-- s0_fetch/               Data download (PDB, FASTA, FREED fragments, ZINC, ChEMBL, GNINA)
+|   |-- s1_prepare/             Target preparation (PDB -> PDBQT, binding box, MSA, baseline)
+|   |-- s2_calibrate/           Calibration and validation (docking, normalization, redocking, enrichment)
 |   |-- s3_generate/            Molecule generation (configured backend; default FREED++)
-|   |-- s4_score/               Affinity scoring (configured engine; default Boltz-2)
-|   |-- s5_analyze/             Statistical analysis (aggregate, metrics, correlation)
+|   |-- s4_score/               Affinity scoring (configured engine; default Boltz-2) + GNINA
+|   |-- s5_analyze/             Statistical analysis (aggregate, metrics, correlation, sensitivity)
 |   |-- s6_report/              Visualization and manuscript (plots, molecules, LaTeX)
 |   |-- s6_md/                  MD validation (GROMACS, post-hoc binding stability)
-|   |-- s7_audit/               Post-hoc verification (claim traceability)
-|   |-- pipeline/               End-to-end orchestrators (full experiment, pilot, post)
+|   |-- s7_audit/               Post-hoc verification (claim traceability, duplication check)
+|   |-- pipeline/               End-to-end orchestrators (full experiment, pilot, post, stages)
 |   +-- smoke/                  Smoke tests (Boltz-2 health check, reward capping)
 |
-|-- configs/                    YAML configuration (pairs, metrics, experiment, normalization)
-|-- tests/                      pytest suite (~960 tests)
-|-- docker/freedpp/             FREED++ Docker image + dual_reward_patch.py
+|-- configs/                    YAML configuration
+|   |-- pairs.yaml              Target pairs (5 core + 7 auxiliary + 1 blocked)
+|   |-- metrics.yaml            Metric definitions (hit-rate thresholds, effect size)
+|   |-- experiment.yaml         Global experiment config (generator, scorer, seeds, paths)
+|   |-- reward_modes.yaml       Reward scalarization definitions
+|   |-- calibration.yaml        UniDock calibration parameters
+|   |-- normalization.yaml      Z-score normalization (generated by calibration)
+|   |-- filters.yaml            Molecular property filters
+|   |-- master_config.yaml      Master configuration (merges pairs + experiment)
+|   +-- pairs_single.yaml       Single-target baseline pairs
+|-- tests/                      pytest suite (~1160 tests)
+|-- docker/                     Container definitions
+|   |-- freedpp/                FREED++ image (Dockerfile + dual_reward_patch modules + data/)
+|   |-- gnina/                  GNINA CNN scoring image
+|   |-- boltz2/                 Boltz-2 NIM launch script
+|   +-- md/                     GROMACS MD simulation image
+|-- scripts/                    Standalone runnable scripts (mirrors cli/ structure)
 |-- docs/                       Project documentation (see Documentation Map below)
 |-- report/                     LaTeX manuscript (chapters/, figures/, templates/)
 +-- output/                     Runtime data (gitignored)
     |-- data/                   Target structures, calibration sets, baseline
-    |-- cache/                  Score cache + MSA cache (backend-dependent)
+    |-- cache/                  Score cache + MSA cache + FREED++ model cache
     +-- results/                Experiment outputs
 ```
 
@@ -363,7 +441,10 @@ Read in the order shown for fastest onboarding.
 | 8 | [Receptor QC](docs/receptor_qc.md) | Reference | Per-target structural quality control |
 | 9 | [NIM Benchmark](docs/nim_benchmark.md) | Reference | Boltz-2 NIM backend benchmarks |
 | 10 | [Reward Modes](docs/reward_modes.md) | Reference | Declarative reward registry, YAML schema, plugin extension |
-| 11 | [Doc Index](docs/README.md) | Living | Source priority and conflict resolution rules |
+| 11 | [I/O Contracts](docs/io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages |
+| 12 | [Novelty Report](docs/novelty_report.md) | Reference | Gap analysis vs prior work, novelty assessment |
+| 13 | [Pipeline Granularity](docs/tasks_pipeline_granularity.md) | Living | Pipeline stage refactoring plan (9→17 stages) |
+| 14 | [Doc Index](docs/README.md) | Living | Source priority and conflict resolution rules |
 
 **Source priority** (higher wins in conflicts): goal.md > configs/*.yaml > dualdocking/ > selection_criteria.md > report/ > README.md.
 
@@ -372,7 +453,7 @@ Read in the order shown for fastest onboarding.
 ## Testing
 
 ```bash
-# Full test suite (~960 tests, parallelized)
+# Full test suite (~1160 tests, parallelized)
 uv run pytest tests/ -v
 
 # Single test file

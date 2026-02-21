@@ -124,12 +124,18 @@ def _build_local_cmd(
     """Build command for local gnina binary."""
     cmd = [
         gnina_bin,
-        "-r", str(receptor_pdb),
-        "-l", str(ligands_sdf),
-        "-o", str(output_sdf),
-        "--exhaustiveness", str(exhaustiveness),
-        "--num_modes", "1",
-        "--seed", str(seed),
+        "-r",
+        str(receptor_pdb),
+        "-l",
+        str(ligands_sdf),
+        "-o",
+        str(output_sdf),
+        "--exhaustiveness",
+        str(exhaustiveness),
+        "--num_modes",
+        "1",
+        "--seed",
+        str(seed),
     ]
     if autobox_ligand is not None:
         cmd.extend(["--autobox_ligand", str(autobox_ligand)])
@@ -138,14 +144,22 @@ def _build_local_cmd(
             sx, sy, sz = box_size
         else:
             sx = sy = sz = float(box_size)
-        cmd.extend([
-            "--center_x", str(center[0]),
-            "--center_y", str(center[1]),
-            "--center_z", str(center[2]),
-            "--size_x", str(sx),
-            "--size_y", str(sy),
-            "--size_z", str(sz),
-        ])
+        cmd.extend(
+            [
+                "--center_x",
+                str(center[0]),
+                "--center_y",
+                str(center[1]),
+                "--center_z",
+                str(center[2]),
+                "--size_x",
+                str(sx),
+                "--size_y",
+                str(sy),
+                "--size_z",
+                str(sz),
+            ]
+        )
     return cmd
 
 
@@ -163,18 +177,30 @@ def _build_docker_cmd(
 ) -> list[str]:
     """Build command for Docker-based gnina execution."""
     cmd: list[str] = [
-        "docker", "run", "--rm", "--gpus", "all",
-        "-v", f"{receptor_pdb.parent}:/receptor:ro",
-        "-v", f"{tmp}:/work",
+        "docker",
+        "run",
+        "--rm",
+        "--gpus",
+        "all",
+        "-v",
+        f"{receptor_pdb.parent}:/receptor:ro",
+        "-v",
+        f"{tmp}:/work",
     ]
     gnina_args: list[str] = [
         docker_image,
-        "-r", f"/receptor/{receptor_pdb.name}",
-        "-l", "/work/ligands.sdf",
-        "-o", f"/work/{output_sdf_name}",
-        "--exhaustiveness", str(exhaustiveness),
-        "--num_modes", "1",
-        "--seed", str(seed),
+        "-r",
+        f"/receptor/{receptor_pdb.name}",
+        "-l",
+        "/work/ligands.sdf",
+        "-o",
+        f"/work/{output_sdf_name}",
+        "--exhaustiveness",
+        str(exhaustiveness),
+        "--num_modes",
+        "1",
+        "--seed",
+        str(seed),
     ]
     if autobox_ligand is not None:
         cmd.extend(["-v", f"{autobox_ligand.parent}:/autobox:ro"])
@@ -184,14 +210,22 @@ def _build_docker_cmd(
             sx, sy, sz = box_size
         else:
             sx = sy = sz = float(box_size)
-        gnina_args.extend([
-            "--center_x", str(center[0]),
-            "--center_y", str(center[1]),
-            "--center_z", str(center[2]),
-            "--size_x", str(sx),
-            "--size_y", str(sy),
-            "--size_z", str(sz),
-        ])
+        gnina_args.extend(
+            [
+                "--center_x",
+                str(center[0]),
+                "--center_y",
+                str(center[1]),
+                "--center_z",
+                str(center[2]),
+                "--size_x",
+                str(sx),
+                "--size_y",
+                str(sy),
+                "--size_z",
+                str(sz),
+            ]
+        )
     cmd.extend(gnina_args)
     return cmd
 
@@ -215,15 +249,27 @@ def _run_gnina_on_sdf(
 
     if use_local and _GNINA_BINARY is not None:
         cmd = _build_local_cmd(
-            _GNINA_BINARY, receptor_pdb, combined_sdf, output_sdf,
-            autobox_ligand=autobox_ligand, center=center, box_size=box_size,
-            exhaustiveness=exhaustiveness, seed=seed,
+            _GNINA_BINARY,
+            receptor_pdb,
+            combined_sdf,
+            output_sdf,
+            autobox_ligand=autobox_ligand,
+            center=center,
+            box_size=box_size,
+            exhaustiveness=exhaustiveness,
+            seed=seed,
         )
     else:
         cmd = _build_docker_cmd(
-            docker_image, receptor_pdb, tmp, output_sdf.name,
-            autobox_ligand=autobox_ligand, center=center, box_size=box_size,
-            exhaustiveness=exhaustiveness, seed=seed,
+            docker_image,
+            receptor_pdb,
+            tmp,
+            output_sdf.name,
+            autobox_ligand=autobox_ligand,
+            center=center,
+            box_size=box_size,
+            exhaustiveness=exhaustiveness,
+            seed=seed,
         )
 
     mode_str = f"local ({_GNINA_BINARY})" if use_local else f"docker ({docker_image})"
@@ -304,14 +350,10 @@ def score_batch(
     logger.info("Generated conformers for {}/{} molecules", n_conf, n_total)
 
     # Build index of (global_idx, mol) for molecules with valid conformers
-    work: list[tuple[int, Chem.Mol]] = [
-        (i, mol) for i, mol in enumerate(conformers) if mol is not None
-    ]
+    work: list[tuple[int, Chem.Mol]] = [(i, mol) for i, mol in enumerate(conformers) if mol is not None]
 
     # Split into sub-batches
-    chunks: list[list[tuple[int, Chem.Mol]]] = [
-        work[i : i + sub_batch_size] for i in range(0, len(work), sub_batch_size)
-    ]
+    chunks: list[list[tuple[int, Chem.Mol]]] = [work[i : i + sub_batch_size] for i in range(0, len(work), sub_batch_size)]
     n_chunks = len(chunks)
     logger.info("Split {} molecules into {} sub-batches of <={}", n_conf, n_chunks, sub_batch_size)
 
@@ -337,26 +379,36 @@ def score_batch(
 
             logger.info(
                 "Sub-batch {}/{}: {} mols, timeout={}s",
-                chunk_idx + 1, n_chunks, chunk_size, chunk_timeout,
+                chunk_idx + 1,
+                n_chunks,
+                chunk_size,
+                chunk_timeout,
             )
 
             scored = _run_gnina_on_sdf(
-                combined_sdf, receptor_pdb, output_sdf, tmp,
-                autobox_ligand=autobox_ligand, center=center, box_size=box_size,
-                exhaustiveness=exhaustiveness, docker_image=docker_image,
-                timeout=chunk_timeout, seed=seed,
+                combined_sdf,
+                receptor_pdb,
+                output_sdf,
+                tmp,
+                autobox_ligand=autobox_ligand,
+                center=center,
+                box_size=box_size,
+                exhaustiveness=exhaustiveness,
+                docker_image=docker_image,
+                timeout=chunk_timeout,
+                seed=seed,
             )
 
             for idx, scores in zip(chunk_indices, scored):
                 score_map[idx] = scores
 
-            n_ok = sum(
-                1 for s in scored
-                if not (np.isnan(s[0]) or np.isnan(s[1]))
-            )
+            n_ok = sum(1 for s in scored if not (np.isnan(s[0]) or np.isnan(s[1])))
             logger.info(
                 "Sub-batch {}/{}: {}/{} valid scores",
-                chunk_idx + 1, n_chunks, n_ok, chunk_size,
+                chunk_idx + 1,
+                n_chunks,
+                n_ok,
+                chunk_size,
             )
 
     # Assemble final results

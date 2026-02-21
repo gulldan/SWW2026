@@ -99,19 +99,21 @@ class Reinvent4GenerationConfig:
 
 def _cache_key(config: Reinvent4GenerationConfig) -> str:
     """Compute a SHA-256 cache key for the trained agent model."""
-    raw = "|".join([
-        CACHE_KEY_VERSION,
-        config.target_id,
-        config.second_target_id or "",
-        config.reward_mode,
-        config.algorithm,
-        config.generator_type,
-        str(config.batch_size),
-        str(config.n_steps),
-        str(config.seed),
-        config.vina_program,
-        config.prior_model,
-    ])
+    raw = "|".join(
+        [
+            CACHE_KEY_VERSION,
+            config.target_id,
+            config.second_target_id or "",
+            config.reward_mode,
+            config.algorithm,
+            config.generator_type,
+            str(config.batch_size),
+            str(config.n_steps),
+            str(config.seed),
+            config.vina_program,
+            config.prior_model,
+        ]
+    )
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
@@ -188,8 +190,7 @@ def _install_scoring_plugin() -> None:
         import reinvent_plugins.components.comp_dual_docking  # noqa: F401
     except ImportError:
         raise ImportError(
-            "DualDocking plugin not found in reinvent_plugins namespace. "
-            "Ensure the dualdocking package is installed (uv sync)."
+            "DualDocking plugin not found in reinvent_plugins namespace. Ensure the dualdocking package is installed (uv sync)."
         ) from None
 
 
@@ -385,10 +386,7 @@ def generate(config: Reinvent4GenerationConfig) -> list[str]:
             timeout=config.training_timeout,
         )
     except FileNotFoundError:
-        msg = (
-            "REINVENT4 CLI not found. Install with: "
-            "uv add 'reinvent>=4.7' or check that 'reinvent' is on PATH."
-        )
+        msg = "REINVENT4 CLI not found. Install with: uv add 'reinvent>=4.7' or check that 'reinvent' is on PATH."
         raise FileNotFoundError(msg) from None
     pbar.update(1)
 

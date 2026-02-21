@@ -257,9 +257,7 @@ def render_all_pairs(
             df_mode = df_pair[df_pair["mode"] == mode].nsmallest(config.top_n, sort_col)
             if not df_mode.empty:
                 frames.append(df_mode.assign(label=mode))
-        df_top = (
-            pd.concat(frames).sort_values(sort_col, ascending=True).reset_index(drop=True) if frames else pd.DataFrame()
-        )
+        df_top = pd.concat(frames).sort_values(sort_col, ascending=True).reset_index(drop=True) if frames else pd.DataFrame()
 
         if not df_top.empty:
             render_molecule_grid(

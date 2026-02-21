@@ -22,9 +22,9 @@
 
 Pairs with cofactors (COX1_COX2 — heme, AChE_MAOB — FAD): the "Cofactor: Present" axis refers to the **target biology and Boltz-2 reliability**, not to the docking receptor state. The receptor preparation protocol (`removeHeterogens(keepWater=False)`) removes **all** HETATM records, including cofactors; thus UniDock docks to a **cofactor-free** receptor for all targets without exception. This means that docking scores for COX/MAO-B reflect binding to a "stripped" pocket and may be less biologically representative. **Boltz-2 affinity** for cofactor-bearing targets is also unreliable (the affinity head does not model cofactors). For MAO-B, `affinity_probability_binary` is recommended instead of `affinity_pred_value`.
 
-## Summary Table of All 9 Pairs
+## Summary Table of All 13 Pairs
 
-Classification along three axes: **Disease** (AD / Non-AD), **Structure** (Homo / Hetero), **Cofactor** (Clean / Present). See also: [Factorial Design](#factorial-experiment-design).
+Classification along three axes: **Disease** (AD / Non-AD / Oncology), **Structure** (Homo / Hetero), **Cofactor** (Clean / Present). See also: [Factorial Design](#factorial-experiment-design).
 
 | # | Pair | Disease | Structure | Cofactor | Set | PDB A / PDB B | Size* | Boltz-2 |
 |---|------|---------|-----------|----------|-----|---------------|-------|---------|
@@ -35,10 +35,16 @@ Classification along three axes: **Disease** (AD / Non-AD), **Structure** (Homo 
 | 5 | **BACE1_GSK3B** | AD | Hetero | Clean | **Core** | 6EQM / 5KPK | ~724 | ok |
 | 6 | **AChE_BACE1** | AD | Hetero | Clean | **Core** | 4EY7 / 6EQM | ~943 | ok |
 | 7 | **GSK3B_CDK5** | AD | Hetero | Clean | **Core** | 5KPK / 1UNL | ~642 | ok |
-| 8 | **BACE1_CDK5** | AD | Hetero | Clean | Auxiliary | 6EQM / 1UNL | ~692 | ok |
+| 8 | BACE1_CDK5 | AD | Hetero | Clean | Auxiliary | 6EQM / 1UNL | ~692 | ok |
 | 9 | AChE_MAOB | AD | Hetero | Present | Auxiliary | 4EY7 / 2V5Z | ~1063 | warning (FAD) |
+| 10 | MEK1_MEK2 | Oncology | Homo | Clean | Auxiliary | 7JUR / 3PP1 | ~740 | ok |
+| 11 | FGFR1_FGFR2 | Oncology | Homo | Clean | Auxiliary | 5EW8 / 2PSQ | ~620 | ok |
+| 12 | EZH2_EZH1 | Oncology | Homo | Clean | Auxiliary | 5LS6 / 5LS6² | ~760 | ok |
+| 13 | BRD4_BRD2 | Oncology | Homo | Clean | Auxiliary | 3MXF / 3ONI | ~530 | ok |
 
 \* **Size** — approximate total residue count for both proteins after PDBFixer processing (trimming, HETATM removal). Deviations of ±20–50 aa from the RCSB deposited sequence are possible due to missing residues, non-standard residue replacement, and removal of terminal tags.
+
+² **EZH2_EZH1** — both targets use PDB 5LS6 (PRC2 complex structure); EZH2 and EZH1 share 94% SET domain identity and the same overall PRC2 architecture.
 
 ## Human-Only Enforcement
 
@@ -50,7 +56,7 @@ Non-human targets (e.g. COX1 — Ovis aries) are blocked by default.
 
 ## Factorial Experiment Design
 
-The selection of 9 pairs is determined by a pre-fixed factorial design along three axes:
+The selection of 13 pairs is determined by a pre-fixed factorial design along three axes:
 
 - **Structural relation**: Homo (same family, high homology) / Hetero (different families)
 - **Cofactor**: Clean (no cofactor in the pocket biologically) / Present (cofactor present biologically; affects interpretation of docking and Boltz-2 — see [Cofactors](#cofactors--a-critical-boltz-2-limitation))
@@ -69,6 +75,10 @@ The selection of 9 pairs is determined by a pre-fixed factorial design along thr
 | 7 | GSK3B_CDK5 | Hetero | Clean | AD | **Core** | Dual tau kinases at minimal compute (~642 residues). Functional proximity vs structural test |
 | 8 | BACE1_CDK5 | Hetero | Clean | AD | Auxiliary | Robustness: does double-dock advantage persist when replacing GSK3B→CDK5 as tau kinase |
 | 9 | AChE_MAOB | Hetero | Present | AD | Auxiliary | Sensitivity: cofactor (FAD) impact on reward signal. Boltz-2 affinity exploratory only |
+| 10 | MEK1_MEK2 | Homo | Clean | Oncology | Auxiliary | MAPK pathway selectivity (~80% protein ID); trametinib approved 2013. Allosteric pocket test |
+| 11 | FGFR1_FGFR2 | Homo | Clean | Oncology | Auxiliary | Highest in-set homology (~90% kinase domain ID); erdafitinib approved 2024. "Easy homo" oncology control |
+| 12 | EZH2_EZH1 | Homo | Clean | Oncology | Auxiliary | PRC2 methyltransferase (94% SET domain ID); valemetostat dual EZH1/2 approved JP 2022. Epigenetic target test |
+| 13 | BRD4_BRD2 | Homo | Clean | Oncology | Auxiliary | BET bromodomain (85–92% BD1 ID); JQ1 pan-BET inhibitor. Compact pair (~530 residues) |
 
 ### Core vs Auxiliary
 
@@ -77,10 +87,14 @@ The selection of 9 pairs is determined by a pre-fixed factorial design along thr
 - All cofactor-free → Boltz-2 affinity is considered a sufficiently reliable orthogonal metric given concordance with docking and ChEMBL validation
 - Each protein participates in at most 2 core pairs (AChE in 2, BACE1 in 2, GSK3B in 2; CDK2, ERK2, BChE, CDK5 — in 1)
 
-**Auxiliary set (3 pairs + 1 blocked)** — robustness and sensitivity analysis:
+**Auxiliary set (7 pairs + 1 blocked)** — robustness and sensitivity analysis:
 - EGFR_HER2: second homo Non-AD control (not in core since CDK2_ERK2 already covers this)
 - BACE1_CDK5: tau kinase substitution test (overlaps with BACE1_GSK3B and GSK3B_CDK5)
 - AChE_MAOB: cofactor-sensitive pair, docking + binary Boltz-2 only
+- MEK1_MEK2: oncology MAPK pathway homo pair; allosteric pocket selectivity test
+- FGFR1_FGFR2: highest-homology oncology pair (~90% kinase domain ID); "easy homo" control
+- EZH2_EZH1: epigenetic (PRC2 methyltransferase) homo pair; dual inhibitor clinical precedent (valemetostat)
+- BRD4_BRD2: BET bromodomain homo pair; compact size (~530 residues), pan-BET inhibitor precedent
 
 **Blocked:** COX1_COX2 (non-human PDB structures: COX1 — Ovis aries, COX2 — Mus musculus). Excluded from both primary and auxiliary analyses.
 
@@ -89,8 +103,8 @@ The selection of 9 pairs is determined by a pre-fixed factorial design along thr
 ### Target Overlap and Statistical Independence
 
 The same proteins (AChE, BACE1, GSK3B) participate in multiple pairs.
-This is useful for analyzing the effect of the second target, but a naive "N=9 pairs" does not constitute
-9 independent observations.
+This is useful for analyzing the effect of the second target, but a naive "N=13 pairs" does not constitute
+13 independent observations.
 
 - Primary statistical tests are conducted on the **core set** (5 pairs), where overlap is minimized
 - Auxiliary pairs are used as **within-target sensitivity analysis**, not as additional independent observations
@@ -137,6 +151,34 @@ This is useful for analyzing the effect of the second target, but a naive "N=9 p
 - **Biology**: Clinical precedent — ladostigil (Phase II). Rivastigmine + rasagiline pharmacophores.
 - **Caveat**: MAO-B contains a covalent FAD biologically. However, the receptor preparation protocol removes all HETATM (`removeHeterogens`), so UniDock docks to a **cofactor-free** MAO-B receptor. This means docking scores for MAO-B reflect binding to a stripped pocket and may not capture steric/electrostatic effects of FAD. Boltz-2 affinity for MAO-B is also **unreliable** (affinity head does not model cofactors) — interpret with caution; `affinity_probability_binary` is recommended.
 
+## Oncology Kinase & Epigenetic Pairs (Pairs 10–13)
+
+Four additional auxiliary pairs extending the design to oncology targets. All are homologous (Homo), cofactor-free (Clean), and serve as out-of-disease-area generalizability controls.
+
+### MEK1_MEK2 — MAPK Selectivity
+
+- **Biology**: Dual MAP kinase kinases in the RAS-RAF-MEK-ERK pathway. ~80% protein identity. Conserved allosteric pocket. Trametinib (MEK1/2 inhibitor) approved 2013 for melanoma.
+- **Structures**: MEK1 7JUR + MEK2 3PP1.
+- **Role**: Tests double-dock on allosteric (non-ATP) binding pockets.
+
+### FGFR1_FGFR2 — Highest Homology
+
+- **Biology**: Fibroblast growth factor receptors, ~90% kinase domain identity (highest in the auxiliary set). Erdafitinib (pan-FGFR) approved 2024 for bladder cancer.
+- **Structures**: FGFR1 5EW8 + FGFR2 2PSQ.
+- **Role**: "Easy homo" oncology control — double-dock should trivially outperform single when targets are near-identical.
+
+### EZH2_EZH1 — Epigenetic Target
+
+- **Biology**: PRC2 histone methyltransferases, 94% SET domain identity. EZH1 compensates EZH2 loss; valemetostat (dual EZH1/2) approved in Japan 2022 for ATL.
+- **Structures**: Both use PDB 5LS6 (shared PRC2 architecture). WARNING: same PDB for both targets — binding pockets are structurally near-identical.
+- **Role**: Tests double-dock on epigenetic (non-kinase) targets with extremely high homology.
+
+### BRD4_BRD2 — BET Bromodomain
+
+- **Biology**: BET family bromodomains, 85–92% BD1 identity, ~95% pocket conservation. JQ1 is a well-characterized pan-BET inhibitor; I-BET762 reached Phase I.
+- **Structures**: BRD4 3MXF + BRD2 3ONI.
+- **Role**: Compact pair (~530 total residues) — fastest compute; tests epigenetic reader domain targets.
+
 ## Boltz-2 Scoring Protocol
 
 ### Two Usage Modes
@@ -145,7 +187,7 @@ Boltz-2 is used as an **orthogonal scorer** (independent of the UniDock reward) 
 
 | Mode | When Applied | Metric | Status |
 |------|-------------|--------|--------|
-| **Primary (quantitative)** | All cofactor-free pairs: 5 core + 2 auxiliary (7 of 8 active) | `affinity_pred_value` (log10 IC50-like, μM) | Primary endpoint |
+| **Primary (quantitative)** | All cofactor-free pairs: 5 core + 6 auxiliary (11 of 12 active) | `affinity_pred_value` (log10 IC50-like, μM) | Primary endpoint |
 | **Exploratory (binary)** | Cofactor-bearing pairs (AChE_MAOB) | `affinity_probability_binary` (hit/non-hit) | Exploratory only |
 
 ### Primary Mode: `affinity_pred_value`

@@ -230,7 +230,16 @@ def main(  # noqa: PLR0913
 
     results.sort(key=lambda r: r.target_id)
     write_outputs(
-        results, target_pdb_map, output, csv_output, figures_path, seed, max_actives, auroc_threshold, bedroc_threshold, alpha,
+        results,
+        target_pdb_map,
+        output,
+        csv_output,
+        figures_path,
+        seed,
+        max_actives,
+        auroc_threshold,
+        bedroc_threshold,
+        alpha,
         PROJECT_ROOT,
     )
     _print_summary(results, auroc_threshold, bedroc_threshold, alpha)

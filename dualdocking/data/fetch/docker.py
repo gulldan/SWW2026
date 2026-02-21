@@ -23,9 +23,7 @@ DOCKER_BIN: str = shutil.which("docker") or "docker"
 MOTIFS_URL: str = "https://raw.githubusercontent.com/AITRICS/FREED/main/gym_molecule/dataset/motifs_zinc_random_92.txt"
 
 # Pat Walters rd_filters merged alert collections (PAINS / SureChEMBL / Glaxo)
-ALERT_COLLECTIONS_URL: str = (
-    "https://raw.githubusercontent.com/PatWalters/rd_filters/master/rd_filters/data/alert_collection.csv"
-)
+ALERT_COLLECTIONS_URL: str = "https://raw.githubusercontent.com/PatWalters/rd_filters/master/rd_filters/data/alert_collection.csv"
 
 
 def docker_image_exists(image: str) -> bool:

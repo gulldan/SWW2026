@@ -37,11 +37,16 @@ def _preprocess_trajectory(
     # Step 1: fix PBC
     _run(
         [
-            "gmx", "trjconv",
-            "-s", str(tpr_path),
-            "-f", str(xtc_path),
-            "-o", str(xtc_whole),
-            "-pbc", "whole",
+            "gmx",
+            "trjconv",
+            "-s",
+            str(tpr_path),
+            "-f",
+            str(xtc_path),
+            "-o",
+            str(xtc_whole),
+            "-pbc",
+            "whole",
         ],
         cwd=work_dir,
         input_text="System\n",
@@ -51,11 +56,17 @@ def _preprocess_trajectory(
     # Step 2: center complex
     _run(
         [
-            "gmx", "trjconv",
-            "-s", str(tpr_path),
-            "-f", str(xtc_whole),
-            "-o", str(xtc_center),
-            "-center", "-pbc", "mol",
+            "gmx",
+            "trjconv",
+            "-s",
+            str(tpr_path),
+            "-f",
+            str(xtc_whole),
+            "-o",
+            str(xtc_center),
+            "-center",
+            "-pbc",
+            "mol",
         ],
         cwd=work_dir,
         input_text="Protein\nSystem\n",
@@ -66,11 +77,16 @@ def _preprocess_trajectory(
     # Step 3: least-squares fit
     _run(
         [
-            "gmx", "trjconv",
-            "-s", str(tpr_path),
-            "-f", str(xtc_center),
-            "-o", str(xtc_fit),
-            "-fit", "rot+trans",
+            "gmx",
+            "trjconv",
+            "-s",
+            str(tpr_path),
+            "-f",
+            str(xtc_center),
+            "-o",
+            str(xtc_fit),
+            "-fit",
+            "rot+trans",
         ],
         cwd=work_dir,
         input_text="Backbone\nSystem\n",
@@ -153,10 +169,18 @@ def _analyze_trajectory(
     bb_rmsd_xvg = work_dir / "rmsd_backbone.xvg"
     _run(
         [
-            "gmx", "rms",
-            "-s", str(tpr), "-f", str(xtc_fit),
-            "-n", str(ndx_path),
-            "-o", str(bb_rmsd_xvg), "-tu", "ns",
+            "gmx",
+            "rms",
+            "-s",
+            str(tpr),
+            "-f",
+            str(xtc_fit),
+            "-n",
+            str(ndx_path),
+            "-o",
+            str(bb_rmsd_xvg),
+            "-tu",
+            "ns",
         ],
         cwd=work_dir,
         input_text="Backbone\nBackbone\n",
@@ -170,10 +194,18 @@ def _analyze_trajectory(
     lig_rmsd_xvg = work_dir / "rmsd_ligand.xvg"
     _run(
         [
-            "gmx", "rms",
-            "-s", str(tpr), "-f", str(xtc_fit),
-            "-n", str(ndx_path),
-            "-o", str(lig_rmsd_xvg), "-tu", "ns",
+            "gmx",
+            "rms",
+            "-s",
+            str(tpr),
+            "-f",
+            str(xtc_fit),
+            "-n",
+            str(ndx_path),
+            "-o",
+            str(lig_rmsd_xvg),
+            "-tu",
+            "ns",
         ],
         cwd=work_dir,
         input_text="LIG\nLIG\n",
@@ -187,10 +219,17 @@ def _analyze_trajectory(
     rmsf_xvg = work_dir / "rmsf.xvg"
     _run(
         [
-            "gmx", "rmsf",
-            "-s", str(tpr), "-f", str(xtc_fit),
-            "-n", str(ndx_path),
-            "-o", str(rmsf_xvg), "-res",
+            "gmx",
+            "rmsf",
+            "-s",
+            str(tpr),
+            "-f",
+            str(xtc_fit),
+            "-n",
+            str(ndx_path),
+            "-o",
+            str(rmsf_xvg),
+            "-res",
         ],
         cwd=work_dir,
         input_text="Backbone\n",
@@ -204,10 +243,16 @@ def _analyze_trajectory(
     rg_xvg = work_dir / "gyrate.xvg"
     _run(
         [
-            "gmx", "gyrate",
-            "-s", str(tpr), "-f", str(xtc_fit),
-            "-n", str(ndx_path),
-            "-o", str(rg_xvg),
+            "gmx",
+            "gyrate",
+            "-s",
+            str(tpr),
+            "-f",
+            str(xtc_fit),
+            "-n",
+            str(ndx_path),
+            "-o",
+            str(rg_xvg),
         ],
         cwd=work_dir,
         input_text="Protein\n",
@@ -223,10 +268,18 @@ def _analyze_trajectory(
     try:
         _run(
             [
-                "gmx", "hbond-legacy",
-                "-s", str(tpr), "-f", str(xtc_fit),
-                "-n", str(ndx_path),
-                "-num", str(hbond_xvg), "-tu", "ns",
+                "gmx",
+                "hbond-legacy",
+                "-s",
+                str(tpr),
+                "-f",
+                str(xtc_fit),
+                "-n",
+                str(ndx_path),
+                "-num",
+                str(hbond_xvg),
+                "-tu",
+                "ns",
             ],
             cwd=work_dir,
             input_text="Protein\nLIG\n",
@@ -238,10 +291,18 @@ def _analyze_trajectory(
         try:
             _run(
                 [
-                    "gmx", "hbond",
-                    "-s", str(tpr), "-f", str(xtc_fit),
-                    "-n", str(ndx_path),
-                    "-num", str(hbond_xvg), "-tu", "ns",
+                    "gmx",
+                    "hbond",
+                    "-s",
+                    str(tpr),
+                    "-f",
+                    str(xtc_fit),
+                    "-n",
+                    str(ndx_path),
+                    "-num",
+                    str(hbond_xvg),
+                    "-tu",
+                    "ns",
                 ],
                 cwd=work_dir,
                 input_text="Protein\nLIG\n",
@@ -265,9 +326,7 @@ def _analyze_trajectory(
 
     # ── Compute summary metrics ──────────────────────────────────
     # Ligand RMSD stability (last N ns)
-    tail = lig_rmsd_df[
-        lig_rmsd_df["time_ns"] >= (config.simulation_time_ns - config.stable_window_ns)
-    ]
+    tail = lig_rmsd_df[lig_rmsd_df["time_ns"] >= (config.simulation_time_ns - config.stable_window_ns)]
     mean_rmsd = float(tail["rmsd_A"].mean()) if len(tail) > 0 else float("nan")
     max_rmsd = float(tail["rmsd_A"].max()) if len(tail) > 0 else float("nan")
     stable = bool(mean_rmsd < config.rmsd_threshold_a)
@@ -333,20 +392,26 @@ def _run_mmpbsa(
 
     mmpbsa_in = work_dir / "mmpbsa.in"
     mmpbsa_in.write_text(
-        f"&general\n  startframe={start_frame}\n  endframe={end_frame}\n  interval=10\n/\n"
-        "&gb\n  igb=5\n  saltcon=0.15\n/\n"
+        f"&general\n  startframe={start_frame}\n  endframe={end_frame}\n  interval=10\n/\n&gb\n  igb=5\n  saltcon=0.15\n/\n"
     )
 
     result = _run(
         [
             "gmx_MMPBSA",
             "-O",
-            "-i", str(mmpbsa_in),
-            "-cs", str(work_dir / "md.tpr"),
-            "-ct", str(work_dir / "md.xtc"),
-            "-cp", str(work_dir / "topol.top"),
-            "-ci", str(ndx_path),
-            "-cg", "Protein", "LIG",
+            "-i",
+            str(mmpbsa_in),
+            "-cs",
+            str(work_dir / "md.tpr"),
+            "-ct",
+            str(work_dir / "md.xtc"),
+            "-cp",
+            str(work_dir / "topol.top"),
+            "-ci",
+            str(ndx_path),
+            "-cg",
+            "Protein",
+            "LIG",
         ],
         cwd=work_dir,
         check=False,

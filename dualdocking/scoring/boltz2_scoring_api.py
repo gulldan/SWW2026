@@ -14,7 +14,6 @@ import numpy as np
 from tqdm import tqdm
 
 
-
 class _LoggerLike(Protocol):
     """Minimal logger protocol for scoring orchestration."""
 

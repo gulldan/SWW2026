@@ -134,24 +134,35 @@ def _score_one_gnina(
 
     cmd = [
         str(gnina_bin),
-        "-r", str(receptor_pdb),
-        "-l", str(ligand_sdf),
+        "-r",
+        str(receptor_pdb),
+        "-l",
+        str(ligand_sdf),
         "--minimize",
-        "--num_modes", "1",
+        "--num_modes",
+        "1",
         "--no_gpu",  # CPU for reproducibility; use --device for GPU
     ]
 
     if autobox_ligand and autobox_ligand.exists():
         cmd.extend(["--autobox_ligand", str(autobox_ligand)])
     elif center and box_size:
-        cmd.extend([
-            "--center_x", str(center[0]),
-            "--center_y", str(center[1]),
-            "--center_z", str(center[2]),
-            "--size_x", str(box_size[0]),
-            "--size_y", str(box_size[1]),
-            "--size_z", str(box_size[2]),
-        ])
+        cmd.extend(
+            [
+                "--center_x",
+                str(center[0]),
+                "--center_y",
+                str(center[1]),
+                "--center_z",
+                str(center[2]),
+                "--size_x",
+                str(box_size[0]),
+                "--size_y",
+                str(box_size[1]),
+                "--size_z",
+                str(box_size[2]),
+            ]
+        )
     else:
         cmd.append("--autobox_ligand")
         cmd.append(str(receptor_pdb))  # whole-protein fallback
@@ -361,14 +372,26 @@ def main(
 
     # Score both targets
     _score_target(
-        gnina_bin, target_a_id, "A", pdb_a, smiles_list,
+        gnina_bin,
+        target_a_id,
+        "A",
+        pdb_a,
+        smiles_list,
         result_dir / "gnina_scores_A.parquet",
-        force=force, center=center_a, box_size=size_a,
+        force=force,
+        center=center_a,
+        box_size=size_a,
     )
     _score_target(
-        gnina_bin, target_b_id, "B", pdb_b, smiles_list,
+        gnina_bin,
+        target_b_id,
+        "B",
+        pdb_b,
+        smiles_list,
         result_dir / "gnina_scores_B.parquet",
-        force=force, center=center_b, box_size=size_b,
+        force=force,
+        center=center_b,
+        box_size=size_b,
     )
 
     logger.info("GNINA scoring complete for {}/{}/seed_{}", pair, mode, seed)

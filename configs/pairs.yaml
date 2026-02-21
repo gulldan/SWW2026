@@ -5,11 +5,12 @@
 # Factorial design and core/auxiliary: see docs/selection_criteria.md
 #
 # set: core    — primary hypothesis test (5 pairs)
-# set: auxiliary — robustness/sensitivity analysis (3 pairs)
+# set: auxiliary — robustness/sensitivity analysis (7 pairs)
 # set: blocked — excluded from production runs (1 pair)
 #
 # Pairs 1-4: non-AD control + AD-homo bridge
 # Pairs 5-9: AD-specific (heterogeneous targets)
+# Pairs 10-13: oncology kinase & epigenetic (auxiliary)
 
 pairs:
   # --- Original 4 pairs (non-AD control) ---

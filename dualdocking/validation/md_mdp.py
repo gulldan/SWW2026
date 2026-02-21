@@ -18,8 +18,7 @@ def _write_ions_mdp(path: Path) -> None:
     path.write_text(
         "integrator               = steep\n"
         "nsteps                   = 0\n"
-        "ensemble-temperature-setting = not available\n"
-        + _MDP_VERLET
+        "ensemble-temperature-setting = not available\n" + _MDP_VERLET
     )
 
 
@@ -31,8 +30,7 @@ def _write_em_mdp(path: Path) -> None:
         "emstep                   = 0.01\n"
         "nsteps                   = 50000\n"
         "nstlist                  = 10\n"
-        "ensemble-temperature-setting = not available\n"
-        + _MDP_VERLET
+        "ensemble-temperature-setting = not available\n" + _MDP_VERLET
     )
 
 
@@ -55,9 +53,7 @@ def _write_equil_mdp(
         f"nsteps                   = {nsteps}\n"
         f"nstxout-compressed       = {config.nstxout_compressed}\n"
         f"nstlog                   = {config.nstlog}\n"
-        f"nstenergy                = {config.nstenergy}\n"
-        + _MDP_VERLET
-        + "tcoupl                   = V-rescale\n"
+        f"nstenergy                = {config.nstenergy}\n" + _MDP_VERLET + "tcoupl                   = V-rescale\n"
         f"tc-grps                  = Protein_LIG Water_and_ions\n"
         f"tau_t                    = 0.1 0.1\n"
         f"ref_t                    = {config.ref_t} {config.ref_t}\n"
@@ -105,9 +101,7 @@ def _write_prod_mdp(path: Path, config: MDConfig) -> None:
         f"nsteps                   = {nsteps}\n"
         f"nstxout-compressed       = {config.nstxout_compressed}\n"
         f"nstlog                   = {config.nstlog}\n"
-        f"nstenergy                = {config.nstenergy}\n"
-        + _MDP_VERLET
-        + "tcoupl                   = V-rescale\n"
+        f"nstenergy                = {config.nstenergy}\n" + _MDP_VERLET + "tcoupl                   = V-rescale\n"
         f"tc-grps                  = Protein_LIG Water_and_ions\n"
         f"tau_t                    = 1.0 1.0\n"
         f"ref_t                    = {config.ref_t} {config.ref_t}\n"

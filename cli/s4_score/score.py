@@ -192,12 +192,20 @@ def main(
     target_b_id = pair_cfg["target_b"]["id"]
 
     scores_a = _score_one_target(
-        target_a_id, smiles_list, result_dir / "scores_A.csv", force,
-        scoring_backend, use_cache=use_cache,
+        target_a_id,
+        smiles_list,
+        result_dir / "scores_A.csv",
+        force,
+        scoring_backend,
+        use_cache=use_cache,
     )
     scores_b = _score_one_target(
-        target_b_id, smiles_list, result_dir / "scores_B.csv", force,
-        scoring_backend, use_cache=use_cache,
+        target_b_id,
+        smiles_list,
+        result_dir / "scores_B.csv",
+        force,
+        scoring_backend,
+        use_cache=use_cache,
     )
 
     joined, _primary_col = _build_joined(smiles_list, scores_a, scores_b, pair, exp_cfg)

@@ -102,7 +102,7 @@ z-score normalization parameters for FREED++ reward.
 
 **Scripts**: `cli/s3_generate/generate.py` →
 `dualdocking/generation/backends.py` (resolver) →
-built-in `dualdocking/generation/freedpp.py` or external generator backend.
+built-in `dualdocking/generation/freedpp/` or external generator backend.
 
 Runs the configured generator backend to produce molecules optimized for one
 or both targets. Default backend is FREED++ (Docker).

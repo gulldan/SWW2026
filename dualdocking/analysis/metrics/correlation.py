@@ -211,11 +211,7 @@ def run_correlation(config: CorrelationConfig) -> CorrelationResult:
     """
     from dualdocking.data.io_utils import stem_exists
 
-    results_root = (
-        config.results_root
-        if config.results_root.is_absolute()
-        else config.project_root / config.results_root
-    )
+    results_root = config.results_root if config.results_root.is_absolute() else config.project_root / config.results_root
 
     rows: list[dict[str, Any]] = []
     json_out: dict[str, Any] = {"pairs": {}}
@@ -294,12 +290,8 @@ def run_correlation(config: CorrelationConfig) -> CorrelationResult:
                 if len(x) < 3:
                     continue
 
-                spearman_rho, sp_ci_lo, sp_ci_hi = bootstrap_correlation(
-                    x, y, "spearman", n_bootstrap=config.n_bootstrap
-                )
-                pearson_r, pe_ci_lo, pe_ci_hi = bootstrap_correlation(
-                    x, y, "pearson", n_bootstrap=config.n_bootstrap
-                )
+                spearman_rho, sp_ci_lo, sp_ci_hi = bootstrap_correlation(x, y, "spearman", n_bootstrap=config.n_bootstrap)
+                pearson_r, pe_ci_lo, pe_ci_hi = bootstrap_correlation(x, y, "pearson", n_bootstrap=config.n_bootstrap)
 
                 target_stats = {
                     "n": len(x),

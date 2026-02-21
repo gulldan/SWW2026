@@ -79,7 +79,9 @@ def main(
     targets_dir = data_dir / "targets"
 
     def _resolve_receptor_and_box(
-        target_id: str, pdb_id: str, side: str,
+        target_id: str,
+        pdb_id: str,
+        side: str,
     ) -> tuple[Path, tuple[float, float, float] | None, tuple[float, float, float]]:
         """Resolve receptor PDB and binding box from actual data layout."""
         receptor = receptors_dir / f"{target_id}.fixed.pdb"

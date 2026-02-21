@@ -251,15 +251,35 @@ def run_calibration_docking(  # noqa: PLR0913
 
         if actual_workers > 1 and not dry_run:
             _prepare_ligands_parallel(
-                runner, candidates, n, ligands_dir, params, seed, overwrite,
-                actual_workers, use_existing_manifest, project_root,
-                smiles, ligand_paths, failed_smiles,
+                runner,
+                candidates,
+                n,
+                ligands_dir,
+                params,
+                seed,
+                overwrite,
+                actual_workers,
+                use_existing_manifest,
+                project_root,
+                smiles,
+                ligand_paths,
+                failed_smiles,
             )
         else:
             _prepare_ligands_sequential(
-                runner, candidates, n, ligands_dir, params, seed, overwrite,
-                dry_run, use_existing_manifest, project_root,
-                smiles, ligand_paths, failed_smiles,
+                runner,
+                candidates,
+                n,
+                ligands_dir,
+                params,
+                seed,
+                overwrite,
+                dry_run,
+                use_existing_manifest,
+                project_root,
+                smiles,
+                ligand_paths,
+                failed_smiles,
             )
 
         if len(smiles) < n:
@@ -298,17 +318,39 @@ def run_calibration_docking(  # noqa: PLR0913
         if n_gpus > 1 and len(target_ids) > 1 and not dry_run:
             logger.info("Parallel calibration docking: {} targets across {} GPUs", len(target_ids), n_gpus)
             _dock_targets_parallel(
-                target_ids, n_gpus, docker_image, project_root,
-                scores_root, receptors_dir, work_dir, binary,
-                params, ligand_paths, use_unidock_batch, batch_size, seed,
-                overwrite, dry_run,
+                target_ids,
+                n_gpus,
+                docker_image,
+                project_root,
+                scores_root,
+                receptors_dir,
+                work_dir,
+                binary,
+                params,
+                ligand_paths,
+                use_unidock_batch,
+                batch_size,
+                seed,
+                overwrite,
+                dry_run,
             )
         else:
             for target in target_ids:
                 _dock_target(
-                    target, scores_root, receptors_dir, work_dir, runner, binary,
-                    params, ligand_paths, use_unidock_batch, batch_size, seed,
-                    overwrite, dry_run, project_root,
+                    target,
+                    scores_root,
+                    receptors_dir,
+                    work_dir,
+                    runner,
+                    binary,
+                    params,
+                    ligand_paths,
+                    use_unidock_batch,
+                    batch_size,
+                    seed,
+                    overwrite,
+                    dry_run,
+                    project_root,
                 )
 
     return manifest
@@ -319,7 +361,9 @@ def _detect_gpu_count() -> int:
     try:
         result = subprocess.run(
             ["nvidia-smi", "--list-gpus"],  # noqa: S603, S607
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return max(1, len(result.stdout.strip().splitlines()))
     except (FileNotFoundError, subprocess.CalledProcessError):
@@ -356,10 +400,20 @@ def _dock_targets_parallel(  # noqa: PLR0913
         with DockerRunner(docker_image, project_root, gpus=f'"device={gpu_idx}"') as gpu_runner:
             for target in targets:
                 _dock_target(
-                    target, scores_root, receptors_dir, work_dir,
-                    gpu_runner, binary, params, ligand_paths,
-                    use_unidock_batch, batch_size, seed,
-                    overwrite, dry_run, project_root,
+                    target,
+                    scores_root,
+                    receptors_dir,
+                    work_dir,
+                    gpu_runner,
+                    binary,
+                    params,
+                    ligand_paths,
+                    use_unidock_batch,
+                    batch_size,
+                    seed,
+                    overwrite,
+                    dry_run,
+                    project_root,
                 )
 
     with ThreadPoolExecutor(max_workers=n_gpus) as pool:
@@ -528,13 +582,32 @@ def _dock_target(  # noqa: PLR0913
 
     if use_unidock_batch and not dry_run:
         scores, failures = _dock_batch(
-            runner, binary, receptor_path, ligand_paths, center, size,
-            params, target_work, target, batch_size, seed, project_root,
+            runner,
+            binary,
+            receptor_path,
+            ligand_paths,
+            center,
+            size,
+            params,
+            target_work,
+            target,
+            batch_size,
+            seed,
+            project_root,
         )
     else:
         scores, failures = _dock_sequential(
-            runner, binary, receptor_path, ligand_paths, center, size,
-            params, target_work, target, dry_run, project_root,
+            runner,
+            binary,
+            receptor_path,
+            ligand_paths,
+            center,
+            size,
+            params,
+            target_work,
+            target,
+            dry_run,
+            project_root,
         )
 
     if failures:

@@ -68,9 +68,12 @@ def build_md_image(
     cmd = [
         DOCKER_BIN,
         "build",
-        "-f", str(dockerfile),
-        "-t", image,
-        "--build-arg", f"CUDA_ARCHITECTURES={cuda_arch}",
+        "-f",
+        str(dockerfile),
+        "-t",
+        image,
+        "--build-arg",
+        f"CUDA_ARCHITECTURES={cuda_arch}",
         str(project_root),
     ]
 
@@ -145,11 +148,16 @@ def run_md_in_docker(  # noqa: PLR0913
     gpu_flags = [] if no_gpu else ["--gpus", "all"]
 
     volumes = [
-        "-v", f"{project_root / 'output'}:/workspace/output",
-        "-v", f"{project_root / 'configs'}:/workspace/configs:ro",
-        "-v", f"{project_root / 'dualdocking'}:/workspace/dualdocking:ro",
-        "-v", f"{project_root / 'cli'}:/workspace/cli:ro",
-        "-v", f"{project_root / 'pyproject.toml'}:/workspace/pyproject.toml:ro",
+        "-v",
+        f"{project_root / 'output'}:/workspace/output",
+        "-v",
+        f"{project_root / 'configs'}:/workspace/configs:ro",
+        "-v",
+        f"{project_root / 'dualdocking'}:/workspace/dualdocking:ro",
+        "-v",
+        f"{project_root / 'cli'}:/workspace/cli:ro",
+        "-v",
+        f"{project_root / 'pyproject.toml'}:/workspace/pyproject.toml:ro",
     ]
 
     # Build CLI args to forward into the container entrypoint
@@ -166,7 +174,9 @@ def run_md_in_docker(  # noqa: PLR0913
         cli_args.append("--no-gpu")
 
     cmd = [
-        DOCKER_BIN, "run", "--rm",
+        DOCKER_BIN,
+        "run",
+        "--rm",
         *gpu_flags,
         *volumes,
         image,

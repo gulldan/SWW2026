@@ -88,7 +88,7 @@ Naming:
 | `T_A`, `T_B` | Hit thresholds (log10 IC50 uM); 0.0 = 1 uM |
 | `z_A`, `z_B` | Per-target z-scores from calibration |
 
-Target pairs are named `{TARGET_A}_{TARGET_B}`, e.g., `CDK2_ERK2`. Pairs belong to a `set`: `core` (5 pairs, primary analysis), `auxiliary` (3 pairs, robustness), or `blocked` (excluded).
+Target pairs are named `{TARGET_A}_{TARGET_B}`, e.g., `CDK2_ERK2`. Pairs belong to a `set`: `core` (5 pairs, primary analysis), `auxiliary` (7 pairs, robustness), or `blocked` (excluded).
 
 ### Files You Should Never Commit
 

@@ -56,11 +56,7 @@ def aggregate(config: AggregateConfig) -> Path:
     from dualdocking.analysis.fairness import validate_reward_quality
     from dualdocking.data.io_utils import read_df, stem_exists
 
-    results_root = (
-        config.results_root
-        if config.results_root.is_absolute()
-        else config.project_root / config.results_root
-    )
+    results_root = config.results_root if config.results_root.is_absolute() else config.project_root / config.results_root
     frames: list[pd.DataFrame] = []
 
     for pair_id in config.pairs:
@@ -118,11 +114,7 @@ def aggregate(config: AggregateConfig) -> Path:
         sys.exit(1)
 
     combined = pd.concat(frames, ignore_index=True)
-    out_path = (
-        config.output_path
-        if config.output_path.is_absolute()
-        else config.project_root / config.output_path
-    )
+    out_path = config.output_path if config.output_path.is_absolute() else config.project_root / config.output_path
     out_path.parent.mkdir(parents=True, exist_ok=True)
     combined.to_parquet(out_path, index=False)
     logger.info("Aggregated {} rows -> {}", len(combined), out_path)

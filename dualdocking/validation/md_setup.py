@@ -91,38 +91,65 @@ def _parameterize_ligand(smiles: str, work_dir: Path, *, cmd_timeout: int = 600)
     # SDF -> MOL2 via obabel (no --gen3d: RDKit already did 3D)
     _run(
         ["obabel", str(work_dir / "ligand.sdf"), "-O", str(mol2_path)],
-        cwd=work_dir, timeout=cmd_timeout,
+        cwd=work_dir,
+        timeout=cmd_timeout,
     )
 
     # Antechamber: AM1-BCC charges
     _run(
         [
             "antechamber",
-            "-i", str(mol2_path), "-fi", "mol2",
-            "-o", str(work_dir / "ligand_bcc.mol2"), "-fo", "mol2",
-            "-c", "bcc", "-at", "gaff2", "-rn", "LIG",
+            "-i",
+            str(mol2_path),
+            "-fi",
+            "mol2",
+            "-o",
+            str(work_dir / "ligand_bcc.mol2"),
+            "-fo",
+            "mol2",
+            "-c",
+            "bcc",
+            "-at",
+            "gaff2",
+            "-rn",
+            "LIG",
         ],
-        cwd=work_dir, timeout=cmd_timeout,
+        cwd=work_dir,
+        timeout=cmd_timeout,
     )
 
     # Parmchk2: missing parameters
     _run(
         [
             "parmchk2",
-            "-i", str(work_dir / "ligand_bcc.mol2"), "-f", "mol2",
-            "-o", str(work_dir / "ligand.frcmod"), "-s", "gaff2",
+            "-i",
+            str(work_dir / "ligand_bcc.mol2"),
+            "-f",
+            "mol2",
+            "-o",
+            str(work_dir / "ligand.frcmod"),
+            "-s",
+            "gaff2",
         ],
-        cwd=work_dir, timeout=cmd_timeout,
+        cwd=work_dir,
+        timeout=cmd_timeout,
     )
 
     # Acpype: AMBER -> GROMACS conversion
     _run(
         [
             "acpype",
-            "-i", str(work_dir / "ligand_bcc.mol2"),
-            "-b", "LIG", "-c", "user", "-a", "gaff2",
+            "-i",
+            str(work_dir / "ligand_bcc.mol2"),
+            "-b",
+            "LIG",
+            "-c",
+            "user",
+            "-a",
+            "gaff2",
         ],
-        cwd=work_dir, timeout=cmd_timeout,
+        cwd=work_dir,
+        timeout=cmd_timeout,
     )
 
     acpype_dir = work_dir / "LIG.acpype"
@@ -133,10 +160,16 @@ def _parameterize_ligand(smiles: str, work_dir: Path, *, cmd_timeout: int = 600)
     # Generate ligand position restraints
     _run(
         [
-            "gmx", "genrestr",
-            "-f", str(acpype_dir / "LIG_GMX.gro"),
-            "-o", str(acpype_dir / "posre_lig.itp"),
-            "-fc", "1000", "1000", "1000",
+            "gmx",
+            "genrestr",
+            "-f",
+            str(acpype_dir / "LIG_GMX.gro"),
+            "-o",
+            str(acpype_dir / "posre_lig.itp"),
+            "-fc",
+            "1000",
+            "1000",
+            "1000",
         ],
         cwd=work_dir,
         input_text="0\n",  # group 0 = System (all ligand atoms)
@@ -146,12 +179,7 @@ def _parameterize_ligand(smiles: str, work_dir: Path, *, cmd_timeout: int = 600)
     # Patch LIG ITP with position restraint ifdef
     lig_itp = acpype_dir / "LIG_GMX.itp"
     itp_content = lig_itp.read_text()
-    posres_block = (
-        "\n; Include ligand position restraints\n"
-        "#ifdef POSRES_LIG\n"
-        '#include "posre_lig.itp"\n'
-        "#endif\n"
-    )
+    posres_block = '\n; Include ligand position restraints\n#ifdef POSRES_LIG\n#include "posre_lig.itp"\n#endif\n'
     if "#ifdef POSRES_LIG" not in itp_content:
         lig_itp.write_text(itp_content + posres_block)
 
@@ -197,9 +225,12 @@ def _make_index(tpr_path: Path, work_dir: Path, *, cmd_timeout: int = 600) -> Pa
     ndx_path = work_dir / "index.ndx"
     _run(
         [
-            "gmx", "make_ndx",
-            "-f", str(tpr_path),
-            "-o", str(ndx_path),
+            "gmx",
+            "make_ndx",
+            "-f",
+            str(tpr_path),
+            "-o",
+            str(ndx_path),
         ],
         cwd=work_dir,
         input_text="q\n",
@@ -349,13 +380,22 @@ def _setup_system(
     # Protein topology — amber14sb (Maier et al. 2015)
     _run(
         [
-            "gmx", "pdb2gmx",
-            "-f", str(repaired_pdb),
-            "-o", str(work_dir / "protein.gro"),
-            "-p", str(work_dir / "topol.top"),
-            "-ignh", "-ff", "amber14sb", "-water", "tip3p",
+            "gmx",
+            "pdb2gmx",
+            "-f",
+            str(repaired_pdb),
+            "-o",
+            str(work_dir / "protein.gro"),
+            "-p",
+            str(work_dir / "topol.top"),
+            "-ignh",
+            "-ff",
+            "amber14sb",
+            "-water",
+            "tip3p",
         ],
-        cwd=work_dir, timeout=config.cmd_timeout,
+        cwd=work_dir,
+        timeout=config.cmd_timeout,
     )
 
     # Merge protein + ligand coordinates
@@ -371,45 +411,75 @@ def _setup_system(
     # Solvate
     _run(
         [
-            "gmx", "editconf",
-            "-f", str(work_dir / "complex.gro"),
-            "-o", str(work_dir / "box.gro"),
-            "-c", "-d", "1.2", "-bt", "dodecahedron",
+            "gmx",
+            "editconf",
+            "-f",
+            str(work_dir / "complex.gro"),
+            "-o",
+            str(work_dir / "box.gro"),
+            "-c",
+            "-d",
+            "1.2",
+            "-bt",
+            "dodecahedron",
         ],
-        cwd=work_dir, timeout=config.cmd_timeout,
+        cwd=work_dir,
+        timeout=config.cmd_timeout,
     )
     _run(
         [
-            "gmx", "solvate",
-            "-cp", str(work_dir / "box.gro"),
-            "-cs", "spc216.gro",
-            "-o", str(work_dir / "solv.gro"),
-            "-p", str(work_dir / "topol.top"),
+            "gmx",
+            "solvate",
+            "-cp",
+            str(work_dir / "box.gro"),
+            "-cs",
+            "spc216.gro",
+            "-o",
+            str(work_dir / "solv.gro"),
+            "-p",
+            str(work_dir / "topol.top"),
         ],
-        cwd=work_dir, timeout=config.cmd_timeout,
+        cwd=work_dir,
+        timeout=config.cmd_timeout,
     )
 
     # Add ions (neutralize + 0.15 M NaCl)
     _write_ions_mdp(work_dir / "ions.mdp")
     _run(
         [
-            "gmx", "grompp",
-            "-f", str(work_dir / "ions.mdp"),
-            "-c", str(work_dir / "solv.gro"),
-            "-p", str(work_dir / "topol.top"),
-            "-o", str(work_dir / "ions.tpr"),
-            "-maxwarn", "1",
+            "gmx",
+            "grompp",
+            "-f",
+            str(work_dir / "ions.mdp"),
+            "-c",
+            str(work_dir / "solv.gro"),
+            "-p",
+            str(work_dir / "topol.top"),
+            "-o",
+            str(work_dir / "ions.tpr"),
+            "-maxwarn",
+            "1",
         ],
-        cwd=work_dir, timeout=config.cmd_timeout,
+        cwd=work_dir,
+        timeout=config.cmd_timeout,
     )
     _run(
         [
-            "gmx", "genion",
-            "-s", str(work_dir / "ions.tpr"),
-            "-o", str(work_dir / "solv_ions.gro"),
-            "-p", str(work_dir / "topol.top"),
-            "-pname", "NA", "-nname", "CL",
-            "-neutral", "-conc", "0.15",
+            "gmx",
+            "genion",
+            "-s",
+            str(work_dir / "ions.tpr"),
+            "-o",
+            str(work_dir / "solv_ions.gro"),
+            "-p",
+            str(work_dir / "topol.top"),
+            "-pname",
+            "NA",
+            "-nname",
+            "CL",
+            "-neutral",
+            "-conc",
+            "0.15",
         ],
         cwd=work_dir,
         input_text="SOL\n",
@@ -420,18 +490,26 @@ def _setup_system(
     _write_em_mdp(work_dir / "em.mdp")
     _run(
         [
-            "gmx", "grompp",
-            "-f", str(work_dir / "em.mdp"),
-            "-c", str(work_dir / "solv_ions.gro"),
-            "-p", str(work_dir / "topol.top"),
-            "-o", str(work_dir / "em.tpr"),
-            "-maxwarn", "1",
+            "gmx",
+            "grompp",
+            "-f",
+            str(work_dir / "em.mdp"),
+            "-c",
+            str(work_dir / "solv_ions.gro"),
+            "-p",
+            str(work_dir / "topol.top"),
+            "-o",
+            str(work_dir / "em.tpr"),
+            "-maxwarn",
+            "1",
         ],
-        cwd=work_dir, timeout=config.cmd_timeout,
+        cwd=work_dir,
+        timeout=config.cmd_timeout,
     )
     _run(
         ["gmx", "mdrun", "-deffnm", str(work_dir / "em"), "-ntmpi", "1", *em_gpu_flags],
-        cwd=work_dir, timeout=config.mdrun_timeout,
+        cwd=work_dir,
+        timeout=config.mdrun_timeout,
     )
 
     # Create index file after EM
@@ -441,61 +519,92 @@ def _setup_system(
     _write_nvt_mdp(work_dir / "nvt.mdp", config)
     _run(
         [
-            "gmx", "grompp",
-            "-f", str(work_dir / "nvt.mdp"),
-            "-c", str(work_dir / "em.gro"),
-            "-r", str(work_dir / "em.gro"),
-            "-p", str(work_dir / "topol.top"),
-            "-n", str(ndx),
-            "-o", str(work_dir / "nvt.tpr"),
-            "-maxwarn", "1",
+            "gmx",
+            "grompp",
+            "-f",
+            str(work_dir / "nvt.mdp"),
+            "-c",
+            str(work_dir / "em.gro"),
+            "-r",
+            str(work_dir / "em.gro"),
+            "-p",
+            str(work_dir / "topol.top"),
+            "-n",
+            str(ndx),
+            "-o",
+            str(work_dir / "nvt.tpr"),
+            "-maxwarn",
+            "1",
         ],
-        cwd=work_dir, timeout=config.cmd_timeout,
+        cwd=work_dir,
+        timeout=config.cmd_timeout,
     )
     _run(
         ["gmx", "mdrun", "-deffnm", str(work_dir / "nvt"), "-ntmpi", "1", *gpu_flags],
-        cwd=work_dir, timeout=config.mdrun_timeout,
+        cwd=work_dir,
+        timeout=config.mdrun_timeout,
     )
 
     # NPT equilibration
     _write_npt_mdp(work_dir / "npt.mdp", config)
     _run(
         [
-            "gmx", "grompp",
-            "-f", str(work_dir / "npt.mdp"),
-            "-c", str(work_dir / "nvt.gro"),
-            "-r", str(work_dir / "nvt.gro"),
-            "-p", str(work_dir / "topol.top"),
-            "-n", str(ndx),
-            "-t", str(work_dir / "nvt.cpt"),
-            "-o", str(work_dir / "npt.tpr"),
-            "-maxwarn", "1",
+            "gmx",
+            "grompp",
+            "-f",
+            str(work_dir / "npt.mdp"),
+            "-c",
+            str(work_dir / "nvt.gro"),
+            "-r",
+            str(work_dir / "nvt.gro"),
+            "-p",
+            str(work_dir / "topol.top"),
+            "-n",
+            str(ndx),
+            "-t",
+            str(work_dir / "nvt.cpt"),
+            "-o",
+            str(work_dir / "npt.tpr"),
+            "-maxwarn",
+            "1",
         ],
-        cwd=work_dir, timeout=config.cmd_timeout,
+        cwd=work_dir,
+        timeout=config.cmd_timeout,
     )
     _run(
         ["gmx", "mdrun", "-deffnm", str(work_dir / "npt"), "-ntmpi", "1", *gpu_flags],
-        cwd=work_dir, timeout=config.mdrun_timeout,
+        cwd=work_dir,
+        timeout=config.mdrun_timeout,
     )
 
     # Production MD
     _write_prod_mdp(work_dir / "md.mdp", config)
     _run(
         [
-            "gmx", "grompp",
-            "-f", str(work_dir / "md.mdp"),
-            "-c", str(work_dir / "npt.gro"),
-            "-t", str(work_dir / "npt.cpt"),
-            "-p", str(work_dir / "topol.top"),
-            "-n", str(ndx),
-            "-o", str(work_dir / "md.tpr"),
-            "-maxwarn", "1",
+            "gmx",
+            "grompp",
+            "-f",
+            str(work_dir / "md.mdp"),
+            "-c",
+            str(work_dir / "npt.gro"),
+            "-t",
+            str(work_dir / "npt.cpt"),
+            "-p",
+            str(work_dir / "topol.top"),
+            "-n",
+            str(ndx),
+            "-o",
+            str(work_dir / "md.tpr"),
+            "-maxwarn",
+            "1",
         ],
-        cwd=work_dir, timeout=config.cmd_timeout,
+        cwd=work_dir,
+        timeout=config.cmd_timeout,
     )
     _run(
         ["gmx", "mdrun", "-deffnm", str(work_dir / "md"), "-ntmpi", "1", *gpu_flags],
-        cwd=work_dir, timeout=config.mdrun_timeout,
+        cwd=work_dir,
+        timeout=config.mdrun_timeout,
     )
 
     return work_dir / "md.tpr"

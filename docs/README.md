@@ -52,7 +52,9 @@ Updated: 2026-02-15
 | 8 | [`receptor_qc.md`](receptor_qc.md) | Reference | Per-target structural QC: resolution, chain, ligand, mutations, coverage. |
 | 9 | [`nim_benchmark.md`](nim_benchmark.md) | Reference | Boltz-2 CLI vs NIM backend: latency, score agreement, TensorRT notes. |
 | 10 | [`reward_modes.md`](reward_modes.md) | Reference | Declarative reward registry (`configs/reward_modes.yaml`), runtime resolution, plugin extension. |
-| 11 | [`tasks.md`](tasks.md) | Living log | Task journal, execution plan, daily progress. |
+| 11 | [`io_contracts.md`](io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages. |
+| 12 | [`novelty_report.md`](novelty_report.md) | Reference | Gap analysis vs prior work, novelty assessment. |
+| 13 | [`tasks_pipeline_granularity.md`](tasks_pipeline_granularity.md) | Living log | Pipeline stage refactoring plan (9→17 stages). |
 
 **Status definitions:**
 - **Operational spec** -- single source of truth; changes require explicit approval
@@ -81,7 +83,7 @@ The two scorers are never mixed: FREED++ optimizes docking scores `d_A, d_B`; Bo
 ### Target Pairs
 
 - **5 core pairs** (primary analysis): CDK2\_ERK2, AChE\_BChE, BACE1\_GSK3B, AChE\_BACE1, GSK3B\_CDK5
-- **3 auxiliary pairs** (exploratory): EGFR\_HER2, BACE1\_CDK5, AChE\_MAOB
+- **7 auxiliary pairs** (exploratory): EGFR\_HER2, BACE1\_CDK5, AChE\_MAOB, MEK1\_MEK2, FGFR1\_FGFR2, EZH2\_EZH1, BRD4\_BRD2
 - **1 blocked pair**: COX1\_COX2 (non-human PDB structures)
 
 Pair definitions live in `configs/pairs.yaml`. Each has a `set: core/auxiliary/blocked` field.

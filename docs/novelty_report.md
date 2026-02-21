@@ -221,7 +221,7 @@
 | Weight configurations | 1-2 (single vs dual) | **6 configurations** (single_a, single_b, double, linear_equal, biased_a, selective_a) |
 | Reward type | Properties (QED, SA, logP) | **Docking score to 2 protein targets** |
 | Selectivity | Not explored | **Included (w=-1)** |
-| Pair design | Single pair or none | **5 core + 3 auxiliary pairs** with factorial design |
+| Pair design | Single pair or none | **5 core + 7 auxiliary pairs** with factorial design |
 
 **Closest works**:
 - CPRL (Wang & Zhu 2024): Pareto RL but for molecular properties, not dual-target docking
@@ -382,7 +382,7 @@ As confirmed by HuggingFace search: **"NO single work combines all three claims.
 | Configuration (`configs/`) | Complete | Schema validation | Pre-registered design |
 | Reporting (`report/templates/`) | Production | Via pipeline | LaTeX + plots |
 
-**Pre-registered configurations**: `pairs.yaml` (9 pairs, factorial design), `metrics.yaml` (thresholds T=0.0), `experiment.yaml` (1000 molecules, 5 seeds, 6 modes)
+**Pre-registered configurations**: `pairs.yaml` (13 pairs: 5 core + 7 auxiliary + 1 blocked, factorial design), `metrics.yaml` (thresholds T=0.0), `experiment.yaml` (1000 molecules, 5 seeds, 7 modes)
 
 ---
 

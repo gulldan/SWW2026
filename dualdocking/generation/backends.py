@@ -248,9 +248,7 @@ def _reinvent4_backend(request: GenerationRequest) -> list[str]:
     # epochs * steps_per_epoch.  The CLI --steps-per-epoch override is
     # re-interpreted as total n_steps for REINVENT4.
     n_steps = (
-        request.steps_per_epoch_override
-        if request.steps_per_epoch_override is not None
-        else _cfg_int(r4_cfg, "n_steps", 500)
+        request.steps_per_epoch_override if request.steps_per_epoch_override is not None else _cfg_int(r4_cfg, "n_steps", 500)
     )
 
     gen_config = Reinvent4GenerationConfig(

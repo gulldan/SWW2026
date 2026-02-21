@@ -157,8 +157,9 @@ class RewardStats:
             reward_params=reward_params,
         )
         path.write_text(json.dumps(meta, indent=2))
-        logger.info("Wrote reward metadata: {} (total={}, invalid_a={}, invalid_b={})",
-                     path, self.total, self.invalid_a, self.invalid_b)
+        logger.info(
+            "Wrote reward metadata: {} (total={}, invalid_a={}, invalid_b={})", path, self.total, self.invalid_a, self.invalid_b
+        )
 
 
 _reward_stats = RewardStats()
@@ -231,13 +232,28 @@ def dock_single(
 
     cmd = [
         vina_program,
-        "--receptor", str(receptor_pdbqt),
-        "--ligand", str(ligand_pdbqt),
-        "--center_x", cx.strip(), "--center_y", cy.strip(), "--center_z", cz.strip(),
-        "--size_x", sx.strip(), "--size_y", sy.strip(), "--size_z", sz.strip(),
-        "--exhaustiveness", str(exhaustiveness),
-        "--num_modes", "1",
-        "--out", str(out_pdbqt),
+        "--receptor",
+        str(receptor_pdbqt),
+        "--ligand",
+        str(ligand_pdbqt),
+        "--center_x",
+        cx.strip(),
+        "--center_y",
+        cy.strip(),
+        "--center_z",
+        cz.strip(),
+        "--size_x",
+        sx.strip(),
+        "--size_y",
+        sy.strip(),
+        "--size_z",
+        sz.strip(),
+        "--exhaustiveness",
+        str(exhaustiveness),
+        "--num_modes",
+        "1",
+        "--out",
+        str(out_pdbqt),
     ]
 
     try:

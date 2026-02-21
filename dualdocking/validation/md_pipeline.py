@@ -94,7 +94,9 @@ def run_single_molecule_md(
             logger.info("  Preprocessing trajectory...")
             ndx = work / "index.ndx"
             xtc_fit = _preprocess_trajectory(
-                work / "md.tpr", work / "md.xtc", work,
+                work / "md.tpr",
+                work / "md.xtc",
+                work,
                 cmd_timeout=config.cmd_timeout,
             )
 
@@ -141,175 +143,324 @@ def build_gromacs_commands() -> list[list[str]]:
 
     # ── Setup (14 commands) ──────────────────────────────────────
     # 1. pdb2gmx — amber14sb (Maier et al. 2015)
-    commands.append([
-        "gmx", "pdb2gmx",
-        "-f", str(w / "protein.pdb"),
-        "-o", str(w / "protein.gro"),
-        "-p", str(w / "topol.top"),
-        "-ignh", "-ff", "amber14sb", "-water", "tip3p",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "pdb2gmx",
+            "-f",
+            str(w / "protein.pdb"),
+            "-o",
+            str(w / "protein.gro"),
+            "-p",
+            str(w / "topol.top"),
+            "-ignh",
+            "-ff",
+            "amber14sb",
+            "-water",
+            "tip3p",
+        ]
+    )
     # 2. editconf
-    commands.append([
-        "gmx", "editconf",
-        "-f", str(w / "complex.gro"),
-        "-o", str(w / "box.gro"),
-        "-c", "-d", "1.2", "-bt", "dodecahedron",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "editconf",
+            "-f",
+            str(w / "complex.gro"),
+            "-o",
+            str(w / "box.gro"),
+            "-c",
+            "-d",
+            "1.2",
+            "-bt",
+            "dodecahedron",
+        ]
+    )
     # 3. solvate
-    commands.append([
-        "gmx", "solvate",
-        "-cp", str(w / "box.gro"),
-        "-cs", "spc216.gro",
-        "-o", str(w / "solv.gro"),
-        "-p", str(w / "topol.top"),
-    ])
+    commands.append(
+        [
+            "gmx",
+            "solvate",
+            "-cp",
+            str(w / "box.gro"),
+            "-cs",
+            "spc216.gro",
+            "-o",
+            str(w / "solv.gro"),
+            "-p",
+            str(w / "topol.top"),
+        ]
+    )
     # 4. grompp ions
-    commands.append([
-        "gmx", "grompp",
-        "-f", str(w / "ions.mdp"),
-        "-c", str(w / "solv.gro"),
-        "-p", str(w / "topol.top"),
-        "-o", str(w / "ions.tpr"),
-        "-maxwarn", "0",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "grompp",
+            "-f",
+            str(w / "ions.mdp"),
+            "-c",
+            str(w / "solv.gro"),
+            "-p",
+            str(w / "topol.top"),
+            "-o",
+            str(w / "ions.tpr"),
+            "-maxwarn",
+            "0",
+        ]
+    )
     # 5. genion
-    commands.append([
-        "gmx", "genion",
-        "-s", str(w / "ions.tpr"),
-        "-o", str(w / "solv_ions.gro"),
-        "-p", str(w / "topol.top"),
-        "-pname", "NA", "-nname", "CL",
-        "-neutral", "-conc", "0.15",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "genion",
+            "-s",
+            str(w / "ions.tpr"),
+            "-o",
+            str(w / "solv_ions.gro"),
+            "-p",
+            str(w / "topol.top"),
+            "-pname",
+            "NA",
+            "-nname",
+            "CL",
+            "-neutral",
+            "-conc",
+            "0.15",
+        ]
+    )
     # 6. grompp EM
-    commands.append([
-        "gmx", "grompp",
-        "-f", str(w / "em.mdp"),
-        "-c", str(w / "solv_ions.gro"),
-        "-p", str(w / "topol.top"),
-        "-o", str(w / "em.tpr"),
-        "-maxwarn", "0",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "grompp",
+            "-f",
+            str(w / "em.mdp"),
+            "-c",
+            str(w / "solv_ions.gro"),
+            "-p",
+            str(w / "topol.top"),
+            "-o",
+            str(w / "em.tpr"),
+            "-maxwarn",
+            "0",
+        ]
+    )
     # 7. mdrun EM
     commands.append(["gmx", "mdrun", "-deffnm", str(w / "em"), "-ntmpi", "1"])
     # 8. make_ndx
-    commands.append([
-        "gmx", "make_ndx",
-        "-f", str(w / "em.tpr"),
-        "-o", ndx,
-    ])
+    commands.append(
+        [
+            "gmx",
+            "make_ndx",
+            "-f",
+            str(w / "em.tpr"),
+            "-o",
+            ndx,
+        ]
+    )
     # 9. grompp NVT
-    commands.append([
-        "gmx", "grompp",
-        "-f", str(w / "nvt.mdp"),
-        "-c", str(w / "em.gro"),
-        "-r", str(w / "em.gro"),
-        "-p", str(w / "topol.top"),
-        "-n", ndx,
-        "-o", str(w / "nvt.tpr"),
-        "-maxwarn", "1",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "grompp",
+            "-f",
+            str(w / "nvt.mdp"),
+            "-c",
+            str(w / "em.gro"),
+            "-r",
+            str(w / "em.gro"),
+            "-p",
+            str(w / "topol.top"),
+            "-n",
+            ndx,
+            "-o",
+            str(w / "nvt.tpr"),
+            "-maxwarn",
+            "1",
+        ]
+    )
     # 10. mdrun NVT
     commands.append(["gmx", "mdrun", "-deffnm", str(w / "nvt"), "-ntmpi", "1"])
     # 11. grompp NPT
-    commands.append([
-        "gmx", "grompp",
-        "-f", str(w / "npt.mdp"),
-        "-c", str(w / "nvt.gro"),
-        "-r", str(w / "nvt.gro"),
-        "-p", str(w / "topol.top"),
-        "-n", ndx,
-        "-t", str(w / "nvt.cpt"),
-        "-o", str(w / "npt.tpr"),
-        "-maxwarn", "1",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "grompp",
+            "-f",
+            str(w / "npt.mdp"),
+            "-c",
+            str(w / "nvt.gro"),
+            "-r",
+            str(w / "nvt.gro"),
+            "-p",
+            str(w / "topol.top"),
+            "-n",
+            ndx,
+            "-t",
+            str(w / "nvt.cpt"),
+            "-o",
+            str(w / "npt.tpr"),
+            "-maxwarn",
+            "1",
+        ]
+    )
     # 12. mdrun NPT
     commands.append(["gmx", "mdrun", "-deffnm", str(w / "npt"), "-ntmpi", "1"])
     # 13. grompp prod
-    commands.append([
-        "gmx", "grompp",
-        "-f", str(w / "md.mdp"),
-        "-c", str(w / "npt.gro"),
-        "-t", str(w / "npt.cpt"),
-        "-p", str(w / "topol.top"),
-        "-n", ndx,
-        "-o", str(w / "md.tpr"),
-        "-maxwarn", "1",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "grompp",
+            "-f",
+            str(w / "md.mdp"),
+            "-c",
+            str(w / "npt.gro"),
+            "-t",
+            str(w / "npt.cpt"),
+            "-p",
+            str(w / "topol.top"),
+            "-n",
+            ndx,
+            "-o",
+            str(w / "md.tpr"),
+            "-maxwarn",
+            "1",
+        ]
+    )
     # 14. mdrun prod
     commands.append(["gmx", "mdrun", "-deffnm", str(w / "md"), "-ntmpi", "1"])
 
     # ── Preprocessing (3 commands) ───────────────────────────────
     # 15. trjconv -pbc whole
-    commands.append([
-        "gmx", "trjconv",
-        "-s", str(w / "md.tpr"),
-        "-f", str(w / "md.xtc"),
-        "-o", str(w / "md_whole.xtc"),
-        "-pbc", "whole",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "trjconv",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md.xtc"),
+            "-o",
+            str(w / "md_whole.xtc"),
+            "-pbc",
+            "whole",
+        ]
+    )
     # 16. trjconv -center -pbc mol
-    commands.append([
-        "gmx", "trjconv",
-        "-s", str(w / "md.tpr"),
-        "-f", str(w / "md_whole.xtc"),
-        "-o", str(w / "md_center.xtc"),
-        "-center", "-pbc", "mol",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "trjconv",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md_whole.xtc"),
+            "-o",
+            str(w / "md_center.xtc"),
+            "-center",
+            "-pbc",
+            "mol",
+        ]
+    )
     # 17. trjconv -fit rot+trans
-    commands.append([
-        "gmx", "trjconv",
-        "-s", str(w / "md.tpr"),
-        "-f", str(w / "md_center.xtc"),
-        "-o", str(w / "md_fit.xtc"),
-        "-fit", "rot+trans",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "trjconv",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md_center.xtc"),
+            "-o",
+            str(w / "md_fit.xtc"),
+            "-fit",
+            "rot+trans",
+        ]
+    )
 
     # ── Analysis (5 commands) ────────────────────────────────────
     # 18. backbone RMSD
-    commands.append([
-        "gmx", "rms",
-        "-s", str(w / "md.tpr"),
-        "-f", str(w / "md_fit.xtc"),
-        "-n", ndx,
-        "-o", str(w / "rmsd_backbone.xvg"),
-        "-tu", "ns",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "rms",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md_fit.xtc"),
+            "-n",
+            ndx,
+            "-o",
+            str(w / "rmsd_backbone.xvg"),
+            "-tu",
+            "ns",
+        ]
+    )
     # 19. ligand RMSD
-    commands.append([
-        "gmx", "rms",
-        "-s", str(w / "md.tpr"),
-        "-f", str(w / "md_fit.xtc"),
-        "-n", ndx,
-        "-o", str(w / "rmsd_ligand.xvg"),
-        "-tu", "ns",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "rms",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md_fit.xtc"),
+            "-n",
+            ndx,
+            "-o",
+            str(w / "rmsd_ligand.xvg"),
+            "-tu",
+            "ns",
+        ]
+    )
     # 20. RMSF
-    commands.append([
-        "gmx", "rmsf",
-        "-s", str(w / "md.tpr"),
-        "-f", str(w / "md_fit.xtc"),
-        "-n", ndx,
-        "-o", str(w / "rmsf.xvg"),
-        "-res",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "rmsf",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md_fit.xtc"),
+            "-n",
+            ndx,
+            "-o",
+            str(w / "rmsf.xvg"),
+            "-res",
+        ]
+    )
     # 21. Rg
-    commands.append([
-        "gmx", "gyrate",
-        "-s", str(w / "md.tpr"),
-        "-f", str(w / "md_fit.xtc"),
-        "-n", ndx,
-        "-o", str(w / "gyrate.xvg"),
-    ])
+    commands.append(
+        [
+            "gmx",
+            "gyrate",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md_fit.xtc"),
+            "-n",
+            ndx,
+            "-o",
+            str(w / "gyrate.xvg"),
+        ]
+    )
     # 22. hbond-legacy
-    commands.append([
-        "gmx", "hbond-legacy",
-        "-s", str(w / "md.tpr"),
-        "-f", str(w / "md_fit.xtc"),
-        "-n", ndx,
-        "-num", str(w / "hbond.xvg"),
-        "-tu", "ns",
-    ])
+    commands.append(
+        [
+            "gmx",
+            "hbond-legacy",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md_fit.xtc"),
+            "-n",
+            ndx,
+            "-num",
+            str(w / "hbond.xvg"),
+            "-tu",
+            "ns",
+        ]
+    )
 
     return commands
 
@@ -346,9 +497,7 @@ def run_md_validation(
 
     for m in config.modes:
         logger.info("=== Mode: {} ===", m)
-        top_df = select_top_molecules(
-            config.pair_id, m, config.top_n, config.seeds, config.results_dir
-        )
+        top_df = select_top_molecules(config.pair_id, m, config.top_n, config.seeds, config.results_dir)
         if top_df.empty:
             logger.warning("No scored molecules found for {}/{}", config.pair_id, m)
             continue
@@ -393,9 +542,7 @@ def write_summary(results: list[MDResult], summary_path: Path) -> None:
     if summary_path.exists():
         existing = pd.read_parquet(summary_path)
         summary_df = pd.concat([existing, summary_df], ignore_index=True)
-        summary_df = summary_df.drop_duplicates(
-            subset=["pair", "mode", "mol_id", "target"], keep="last"
-        )
+        summary_df = summary_df.drop_duplicates(subset=["pair", "mode", "mol_id", "target"], keep="last")
 
     summary_df.to_parquet(summary_path, index=False)
     logger.info("MD summary written: {} ({} rows)", summary_path, len(summary_df))

@@ -108,8 +108,8 @@ def simulate_power_hierarchical(
         mol_idx_c = rng.integers(0, n_molecules, size=(n_bootstrap, n_seeds, n_molecules))
         mol_idx_t = rng.integers(0, n_molecules, size=(n_bootstrap, n_seeds, n_molecules))
 
-        sel_c = control[idx_c]       # (B, S, M)
-        sel_t = treatment[idx_t]     # (B, S, M)
+        sel_c = control[idx_c]  # (B, S, M)
+        sel_t = treatment[idx_t]  # (B, S, M)
         resamp_c = np.take_along_axis(sel_c, mol_idx_c, axis=2)
         resamp_t = np.take_along_axis(sel_t, mol_idx_t, axis=2)
 

@@ -138,7 +138,6 @@ async def predict_batch_async(
         List of ``(index, affinity)`` aligned to submitted indices.
     """
 
-
     n_urls = len(nim_urls)
     urls = [f"{url}{predict_endpoint}" for url in nim_urls]
     semaphores = [asyncio.Semaphore(concurrency) for _ in range(n_urls)]

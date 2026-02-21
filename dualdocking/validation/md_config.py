@@ -109,9 +109,7 @@ def _run(
     )
     if check and result.returncode != 0:
         tail = (result.stderr or "")[-1000:]
-        raise RuntimeError(
-            f"Command failed (rc={result.returncode}): {' '.join(cmd[:6])}\n{tail}"
-        )
+        raise RuntimeError(f"Command failed (rc={result.returncode}): {' '.join(cmd[:6])}\n{tail}")
     return result
 
 
@@ -124,7 +122,10 @@ def _detect_gpu_flags() -> list[str]:
     try:
         r = subprocess.run(  # noqa: S603
             [nvidia_smi, "--query-gpu=name", "--format=csv,noheader", "--id=0"],
-            capture_output=True, text=True, check=False, timeout=10,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
         )
         if r.returncode == 0 and r.stdout.strip():
             return ["-nb", "gpu", "-pme", "gpu", "-bonded", "gpu", "-update", "gpu"]

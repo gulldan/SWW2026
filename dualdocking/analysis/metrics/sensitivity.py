@@ -136,11 +136,7 @@ def run_sensitivity(config: SensitivityConfig) -> SensitivityResult:
     )
     from dualdocking.data.io_utils import stem_exists
 
-    results_root = (
-        config.results_root
-        if config.results_root.is_absolute()
-        else config.project_root / config.results_root
-    )
+    results_root = config.results_root if config.results_root.is_absolute() else config.project_root / config.results_root
 
     # ---- Load all DataFrames (threshold-agnostic) ----
     raw_data: dict[str, dict[str, dict[int, pd.DataFrame]]] = {}

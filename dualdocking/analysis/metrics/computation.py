@@ -589,11 +589,7 @@ def load_all_data(
     from dualdocking.analysis.fairness import validate_fairness, validate_reward_quality
     from dualdocking.data.io_utils import stem_exists
 
-    results_root = (
-        config.results_root
-        if config.results_root.is_absolute()
-        else config.project_root / config.results_root
-    )
+    results_root = config.results_root if config.results_root.is_absolute() else config.project_root / config.results_root
 
     data: DataDict = {}
 
@@ -699,9 +695,7 @@ def compute_metrics(config: ComputeMetricsConfig) -> ComputeMetricsResult:
             sys.exit(1)
 
     # Summary metrics
-    metrics_out = compute_summary_metrics(
-        config.pairs, config.modes, config.seeds, data, config.metrics_cfg, config.exp_cfg
-    )
+    metrics_out = compute_summary_metrics(config.pairs, config.modes, config.seeds, data, config.metrics_cfg, config.exp_cfg)
 
     # Identify core pairs for FDR scope (SAP 4.2: primary family = H1a+H1b core only)
     core_pair_ids = {pid for pid, cfg in config.pairs.items() if cfg.get("set", "core") == "core"}
@@ -735,11 +729,7 @@ def compute_metrics(config: ComputeMetricsConfig) -> ComputeMetricsResult:
                 group_a,
                 group_b,
                 metric_fn,
-                n_bootstrap=(
-                    config.n_bootstrap
-                    if test_id in ("H1a", "H1b")
-                    else min(config.n_bootstrap, _H2_BOOTSTRAP_CAP)
-                ),
+                n_bootstrap=(config.n_bootstrap if test_id in ("H1a", "H1b") else min(config.n_bootstrap, _H2_BOOTSTRAP_CAP)),
                 rng_seed=42,
                 fast_column=fast_col,
                 fast_fn=fast_fn,

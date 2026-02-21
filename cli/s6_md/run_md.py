@@ -121,9 +121,7 @@ def main(  # noqa: PLR0913
     if dry_run:
         for m in md_config.modes:
             logger.info("=== Mode: {} ===", m)
-            top_df = select_top_molecules(
-                pair, m, top_n, seeds, md_config.results_dir
-            )
+            top_df = select_top_molecules(pair, m, top_n, seeds, md_config.results_dir)
             if top_df.empty:
                 logger.warning("No scored molecules found for {}/{}", pair, m)
                 continue

@@ -196,26 +196,12 @@ def run_claim_audit(config: AuditConfig) -> dict[str, Any]:
         Structured audit dict with ``checks``, ``pass``, ``claim_scenario``,
         ``degradation_warning``, ``evidence_map``, ``summary``, and ``issues``.
     """
-    stats_path = (
-        config.stats_path
-        if config.stats_path.is_absolute()
-        else config.project_root / config.stats_path
-    )
-    metrics_path = (
-        config.metrics_path
-        if config.metrics_path.is_absolute()
-        else config.project_root / config.metrics_path
-    )
+    stats_path = config.stats_path if config.stats_path.is_absolute() else config.project_root / config.stats_path
+    metrics_path = config.metrics_path if config.metrics_path.is_absolute() else config.project_root / config.metrics_path
     sensitivity_path = (
-        config.sensitivity_path
-        if config.sensitivity_path.is_absolute()
-        else config.project_root / config.sensitivity_path
+        config.sensitivity_path if config.sensitivity_path.is_absolute() else config.project_root / config.sensitivity_path
     )
-    pairs_config_path = (
-        config.pairs_config
-        if config.pairs_config.is_absolute()
-        else config.project_root / config.pairs_config
-    )
+    pairs_config_path = config.pairs_config if config.pairs_config.is_absolute() else config.project_root / config.pairs_config
     core_pairs = load_core_pairs(pairs_config_path)
 
     audit: dict[str, Any] = {
