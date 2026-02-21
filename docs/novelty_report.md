@@ -260,7 +260,7 @@
 None of the 65+ PubMed articles or 21 HuggingFace papers uses an RL generator with docking reward for systematic scanning of the weight space of two protein targets.
 
 - Closest: CPRL (Pareto RL for properties), Isigkeit et al. (CLM for dual-ligands), REINVENT 4 ([GitHub](https://github.com/MolecularAI/REINVENT4), multi-objective but no systematic weight grid)
-- Implementation: `dual_reward_patch.py` with 6 modes (single_a, single_b, double, linear_equal, biased_a, selective_a), z-score normalization, multiple scalarizations. 53 dedicated tests.
+- Implementation: `dual_reward_patch.py` with 6 modes (single_a, single_b, double, linear_equal, biased_a, selective_a), z-score normalization, multiple scalarizations. 76 dedicated tests.
 
 ### Claim 2: "Boltz-2 as independent post-scoring (not circular evaluation)"
 
@@ -370,9 +370,9 @@ As confirmed by HuggingFace search: **"NO single work combines all three claims.
 
 | Component | Maturity | Tests | Novelty Claim Supported |
 |-----------|----------|-------|------------------------|
-| Multi-objective scalarizations (`objectives.py`) | Production | Yes (396 total) | Weight-space exploration |
-| Dual reward patch (`dual_reward_patch.py`) | Production | 53 dedicated | FREED++ dual-target RL |
-| Boltz-2 scorer (`boltz2.py`) | Production | 48 dedicated | Orthogonal evaluation |
+| Multi-objective scalarizations (`objectives.py`) | Production | 28 dedicated | Weight-space exploration |
+| Dual reward patch (`dual_reward_patch.py`) | Production | 76 dedicated | FREED++ dual-target RL |
+| Boltz-2 scorer (`boltz2.py`) | Production | 66 dedicated | Orthogonal evaluation |
 | FREED++ Docker wrapper (`generation/freedpp.py`) | Production | Integration | RL generation backend |
 | Statistical analysis (`analysis/statistical.py`) | Production | Yes | Hierarchical bootstrap, FDR, Cliff's delta |
 | Enrichment metrics (`analysis/enrichment.py`) | Production | Yes | AUROC, BEDROC, EF |
@@ -382,7 +382,7 @@ As confirmed by HuggingFace search: **"NO single work combines all three claims.
 | Configuration (`configs/`) | Complete | Schema validation | Pre-registered design |
 | Reporting (`report/templates/`) | Production | Via pipeline | LaTeX + plots |
 
-**Pre-registered configurations**: `pairs.yaml` (13 pairs: 5 core + 7 auxiliary + 1 blocked, factorial design), `metrics.yaml` (thresholds T=0.0), `experiment.yaml` (1000 molecules, 5 seeds, 7 modes)
+**Pre-registered configurations**: `pairs.yaml` (13 pairs: 5 core + 7 auxiliary + 1 blocked, factorial design), `metrics.yaml` (thresholds T=0.0), `experiment.yaml` (1000 molecules, 5 seeds, 6 modes)
 
 ---
 

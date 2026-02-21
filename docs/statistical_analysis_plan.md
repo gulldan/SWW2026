@@ -194,7 +194,7 @@ where `n_greater` = number of pairs where treat > ctrl,
 | < 0.474 | Medium |
 | >= 0.474 | Large |
 
-Implementation: `dualdocking/analysis/statistical.py:200-211` (`cliffs_delta()`).
+Implementation: `dualdocking/analysis/statistical.py:291-314` (`cliffs_delta()`).
 
 #### 4.3.2 Cohen's d (Secondary)
 
@@ -206,7 +206,7 @@ d = (mean_treat - mean_ctrl) / sqrt(pooled_var)
 
 **Interpretation:** 0.2 small, 0.5 medium, 0.8 large (Cohen 1988).
 
-Implementation: `dualdocking/analysis/statistical.py:214-229` (`cohens_d()`).
+Implementation: `dualdocking/analysis/statistical.py:317-340` (`cohens_d()`).
 
 ### 4.4 Significance Decision Rule
 
@@ -217,7 +217,7 @@ A contrast is declared **significant** if ALL three conditions hold
 2. |Cliff's delta| >= 0.33 (at least medium effect)
 3. Bootstrap 95% CI excludes zero (ci_lower > 0 OR ci_upper < 0)
 
-Implementation: `dualdocking/analysis/metrics/computation.py:736-740`.
+Implementation: `dualdocking/analysis/metrics/computation.py:762-765`.
 
 ```python
 entry["significant"] = (
@@ -328,15 +328,15 @@ manual computation steps required.
 |-------------|---------------|----------------|
 | 2.2 Fairness gate | `dualdocking/analysis/fairness.py:44-86` | `validate_fairness()` |
 | 2.2 Quality gate | `dualdocking/analysis/fairness.py:89-167` | `validate_reward_quality()` |
-| 2.3 Missing data | `dualdocking/analysis/metrics/computation.py:600-609` | Completeness check |
-| 3.1 hr_both | `dualdocking/analysis/metrics/computation.py:114-116` | `(aff_a <= thr_a) & (aff_b <= thr_b)` |
+| 2.3 Missing data | `dualdocking/analysis/metrics/computation.py:576-630` | `load_all_data()` completeness check |
+| 3.1 hr_both | `dualdocking/analysis/metrics/computation.py:120-122` | `(aff_a <= thr_a) & (aff_b <= thr_b)` |
 | 3.1 Thresholds | `configs/metrics.yaml:13-43` | `T_A = T_B = 0.0` |
-| 4.1 Bootstrap | `dualdocking/analysis/statistical.py:44-171` | `hierarchical_bootstrap_test()` |
-| 4.2 FDR | `dualdocking/analysis/statistical.py:174-197` | `fdr_correction()` |
-| 4.3.1 Cliff's delta | `dualdocking/analysis/statistical.py:200-211` | `cliffs_delta()` |
-| 4.3.2 Cohen's d | `dualdocking/analysis/statistical.py:214-229` | `cohens_d()` |
-| 4.4 Significance rule | `dualdocking/analysis/metrics/computation.py:736-740` | Conjunctive criterion |
-| 5.2 No-degradation guard | `dualdocking/analysis/metrics/computation.py:146-194` | Degradation Cliff's delta |
+| 4.1 Bootstrap | `dualdocking/analysis/statistical.py:97-254` | `hierarchical_bootstrap_test()` |
+| 4.2 FDR | `dualdocking/analysis/statistical.py:257-288` | `fdr_correction()` |
+| 4.3.1 Cliff's delta | `dualdocking/analysis/statistical.py:291-314` | `cliffs_delta()` |
+| 4.3.2 Cohen's d | `dualdocking/analysis/statistical.py:317-340` | `cohens_d()` |
+| 4.4 Significance rule | `dualdocking/analysis/metrics/computation.py:762-765` | Conjunctive criterion |
+| 5.2 No-degradation guard | `dualdocking/analysis/metrics/computation.py:152-200` | Degradation Cliff's delta |
 | 5.3 Threshold sensitivity | `cli/s5_analyze/threshold_sensitivity.py` | Full script |
 | 6.x Claim audit | `cli/s7_audit/claim_audit.py` | Full script |
 | Proxy-final correlation | `cli/s5_analyze/proxy_correlation.py` | Full script |
@@ -356,9 +356,9 @@ manual computation steps required.
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
-| Bootstrap RNG seed | 42 | `statistical.py:50` |
+| Bootstrap RNG seed | 42 | `statistical.py:103` |
 | Bootstrap replicates | 10,000 | `dualdocking/analysis/metrics/computation.py:27` |
-| FDR alpha | 0.05 | `dualdocking/analysis/metrics/computation.py:732` |
+| FDR alpha | 0.05 | `dualdocking/analysis/metrics/computation.py:758` |
 | RL seeds | [42, 137, 256, 512, 1024] | `configs/experiment.yaml:11` |
 | Molecules per run | 1,000 | `configs/experiment.yaml:7` |
 | Hit threshold T | 0.0 (1 uM) | `configs/metrics.yaml:16-39` |

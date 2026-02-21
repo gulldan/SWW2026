@@ -130,7 +130,7 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 
 | Topic | Location |
 |-------|----------|
-| MD validation pipeline | `dualdocking/validation/md_*.py` (5 modules), `cli/s6_md/run_md.py`, [io_contracts.md](io_contracts.md) (Stage 5c) |
+| MD validation pipeline | `dualdocking/validation/md_*.py` (6 modules), `cli/s6_md/run_md.py`, [io_contracts.md](io_contracts.md) (Stage 5c) |
 | Generator/scorer backend selection | `configs/experiment.yaml` (`generator.backend`, `scorer.engine`) |
 | Reward config Docker passthrough (model-dependent) | `configs/experiment.yaml` (`generator.freedpp.pass_reward_modes_to_container`, `generator.freedpp.reward_modes_path_in_container`) |
 | Reward mode declarations and overrides | `configs/reward_modes.yaml` + `reward_modes.md` |
@@ -139,7 +139,7 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 | Boltz-2 cache format, context hashing | `architecture.md` (Caching section) |
 | Boltz-2 NIM setup and Docker launch | `architecture.md` + `nim_benchmark.md` |
 | Bootstrap procedure, claim rules | `statistical_analysis_plan.md` (Sections 3-5) |
-| ChEMBL target IDs | `configs/pairs.yaml` (per-target `chembl_id` field) |
+| ChEMBL target IDs | `dualdocking/data/chembl_validation.py` (lookup by UniProt ID from `configs/pairs.yaml`) |
 | Cofactor handling and caveats | `selection_criteria.md` (Cofactor section) |
 | Docker image builds (`freedpp`, `gnina`, `md`) | `setup.md` (Docker sections) + `pipeline.md` (Stage 0 + MD section) |
 | Factor design (Disease/Structure/Cofactor) | `selection_criteria.md` (Factor Design section) |

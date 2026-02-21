@@ -52,6 +52,34 @@ After completion, no internet access is required.
 
 ---
 
+## Stage 0b — Prepare
+
+**Scripts**: `cli/s1_prepare/prepare_all.py` (orchestrator),
+`cli/s1_prepare/prepare_targets.py`, `cli/s1_prepare/convert_baseline_parquet.py`,
+`cli/s1_prepare/sample_baseline.py`, `cli/s1_prepare/rdkit_embed.py`
+
+Prepares fetched data for downstream stages: target structure conversion,
+baseline sampling, and 3D embedding.
+
+### Inputs
+
+| File | Format | Source |
+|------|--------|--------|
+| `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | Stage 0 |
+| `output/data/targets/{target_id}.fasta` | FASTA | Stage 0 |
+| `output/data/calibration/*.smi` | SMI | Stage 0 |
+| `configs/pairs.yaml` | YAML | Config |
+
+### Outputs
+
+| File | Format | Contents |
+|------|--------|----------|
+| `output/data/targets/{target_id}.pdbqt` | PDBQT | Receptor prepared for docking |
+| `output/data/baseline/*.parquet` | Parquet | Baseline molecules in Parquet format |
+| `output/cache/prepare_checkpoint.json` | JSON | Step completion tracking |
+
+---
+
 ## Stage 1 — Calibration
 
 **Scripts**: `cli/s2_calibrate/dock_calibration.py` →

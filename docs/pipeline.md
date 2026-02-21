@@ -150,6 +150,7 @@ FREED++ automatically resumes from checkpoints when a previous run was interrupt
 |----------|---------|---------|
 | `FREEDPP_EPOCHS` | from config (100) | Override epoch count (e.g. `10` for smoke tests) |
 | `FREEDPP_NUM_SUB_PROC` | auto-detect by VRAM | Concurrent docking subprocesses |
+| `REINVENT4_N_STEPS` | from config (500) | Override REINVENT4 RL step count |
 | `EXPERIMENT_RUN_ID` | — | Run identifier for logs and manifests |
 
 ## Stage Runner

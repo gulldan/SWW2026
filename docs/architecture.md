@@ -173,24 +173,37 @@ configurable via `generator.freedpp.pass_reward_modes_to_container` and
 
 **Pre-registered (primary hypothesis):**
 
-| Mode | Reward | Description |
-|------|--------|-------------|
-| `single_a` | `-z_A` | Optimize for target A only |
-| `single_b` | `-z_B` | Optimize for target B only |
-| `double` | `-max(z_A, z_B)` | Worst-case over both targets |
+| Mode | Evaluator output | Description |
+|------|-----------------|-------------|
+| `single_a` | `z_A` | Optimize for target A only |
+| `single_b` | `z_B` | Optimize for target B only |
+| `double` | `max(z_A, z_B)` | Worst-case over both targets |
 
 **Exploratory (not pre-registered):**
 
-| Mode | Reward | Description |
-|------|--------|-------------|
-| `linear_equal` | `-(z_A + z_B)` | Equally weighted linear combination |
-| `biased_a` | `-(z_A + 0.3·z_B)` | Target A priority |
-| `selective_a` | `-(z_A - z_B)` | Maximize selectivity for A over B |
-| `selective_weighted` | `-(z_A - \lambda_{off}\cdot z_B)` | Configurable selectivity penalty |
+| Mode | Evaluator output | Description |
+|------|-----------------|-------------|
+| `linear_equal` | `z_A + z_B` | Equally weighted linear combination |
+| `biased_a` | `z_A + 0.3·z_B` | Target A priority |
+| `selective_a` | `z_A - z_B` | Maximize selectivity for A over B |
+| `selective_weighted` | `z_A - λ_off·z_B` | Configurable selectivity penalty |
 
 Where `z_X = (d_X - mu_X) / sigma_X` (per-target z-score from calibration).
 Z-scores are clamped to ±10 (`MAX_Z_ABS`) to prevent corrupt docking scores from
 dominating the RL gradient.
+
+**Sign convention.** Evaluators in `dualdocking/reward/selectivity.py` follow
+**lower-is-better** (matching the docking score convention). Each generation
+backend converts to its own RL reward convention:
+
+- **REINVENT4** negates explicitly: `rewards[i] = -mode.evaluate(...)` (see
+  `dualdocking/generation/reinvent4/scoring.py:391-393`). REINVENT4 DAP
+  expects higher = better.
+- **FREED++** returns the evaluator output directly from the patched
+  `DockingVina.__call__` (see `docker/freedpp/dual_reward_patch_hooks.py:265`).
+  This preserves the original DockingVina convention (docking scores are
+  negative kcal/mol, lower = better); FREED++ SAC is designed to work with
+  lower-is-better rewards natively.
 
 Custom modes can be added without touching FREED++ internals:
 
@@ -298,7 +311,7 @@ After that, the entire pipeline (generation, scoring, analysis) runs offline.
 | MSA | `output/cache/boltz_msa/{id}.csv` | ColabFold API |
 | Boltz checkpoints | `~/.boltz/` | Auto on first run |
 | Score cache | `output/cache/boltz_scores/{target}.{ctx}.json` | Computed |
-| NIM model cache | `output/cache/boltz_nim/` | NIM container |
+| NIM model cache | NIM container internal cache | NIM container |
 | FREED++ models | `output/cache/freedpp_models/{key}/` | Generation |
 
 ## Troubleshooting
