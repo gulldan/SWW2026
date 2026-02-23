@@ -64,6 +64,9 @@ class _GenerationConfigLike(Protocol):
     training_timeout: int
     pass_reward_modes_to_container: bool
     reward_modes_path_in_container: str
+    early_stopping_patience: int
+    early_stopping_threshold: float
+    early_stopping_min_epochs: int
 
 
 class _PopenLike(Protocol):
@@ -71,6 +74,9 @@ class _PopenLike(Protocol):
 
     returncode: int | None
     stdout: Iterable[str] | None
+
+    def terminate(self) -> None:
+        """Send SIGTERM to the process."""
 
     def wait(self, timeout: int | None = None) -> object:
         """Wait for process completion.
@@ -434,6 +440,14 @@ def run_freedpp(  # noqa: PLR0913
         line_count = 0
         noise_patterns = ("DeprecationWarning", "SyntaxWarning", "FutureWarning", "UserWarning", "warnings.warn")
 
+        # Early stopping state
+        reward_history: list[float] = []
+        early_stopped = False
+        es_patience = config.early_stopping_patience
+        es_threshold = config.early_stopping_threshold
+        es_min_epochs = config.early_stopping_min_epochs
+
+        is_training = "train" in commands
         stdout_iter = process.stdout if process.stdout is not None else []
         for line in stdout_iter:
             stripped = line.rstrip()
@@ -445,25 +459,58 @@ def run_freedpp(  # noqa: PLR0913
                 captured_lines.append(line)
                 continue
 
-            if epoch_bar is not None:
-                match = _EPOCH_RE.search(stripped)
-                if match:
-                    epoch_num = int(next(group for group in match.groups() if group is not None))
+            # Epoch matching — for progress bar, logging, and early stopping
+            epoch_match = _EPOCH_RE.search(stripped) if is_training else None
+            if epoch_match is not None:
+                epoch_num = int(next(group for group in epoch_match.groups() if group is not None))
+
+                if epoch_bar is not None:
                     epoch_bar.n = min(epoch_num, config.epochs)
                     epoch_bar.refresh()
-                    log_interval = max(1, config.epochs // 10)
-                    if epoch_num > 0 and epoch_num % log_interval == 0 and epoch_num != last_epoch_logged:
-                        last_epoch_logged = epoch_num
-                        elapsed = time.monotonic() - train_start
-                        sec_per_epoch = elapsed / epoch_num
-                        remaining = (config.epochs - epoch_num) * sec_per_epoch
-                        log.info(
-                            f"[{tag}] Epoch {epoch_num}/{config.epochs} — "
-                            f"{elapsed:.0f}s elapsed, ~{remaining / 60:.0f}m remaining ({sec_per_epoch:.1f}s/epoch)",
-                        )
-                elif line_count % 500 == 0:
+
+                log_interval = max(1, config.epochs // 10)
+                if epoch_num > 0 and epoch_num % log_interval == 0 and epoch_num != last_epoch_logged:
+                    last_epoch_logged = epoch_num
                     elapsed = time.monotonic() - train_start
-                    epoch_bar.set_postfix_str(f"{line_count} lines, {elapsed:.0f}s")
+                    sec_per_epoch = elapsed / epoch_num
+                    remaining = (config.epochs - epoch_num) * sec_per_epoch
+                    log.info(
+                        f"[{tag}] Epoch {epoch_num}/{config.epochs} — "
+                        f"{elapsed:.0f}s elapsed, ~{remaining / 60:.0f}m remaining ({sec_per_epoch:.1f}s/epoch)",
+                    )
+
+                # Collect reward for early stopping
+                metrics = {
+                    m.group("key").lower(): float(m.group("value"))
+                    for m in _METRIC_RE.finditer(stripped)
+                }
+                if "reward" in metrics:
+                    reward_history.append(metrics["reward"])
+                elif "score" in metrics:
+                    reward_history.append(metrics["score"])
+
+                # Check early stopping convergence
+                if (
+                    es_patience > 0
+                    and len(reward_history) >= es_min_epochs
+                    and len(reward_history) >= es_patience
+                ):
+                    window = reward_history[-es_patience:]
+                    mean_val = sum(window) / len(window)
+                    range_val = max(window) - min(window)
+                    if mean_val != 0 and range_val < es_threshold * abs(mean_val):
+                        log.info(
+                            f"[{tag}] Early stopping at epoch {epoch_num}: "
+                            f"reward plateaued for {es_patience} epochs "
+                            f"(range={range_val:.4f}, threshold={es_threshold * abs(mean_val):.4f})"
+                        )
+                        process.terminate()
+                        early_stopped = True
+                        break
+
+            elif epoch_bar is not None and line_count % 500 == 0:
+                elapsed = time.monotonic() - train_start
+                epoch_bar.set_postfix_str(f"{line_count} lines, {elapsed:.0f}s")
 
             low = stripped.lower()
             if any(keyword in low for keyword in ("error", "sample", "saving", "loss", "score", "result")):
@@ -481,12 +528,19 @@ def run_freedpp(  # noqa: PLR0913
 
     if process is None or process.returncode != 0:
         return_code = process.returncode if process is not None and process.returncode is not None else -1
-        log.error(f"[{tag}] FREED++ failed (rc={return_code})")
-        log.error(f"[{tag}] output: {stdout_text[-2000:]}")
-        log.error(f"[{tag}] log -> {log_path}")
-        raise subprocess.CalledProcessError(return_code, docker_cmd, output=stdout_text)
+        # SIGTERM (rc=-15 or 143) from early stopping is intentional — not an error.
+        if early_stopped and return_code in (-15, 143):
+            log.info(f"[{tag}] FREED++ terminated by early stopping (rc={return_code})")
+        else:
+            log.error(f"[{tag}] FREED++ failed (rc={return_code})")
+            log.error(f"[{tag}] output: {stdout_text[-2000:]}")
+            log.error(f"[{tag}] log -> {log_path}")
+            raise subprocess.CalledProcessError(return_code, docker_cmd, output=stdout_text)
 
-    return subprocess.CompletedProcess(docker_cmd, process.returncode, stdout=stdout_text, stderr="")
+    rc = 0 if early_stopped else (process.returncode or 0)
+    result = subprocess.CompletedProcess(docker_cmd, rc, stdout=stdout_text, stderr="")
+    result.early_stopped = early_stopped  # type: ignore[attr-defined]
+    return result
 
 
 def parse_training_log(log_path: Path) -> list[dict[str, int | float]]:

@@ -194,6 +194,9 @@ class _FakePopen:
         self.returncode = 0
         self.stdout = iter([])
 
+    def terminate(self):
+        self.returncode = -15
+
     def wait(self, timeout=None):
         pass
 
@@ -401,3 +404,169 @@ def test_parse_training_log_duplicate_epoch(tmp_path: Path) -> None:
     assert records[0]["epoch"] == 1
     assert records[0]["loss"] == pytest.approx(0.5)
     assert records[0]["reward"] == pytest.approx(-7.0)
+
+
+# --- Early stopping ---
+
+
+class _FakePopenWithLines(_FakePopen):
+    """FakePopen that emits pre-configured stdout lines."""
+
+    def __init__(self, cmd, lines=None, **kwargs):
+        super().__init__(cmd, **kwargs)
+        self.stdout = iter(lines or [])
+        self._terminated = False
+
+    def terminate(self):
+        self._terminated = True
+        self.returncode = -15
+
+
+class TestEarlyStopping:
+    """Test early stopping in the docker streaming loop."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path):
+        self.workspace = tmp_path / "workspace"
+        self.workspace.mkdir()
+        self.pdbqt_a = tmp_path / "receptor_a.pdbqt"
+        self.pdbqt_a.write_text("ATOM ...")
+
+    def _make_epoch_lines(self, rewards: list[float]) -> list[str]:
+        """Generate fake FREED++ epoch log lines with reward values."""
+        return [f"Epoch {i + 1} loss=0.5 reward={r}\n" for i, r in enumerate(rewards)]
+
+    def _run_with_lines(self, config, lines):
+        """Run _run_freedpp with a FakePopen emitting the given lines."""
+        popen_instances = []
+
+        def fake_popen(cmd, **kwargs):
+            proc = _FakePopenWithLines(cmd, lines=lines)
+            popen_instances.append(proc)
+            return proc
+
+        with (
+            patch("dualdocking.generation.freedpp.core.subprocess.Popen", side_effect=fake_popen),
+            patch("dualdocking.generation.freedpp.core.tqdm", side_effect=lambda *a, **kw: None),
+        ):
+            result = _run_freedpp(
+                config,
+                self.workspace,
+                self.pdbqt_a,
+                "1.0,2.0,3.0",
+                "20.0,20.0,20.0",
+            )
+        return result, popen_instances
+
+    def test_early_stopping_triggers_on_plateau(self):
+        """Early stopping should fire when reward plateaus for patience epochs."""
+        # 10 improving epochs, then 15 flat epochs at -7.0 (patience=15, min_epochs=20)
+        rewards = list(range(-1, -11, -1)) + [-7.0] * 15  # 25 total
+        cfg = GenerationConfig(
+            target_id="CDK2",
+            epochs=100,
+            num_sub_proc=8,
+            early_stopping_patience=15,
+            early_stopping_threshold=0.01,
+            early_stopping_min_epochs=20,
+        )
+        lines = self._make_epoch_lines(rewards)
+        result, procs = self._run_with_lines(cfg, lines)
+
+        assert getattr(result, "early_stopped", False) is True
+        assert procs[0]._terminated is True
+
+    def test_early_stopping_does_not_trigger_before_min_epochs(self):
+        """Early stopping must not fire before min_epochs even if reward is flat."""
+        # 15 flat epochs (patience=5, but min_epochs=20)
+        rewards = [-7.0] * 15
+        cfg = GenerationConfig(
+            target_id="CDK2",
+            epochs=100,
+            num_sub_proc=8,
+            early_stopping_patience=5,
+            early_stopping_threshold=0.01,
+            early_stopping_min_epochs=20,
+        )
+        lines = self._make_epoch_lines(rewards)
+        result, procs = self._run_with_lines(cfg, lines)
+
+        assert getattr(result, "early_stopped", False) is False
+        assert procs[0]._terminated is False
+
+    def test_early_stopping_disabled_when_patience_zero(self):
+        """patience=0 disables early stopping entirely."""
+        rewards = [-7.0] * 30
+        cfg = GenerationConfig(
+            target_id="CDK2",
+            epochs=100,
+            num_sub_proc=8,
+            early_stopping_patience=0,
+            early_stopping_threshold=0.01,
+            early_stopping_min_epochs=5,
+        )
+        lines = self._make_epoch_lines(rewards)
+        result, procs = self._run_with_lines(cfg, lines)
+
+        assert getattr(result, "early_stopped", False) is False
+
+    def test_early_stopping_does_not_trigger_with_improving_reward(self):
+        """Steadily improving reward should never trigger early stopping."""
+        rewards = [float(-i) for i in range(1, 31)]  # -1, -2, ..., -30
+        cfg = GenerationConfig(
+            target_id="CDK2",
+            epochs=100,
+            num_sub_proc=8,
+            early_stopping_patience=5,
+            early_stopping_threshold=0.01,
+            early_stopping_min_epochs=10,
+        )
+        lines = self._make_epoch_lines(rewards)
+        result, procs = self._run_with_lines(cfg, lines)
+
+        assert getattr(result, "early_stopped", False) is False
+
+    def test_early_stopping_triggers_resample(self, tmp_path):
+        """After early stopping, a second docker run with commands=sample should happen."""
+        # Create a fake checkpoint so resample logic can find it
+        run_dir = self.workspace / "output" / "run"
+        run_dir.mkdir(parents=True)
+        (run_dir / "model_25.pth").write_bytes(b"fake")
+
+        rewards = [-7.0] * 25  # flat from the start
+        cfg = GenerationConfig(
+            target_id="CDK2",
+            epochs=100,
+            num_sub_proc=8,
+            early_stopping_patience=5,
+            early_stopping_threshold=0.01,
+            early_stopping_min_epochs=10,
+        )
+        lines = self._make_epoch_lines(rewards)
+        popen_calls = []
+
+        def fake_popen(cmd, **kwargs):
+            proc = _FakePopenWithLines(cmd, lines=lines if not popen_calls else [])
+            popen_calls.append({"cmd": cmd, "proc": proc})
+            return proc
+
+        with (
+            patch("dualdocking.generation.freedpp.core.subprocess.Popen", side_effect=fake_popen),
+            patch("dualdocking.generation.freedpp.core.tqdm", side_effect=lambda *a, **kw: None),
+        ):
+            result = _run_freedpp(
+                cfg,
+                self.workspace,
+                self.pdbqt_a,
+                "1.0,2.0,3.0",
+                "20.0,20.0,20.0",
+                commands="train,sample",
+            )
+
+        # First call: training (early-stopped), second call: sample
+        assert len(popen_calls) == 2
+        second_cmd = " ".join(popen_calls[1]["cmd"])
+        assert "--commands" in second_cmd
+        assert "sample" in second_cmd
+        assert "--checkpoint" in second_cmd
+        assert "model_25.pth" in second_cmd

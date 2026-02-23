@@ -180,6 +180,9 @@ def _freedpp_backend(request: GenerationRequest) -> list[str]:
             "reward_modes_path_in_container",
             "/opt/reward_modes.yaml",
         ),
+        early_stopping_patience=_cfg_int(freedpp_cfg, "early_stopping_patience", 15),
+        early_stopping_threshold=_cfg_float(freedpp_cfg, "early_stopping_threshold", 0.01),
+        early_stopping_min_epochs=_cfg_int(freedpp_cfg, "early_stopping_min_epochs", 20),
     )
     return generate(gen_config)
 

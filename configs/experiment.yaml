@@ -63,6 +63,9 @@ generator:
     vina_program: unidock_gpu    # "qvina02" for CPU fallback
     pass_reward_modes_to_container: true    # set false for model images with internal reward config
     reward_modes_path_in_container: /opt/reward_modes.yaml
+    early_stopping_patience: 15    # 0 = disabled; stop training when reward plateaus for N epochs
+    early_stopping_min_epochs: 20  # minimum epochs before early stopping can trigger
+    early_stopping_threshold: 0.01 # relative range threshold for plateau detection
   reinvent4:
     algorithm: dap             # DAP learning strategy (recommended by REINVENT4 authors)
     generator_type: reinvent   # cache key only; architecture follows the prior model

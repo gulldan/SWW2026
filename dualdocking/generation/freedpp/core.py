@@ -114,6 +114,12 @@ class GenerationConfig:
     pass_reward_modes_to_container: bool = True
     reward_modes_path_in_container: str = "/opt/reward_modes.yaml"
 
+    # Early stopping — terminates training when reward plateaus.
+    # Set patience=0 to disable.
+    early_stopping_patience: int = 15
+    early_stopping_threshold: float = 0.01
+    early_stopping_min_epochs: int = 20
+
 
 # ---------------------------------------------------------------------------
 # Docking program resolution (vina_program from FREED++ API)
@@ -269,7 +275,7 @@ def _run_freedpp(
     if _RUN_WITH_PATCH.exists():
         extra = ["-v", f"{_RUN_WITH_PATCH}:/opt/run_with_patch.py:ro"]
 
-    return _docker_helpers.run_freedpp(
+    result = _docker_helpers.run_freedpp(
         config,
         workspace,
         pdbqt_a,
@@ -288,6 +294,59 @@ def _run_freedpp(
         log=logger,
         extra_docker_args=extra,
     )
+
+    # If training was early-stopped and sampling was expected, run a
+    # second Docker container with commands=sample + latest checkpoint.
+    if getattr(result, "early_stopped", False) and "sample" in commands:
+        output_run = workspace / "output" / "run"
+        checkpoints = sorted(output_run.rglob("model_*.pth")) if output_run.exists() else []
+        if checkpoints:
+            latest_ckpt = checkpoints[-1]
+            ckpt_container = f"/workspace/{latest_ckpt.relative_to(workspace)}"
+            logger.info("Early-stopped: resampling with checkpoint {}", ckpt_container)
+
+            def _build_sample_args(
+                cfg: GenerationConfig,
+                pdbqt: Path,
+                center: str,
+                size: str,
+                cmds: str = "sample",
+            ) -> list[str]:
+                return _model_helpers.build_freedpp_args(
+                    cfg,
+                    pdbqt,
+                    center,
+                    size,
+                    commands=cmds,
+                    auto_num_sub_proc=_auto_num_sub_proc,
+                    resolve_vina_path=_resolve_vina_path,
+                    log=logger,
+                    checkpoint=ckpt_container,
+                )
+
+            result = _docker_helpers.run_freedpp(
+                config,
+                workspace,
+                pdbqt_a,
+                center_a,
+                size_a,
+                pdbqt_b=pdbqt_b,
+                center_b=center_b,
+                size_b=size_b,
+                commands="sample",
+                docker_bin=DOCKER_BIN,
+                build_freedpp_args=_build_sample_args,
+                popen=subprocess.Popen,
+                pipe=subprocess.PIPE,
+                getenv=os.getenv,
+                tqdm_factory=tqdm,
+                log=logger,
+                extra_docker_args=extra,
+            )
+        else:
+            logger.warning("Early-stopped but no checkpoints found in {}", output_run)
+
+    return result
 
 
 def parse_training_log(log_path: Path) -> list[dict[str, int | float]]:
