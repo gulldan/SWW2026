@@ -153,14 +153,8 @@ _UNIPROT_JSON_URL = "https://rest.uniprot.org/uniprotkb/{uniprot_id}.json"
 
 # Manual UniProt corrections for pairs with wrong PDB auto-resolution
 _UNIPROT_OVERRIDES: dict[int, dict[str, str]] = {
-    2: {"uniprot_a": "P11802"},  # CDK4 (not CyclinD1 P24385)
-    18: {"uniprot_b": "Q9UBN7"},  # HDAC6 (not MBP P0AEX9)
-    19: {"uniprot_b": "Q92800"},  # EZH1 (not EZH2 Q15910)
-    31: {"uniprot_a": "P29274", "uniprot_b": "P14416"},  # A2A, D2
-    32: {"uniprot_a": "P41594", "uniprot_b": "Q13255"},  # mGluR5, mGluR1
-    41: {"uniprot_b": "P37231"},  # PPARgamma (not RXRalpha P19793)
-    43: {"uniprot_b": "Q8TDU6"},  # TGR5 (not Galpha-s P63092)
-    47: {},  # polyproteins -- domain overrides below
+    2: {"uniprot_a": "P11802"},  # CDK4 (not CyclinD1 P24385); PDB 2W96 = CDK4+CyclinD3
+    9: {"uniprot_b": "P37231"},  # PPARgamma (not RXRalpha P19793); PDB 1FM9 = PPARg+RXRa heterodimer
 }
 
 
