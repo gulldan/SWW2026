@@ -24,6 +24,7 @@ tr:nth-child(even){background:#f4f4f8}
 .lvl-vl{background:#b71c1c}
 .lvl-n{background:#424242}
 .sr{font-size:9pt;color:#333;display:block;margin-top:2px}
+.vr{color:#1565c0;border-top:1px dashed #90caf9;padding-top:2px;margin-top:3px}.vr-warn{color:#c62828;border-top:1px dashed #ef9a9a}
 </style></head><body>
 
 <h1>50 Target Pairs for Dual-Target Drug Design: Critical Selection</h1>
@@ -45,91 +46,91 @@ tr:nth-child(even){background:#f4f4f8}
 <tr><td>1</td><td>RTK (ERBB)</td>
 <td class="pair">EGFR / HER2<br><span class="pdb">1XKK</span> (EGFR+lapatinib, 2.4&Aring;) / <span class="pdb">3PP0</span> (HER2+SYR127063, 2.25&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1158/0008-5472.CAN-04-1168">10.1158/0008-5472.CAN-04-1168</a></td>
-<td class="sim"><span class="lvl lvl-vh">Very High</span> ~80% kinase domain ID; RMSD 1.1&Aring; (247 C&alpha;)<span class="sr">Lapatinib: 10.8/9.3 nM (1.2:1) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3099692/">PMC3099692</a></span></td>
+<td class="sim"><span class="lvl lvl-vh">Very High</span> ~80% kinase domain ID; RMSD 1.1&Aring; (247 C&alpha;)<span class="sr">Lapatinib: 10.8/9.3 nM (1.2:1) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3099692/">PMC3099692</a></span><span class="sr vr">NW full-seq: 49.0% (634/1295), 1210/1255&nbsp;aa | NW domain: 81.3% Protein kinase (712-979 / 720-987, 268/268&nbsp;aa) &mdash; catalog ~80% &#x2713; | UniProt: P00533/P04626 | ChEMBL: CHEMBL203 (29.7K acts, 25.8K IC50) / CHEMBL1824 (6.9K acts, 5.2K IC50)</span></td>
 <td>EGFR/HER2 heterodimerization drives proliferation in breast/lung cancer; lapatinib (FDA 2007) validates dual blockade. <span class="drug">Lapatinib approved</span></td></tr>
 
 <tr><td>2</td><td>CDK (CMGC)</td>
 <td class="pair">CDK4 / CDK6<br><span class="pdb">2W96</span> (CDK4+cycD, 2.3&Aring;) / <span class="pdb">5L2I</span> (CDK6+palbociclib, 2.2&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1038/nrclinonc.2016.26">10.1038/nrclinonc.2016.26</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> ~71% overall protein ID; ATP-site highly conserved<span class="sr">Palbociclib: 11/16 nM (1:1.5) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6248306/">PMC6248306</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> ~71% overall protein ID; ATP-site highly conserved<span class="sr">Palbociclib: 11/16 nM (1:1.5) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6248306/">PMC6248306</a></span><span class="sr vr vr-warn">NW full-seq: 64.4% (212/329) | NW domain: 71.5% Protein kinase (6-295 / 13-300, 290/288&nbsp;aa) &mdash; catalog ~71% &#x2713; | UniProt: P11802/Q00534 | ChEMBL: CHEMBL331 (2.3K acts, 1.8K IC50) / CHEMBL2508 (1.3K acts, 1.0K IC50)<br><b>Auto-resolution issue:</b> PDB 2W96 = CDK4+CyclinD3 complex; 1st entity &rarr; Cyclin&nbsp;D1 (P24385, 295&nbsp;aa). Correct: CDK4&nbsp;=&nbsp;P11802</span></td>
 <td>Redundant Rb phosphorylation in G1-S; dual CDK4/6 inhibitors (palbociclib, ribociclib, abemaciclib) FDA-approved HR+/HER2- breast cancer. <span class="drug">Palbociclib approved 2015</span></td></tr>
 
 <tr><td>3</td><td>RAF (MAPK)</td>
 <td class="pair">BRAF / CRAF<br><span class="pdb">5C9C</span> (BRAF+LY3009120, 2.7&Aring;) / <span class="pdb">3OMV</span> (CRAF+GDC-0879, 2.4&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1021/acs.jmedchem.5b00067">10.1021/acs.jmedchem.5b00067</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> ~75% CR3 kinase domain ID<span class="sr">LY3009120: 9.1/4.3 nM (2.1:1) <a href="https://pubs.acs.org/doi/10.1021/acs.jmedchem.5b00067">J Med Chem 2015</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> ~75% CR3 kinase domain ID<span class="sr">LY3009120: 9.1/4.3 nM (2.1:1) <a href="https://pubs.acs.org/doi/10.1021/acs.jmedchem.5b00067">J Med Chem 2015</a></span><span class="sr vr">NW full-seq: 49.5% (384/776), 766/648&nbsp;aa | NW domain: 82.0% Protein kinase (457-717 / 349-609, 261/261&nbsp;aa) &mdash; catalog ~75% &#x2713; | UniProt: P15056/P04049 | ChEMBL: CHEMBL5145 (12.5K acts, 11.0K IC50) / CHEMBL1906 (6.1K acts, 5.6K IC50)</span></td>
 <td>Selective BRAF(V600E) inhibitors cause paradoxical MAPK via CRAF dimerization; pan-RAF (LY3009120) overcomes resistance. <span class="drug">LY3009120 Phase I</span></td></tr>
 
 <tr><td>4</td><td>JAK (Non-RTK)</td>
 <td class="pair">JAK1 / JAK2<br><span class="pdb">3EYG</span> (JAK1+tofacitinib, 2.0&Aring;) / <span class="pdb">6VGL</span> (JAK2+ruxolitinib, 1.95&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1056/NEJMoa1110556">10.1056/NEJMoa1110556</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> ~70% JH1 kinase domain ID<span class="sr">Ruxolitinib: 3.3/2.8 nM (1.2:1) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5147419/">PMC5147419</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> ~70% JH1 kinase domain ID<span class="sr">Ruxolitinib: 3.3/2.8 nM (1.2:1) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5147419/">PMC5147419</a></span><span class="sr vr">NW full-seq: 42.0% (508/1210), 1154/1132&nbsp;aa | NW domain: 50.5% Protein kinase 1 (583-855 / 545-809, 273/265&nbsp;aa) &mdash; catalog ~70% &#x2717; | UniProt: P23458/O60674 | ChEMBL: CHEMBL2835 (19.4K acts, 15.0K IC50) / CHEMBL2971 (24.4K acts, 19.2K IC50)</span></td>
 <td>Co-activated in myeloproliferative neoplasms via JAK-STAT; ruxolitinib (FDA 2011) demonstrates dual JAK1/2 efficacy. <span class="drug">Ruxolitinib approved</span></td></tr>
 
 <tr><td>5</td><td>MEK (MAPK)</td>
 <td class="pair">MEK1 / MEK2<br><span class="pdb">7JUR</span> (MEK1+trametinib, 2.5&Aring;) / <span class="pdb">3PP1</span> (MEK2+allosteric inh., 2.3&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1038/s41586-020-2760-4">10.1038/s41586-020-2760-4</a></td>
-<td class="sim"><span class="lvl lvl-vh">Very High</span> ~80% overall protein ID; conserved allosteric pocket<span class="sr">Trametinib: 0.7/1.7 nM (1:2.4) <a href="https://omim.org/entry/176872">OMIM 176872</a></span></td>
+<td class="sim"><span class="lvl lvl-vh">Very High</span> ~80% overall protein ID; conserved allosteric pocket<span class="sr">Trametinib: 0.7/1.7 nM (1:2.4) <a href="https://omim.org/entry/176872">OMIM 176872</a></span><span class="sr vr">NW full-seq: 9.9% (100/1008), 950/393&nbsp;aa | UniProt: Q6VAB6/Q02750 | ChEMBL: CHEMBL3627583 (3 acts, 3 IC50) / CHEMBL3587 (2.2K acts, 1.5K IC50)</span></td>
 <td>Functionally redundant downstream of RAF; selective MEK1 inh. leads to compensatory MEK2, necessitating dual inhibitors. <span class="drug">Trametinib approved 2013</span></td></tr>
 
 <tr><td>6</td><td>RTK (ALK/ROS1)</td>
 <td class="pair">ALK / ROS1<br><span class="pdb">2XP2</span> (ALK+crizotinib, 1.9&Aring;) / <span class="pdb">3ZBF</span> (ROS1+crizotinib, 2.2&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1073/pnas.1420785112">10.1073/pnas.1420785112</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> 49% kinase domain / <b>77% ATP-site</b> ID<span class="sr">Crizotinib: 20/4 nM (5:1 ALK/ROS1) <a href="https://www.pnas.org/doi/10.1073/pnas.1515281112">PNAS 2015</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> 49% kinase domain / <b>77% ATP-site</b> ID<span class="sr">Crizotinib: 20/4 nM (5:1 ALK/ROS1) <a href="https://www.pnas.org/doi/10.1073/pnas.1515281112">PNAS 2015</a></span><span class="sr vr">NW full-seq: 18.4% (479/2599), 1620/2347&nbsp;aa | NW domain: 48.4% Protein kinase (1116-1392 / 1945-2222, 277/278&nbsp;aa) &mdash; catalog 49% &#x2713; | UniProt: Q9UM73/P08922 | ChEMBL: CHEMBL4247 (5.5K acts, 4.4K IC50) / CHEMBL5568 (1.1K acts, 422 IC50)</span></td>
 <td>High ATP-site structural homology; crizotinib/lorlatinib covers both ALK- and ROS1-rearranged NSCLC. <span class="drug">Crizotinib approved 2011</span></td></tr>
 
 <tr><td>7</td><td>RTK (FGFR)</td>
 <td class="pair">FGFR1 / FGFR2<br><span class="pdb">5EW8</span> (FGFR1+erdafitinib, 2.0&Aring;) / <span class="pdb">2PSQ</span> (FGFR2+inh., 2.1&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1158/1535-7163.MCT-16-0589">10.1158/1535-7163.MCT-16-0589</a></td>
-<td class="sim"><span class="lvl lvl-vh">Very High</span> ~90% kinase domain ID (highest in set)<span class="sr">Erdafitinib: 1.2/2.5 nM (1:2.1) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6627960/">PMC6627960</a></span></td>
+<td class="sim"><span class="lvl lvl-vh">Very High</span> ~90% kinase domain ID (highest in set)<span class="sr">Erdafitinib: 1.2/2.5 nM (1:2.1) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6627960/">PMC6627960</a></span><span class="sr vr">NW full-seq: 71.5% (594/831), 822/821&nbsp;aa | NW domain: 87.6% Protein kinase (478-767 / 481-770, 290/290&nbsp;aa) &mdash; catalog ~90% &#x2713; | UniProt: P11362/P21802 | ChEMBL: CHEMBL3650 (10.6K acts, 9.0K IC50) / CHEMBL4142 (4.8K acts, 4.7K IC50)</span></td>
 <td>FGFR1 amplification and FGFR2 fusions co-drive cholangiocarcinoma/urothelial; pan-FGFR (erdafitinib) blocks compensatory signaling. <span class="drug">Erdafitinib approved 2019</span></td></tr>
 
 <tr><td>8</td><td>Non-RTK (ABL/SRC)</td>
 <td class="pair">ABL1 / SRC<br><span class="pdb">2GQG</span> (ABL1+dasatinib, 2.4&Aring;) / <span class="pdb">3G5D</span> (SRC+dasatinib, 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1371/journal.pone.0029828">10.1371/journal.pone.0029828</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> ~46% kinase domain ID; similar DFG-out conformation<span class="sr">Dasatinib: 0.6/0.8 nM (1:1.3) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2954126/">PMC2954126</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> ~46% kinase domain ID; similar DFG-out conformation<span class="sr">Dasatinib: 0.6/0.8 nM (1:1.3) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2954126/">PMC2954126</a></span><span class="sr vr">NW full-seq: 18.8% (219/1168), 1130/533&nbsp;aa | NW domain: 49.2% Protein kinase (242-493 / 267-520, 252/254&nbsp;aa) &mdash; catalog ~46% &#x2713; | UniProt: P00519/P00523 | ChEMBL: CHEMBL1862 (9.0K acts, 5.3K IC50) / CHEMBL3655 (389 acts, 378 IC50)</span></td>
 <td>SRC activation mediates imatinib resistance in CML; dasatinib/bosutinib dual ABL/SRC inhibitors overcome SFK-mediated escape. <span class="drug">Dasatinib approved 2006</span></td></tr>
 
 <tr><td>9</td><td>Aurora kinase</td>
 <td class="pair">Aurora A / Aurora B<br><span class="pdb">3E5A</span> (AurA+VX-680, 2.1&Aring;) / <span class="pdb">4AF3</span> (AurB+VX-680, 2.5&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1021/jm3008954">10.1021/jm3008954</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> ~71% kinase domain ID<span class="sr">Tozasertib: 0.6/18 nM (1:30) <a href="https://link.springer.com/article/10.1186/s13008-018-0040-6">Cell Div 2018</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> ~71% kinase domain ID<span class="sr">Tozasertib: 0.6/18 nM (1:30) <a href="https://link.springer.com/article/10.1186/s13008-018-0040-6">Cell Div 2018</a></span><span class="sr vr">NW full-seq: 53.6% (218/407), 403/344&nbsp;aa | NW domain: 74.5% Protein kinase (133-383 / 77-327, 251/251&nbsp;aa) &mdash; catalog ~71% &#x2713; | UniProt: O14965/Q96GD4 | ChEMBL: CHEMBL4722 (6.0K acts, 4.2K IC50) / CHEMBL2185 (4.9K acts, 3.2K IC50)</span></td>
 <td>Complementary roles in mitotic spindle and cytokinesis; cancer compensates selective A or B inhibition via paralog activity. <span class="drug">Tozasertib Phase II</span></td></tr>
 
 <tr><td>10</td><td>Checkpoint kinase</td>
 <td class="pair">WEE1 / CHK1<br><span class="pdb">5V5Y</span> (WEE1+adavosertib, 2.4&Aring;) / <span class="pdb">2GDO</span> (CHK1+AZD7762, 2.4&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.4161/cc.20899">10.4161/cc.20899</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> ~35% (different families); structural resemblance in binding pocket<span class="sr">PD0407824 dual WEE1/CHK1 inh. <a href="https://www.sciencedirect.com/science/article/pii/S0969212605000705">Structure 2005</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> ~35% (different families); structural resemblance in binding pocket<span class="sr">PD0407824 dual WEE1/CHK1 inh. <a href="https://www.sciencedirect.com/science/article/pii/S0969212605000705">Structure 2005</a></span><span class="sr vr">NW full-seq: 11.0% (89/809), 646/476&nbsp;aa | NW domain: 22.5% Protein kinase (299-569 / 9-265, 271/257&nbsp;aa) &mdash; catalog ~35% &#x2248; | UniProt: P30291/O14757 | ChEMBL: CHEMBL5491 (2.0K acts, 1.5K IC50) / CHEMBL4630 (4.7K acts, 3.2K IC50)</span></td>
 <td>Parallel G2/M checkpoint kinases; combined inhibition creates synthetic lethality in p53-deficient tumors. <span class="drug">AZD1775 Phase II</span></td></tr>
 
 <tr><td>11</td><td>Lipid kinase / Ser-Thr kinase</td>
 <td class="pair">PI3K&alpha; / mTOR<br><span class="pdb">6GVF</span> (PI3K&alpha;+alpelisib, 2.9&Aring;) / <span class="pdb">4DRH</span> (mTOR kinase domain, 2.3&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1007/s11523-017-0482-9">10.1007/s11523-017-0482-9</a></td>
-<td class="sim"><span class="lvl lvl-l">Low</span> ~25&ndash;30% (PIKK superfamily); shared ATP-cleft architecture<span class="sr">Dactolisib: 4/20.7 nM (1:5.2) <a href="https://www.medchemexpress.com/BEZ235.html">MedChemExpress</a></span></td>
+<td class="sim"><span class="lvl lvl-l">Low</span> ~25&ndash;30% (PIKK superfamily); shared ATP-cleft architecture<span class="sr">Dactolisib: 4/20.7 nM (1:5.2) <a href="https://www.medchemexpress.com/BEZ235.html">MedChemExpress</a></span><span class="sr vr">NW full-seq: 12.1% (131/1083), 1068/457&nbsp;aa | NW domain: 10.4% PI3K/PI4K catalytic/PPIase FKBP-type 1 (765-1051 / 42-130, 287/89&nbsp;aa) &mdash; catalog ~25–30% &#x2717; | UniProt: P42336/Q13451 | ChEMBL: CHEMBL4005 (12.4K acts, 9.9K IC50) / CHEMBL2052031 (418 acts, 91 IC50)</span></td>
 <td>mTOR inh. alone causes feedback PI3K/AKT activation via IRS-1; dual PI3K/mTOR blocks adaptive resistance loop. <span class="drug">Dactolisib Phase I/II</span></td></tr>
 
 <tr><td>12</td><td>RTK (VEGFR/PDGFR)</td>
 <td class="pair">VEGFR2 / PDGFR&beta;<br><span class="pdb">3VHE</span> (VEGFR2+inh., 2.0&Aring;) / <span class="pdb">5K5X</span> (PDGFR+inh., 2.3&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1038/nrd2380">10.1038/nrd2380</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> ~40&ndash;45% (split-kinase RTKs)<span class="sr">Sunitinib: 80/2 nM (40:1 VEGFR2/PDGFR&beta;) <a href="https://www.selleckchem.com/products/sunitinib.html">Selleck</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> ~40&ndash;45% (split-kinase RTKs)<span class="sr">Sunitinib: 80/2 nM (40:1 VEGFR2/PDGFR&beta;) <a href="https://www.selleckchem.com/products/sunitinib.html">Selleck</a></span><span class="sr vr">NW full-seq: 25.3% (369/1458), 1356/1089&nbsp;aa | NW domain: 46.2% Protein kinase (834-1162 / 593-954, 329/362&nbsp;aa) &mdash; catalog ~40–45% &#x2248; | UniProt: P35968/P16234 | ChEMBL: CHEMBL279 (19.0K acts, 16.9K IC50) / CHEMBL2007 (1.6K acts, 922 IC50)</span></td>
 <td>VEGFR2 drives angiogenesis, PDGFR&beta; stabilizes pericytes; dual blockade (sunitinib, sorafenib) destabilizes tumor vasculature. <span class="drug">Sunitinib approved 2006</span></td></tr>
 
 <tr><td>13</td><td>RTK (EGFR/MET)</td>
 <td class="pair">EGFR / MET<br><span class="pdb">4HJO</span> (EGFR-T790M+WZ4002, 2.8&Aring;) / <span class="pdb">3DKC</span> (MET+tivantinib, 2.3&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1126/science.1141478">10.1126/science.1141478</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> ~33% (different RTK families); no single dual TKI exists<span class="sr">Amivantamab: bispecific Ab, not TKI <a href="https://www.sciencedirect.com/science/article/pii/S0021925821004270">JBC 2021</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> ~33% (different RTK families); no single dual TKI exists<span class="sr">Amivantamab: bispecific Ab, not TKI <a href="https://www.sciencedirect.com/science/article/pii/S0021925821004270">JBC 2021</a></span><span class="sr vr">NW full-seq: 17.0% (291/1716), 1210/1390&nbsp;aa | NW domain: 38.3% Protein kinase (712-979 / 1078-1345, 268/268&nbsp;aa) &mdash; catalog ~33% &#x2713; | UniProt: P00533/P08581 | ChEMBL: CHEMBL203 (29.7K acts, 25.8K IC50) / CHEMBL3717 (10.4K acts, 8.4K IC50)</span></td>
 <td>MET amplification is major EGFR-TKI resistance mechanism in NSCLC; amivantamab dual EGFR/MET targeting overcomes bypass. <span class="drug">Amivantamab approved 2021</span></td></tr>
 
 <tr><td>14</td><td>GTPase / Phosphatase</td>
 <td class="pair">KRAS(G12C) / SHP2<br><span class="pdb">6OIM</span> (KRAS-G12C+sotorasib, 1.65&Aring;) / <span class="pdb">6MDB</span> (SHP2+SHP099, 1.7&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1038/s41586-019-1694-1">10.1038/s41586-019-1694-1</a></td>
-<td class="sim"><span class="lvl lvl-n">None</span> Different protein classes (GTPase vs PTP); covalent/allosteric sites<span class="sr">Mechanistic synergy only <a href="https://www.nature.com/articles/s41591-018-0024-8">Nat Med 2018</a></span></td>
+<td class="sim"><span class="lvl lvl-n">None</span> Different protein classes (GTPase vs PTP); covalent/allosteric sites<span class="sr">Mechanistic synergy only <a href="https://www.nature.com/articles/s41591-018-0024-8">Nat Med 2018</a></span><span class="sr vr">NW full-seq: 9.4% (57/605), 189/593&nbsp;aa | UniProt: P01116/Q06124 | ChEMBL: CHEMBL2189121 (6.0K acts, 5.8K IC50) / CHEMBL3864 (4.9K acts, 4.8K IC50)</span></td>
 <td>Adaptive RTK reactivation post KRAS-G12C inh. leads to SHP2-dependent RAS reloading; combination prevents acquired resistance. <span class="drug">Sotorasib approved 2021</span></td></tr>
 
 <tr><td>15</td><td>RTK (FLT3/KIT)</td>
 <td class="pair">FLT3 / KIT<br><span class="pdb">4XUF</span> (FLT3+quizartinib, 2.3&Aring;) / <span class="pdb">1T46</span> (KIT+imatinib, 1.6&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1182/bloodadvances.2017011080">10.1182/bloodadvances.2017011080</a></td>
-<td class="sim"><span class="lvl lvl-mh">Mod-High</span> 57% kinase domain ID (class III RTK family)<span class="sr">Midostaurin: 4.2/86 nM (1:20) <a href="https://ashpublications.org/blood/article/129/26/3403/36251/">Blood 2017</a></span></td>
+<td class="sim"><span class="lvl lvl-mh">Mod-High</span> 57% kinase domain ID (class III RTK family)<span class="sr">Midostaurin: 4.2/86 nM (1:20) <a href="https://ashpublications.org/blood/article/129/26/3403/36251/">Blood 2017</a></span><span class="sr vr">NW full-seq: 31.5% (340/1080), 993/976&nbsp;aa | NW domain: 52.2% Protein kinase (610-943 / 589-937, 334/349&nbsp;aa) &mdash; catalog 57% &#x2713; | UniProt: P36888/P10721 | ChEMBL: CHEMBL1974 (9.8K acts, 7.1K IC50) / CHEMBL1936 (8.4K acts, 4.4K IC50)</span></td>
 <td>FLT3-ITD mutation in AML coexists with KIT signaling; midostaurin dual FLT3/KIT approved for AML. <span class="drug">Midostaurin approved 2017</span></td></tr>
 </table>
 
@@ -140,43 +141,43 @@ tr:nth-child(even){background:#f4f4f8}
 <tr><td>16</td><td>BCL-2 family (apoptosis)</td>
 <td class="pair">BCL2 / MCL1<br><span class="pdb">4LVT</span> (BCL2+navitoclax, 2.1&Aring;) / <span class="pdb">6FS0</span> (MCL1+S63845, 1.8&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1158/2159-8290.CD-18-0387">10.1158/2159-8290.CD-18-0387</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> ~33% BH3 groove ID; superimposable folds (RMSD 2.3&Aring;), MCL1 groove wider<span class="sr">Venetoclax: &lt;0.01 nM BCL2, no MCL1 (&gt;500&times;) <a href="https://pubs.acs.org/doi/10.1021/acs.biochem.2c00709">Biochemistry 2023</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> ~33% BH3 groove ID; superimposable folds (RMSD 2.3&Aring;), MCL1 groove wider<span class="sr">Venetoclax: &lt;0.01 nM BCL2, no MCL1 (&gt;500&times;) <a href="https://pubs.acs.org/doi/10.1021/acs.biochem.2c00709">Biochemistry 2023</a></span><span class="sr vr">NW full-seq: 21.9% (80/366), 239/350&nbsp;aa | UniProt: P10415/Q07820 | ChEMBL: CHEMBL4860 (7.4K acts, 3.1K IC50) / CHEMBL4361 (5.9K acts, 2.5K IC50)</span></td>
 <td>MCL1 upregulation is dominant venetoclax resistance mechanism; dual BCL2/MCL1 blockade needed in AML/CLL. <span class="drug">Venetoclax approved 2016</span></td></tr>
 
 <tr><td>17</td><td>ADP-ribosyltransferase</td>
 <td class="pair">PARP1 / PARP2<br><span class="pdb">7KK4</span> (PARP1+olaparib, 2.3&Aring;) / <span class="pdb">4TVJ</span> (PARP2+olaparib, 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1073/pnas.2121979119">10.1073/pnas.2121979119</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> ~46% CAT domain ID; conserved HYE catalytic triad &amp; NAD+ pocket<span class="sr">Olaparib: 5/1 nM (~1:1&ndash;5&times;, non-selective) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8150716/">PMC8150716</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> ~46% CAT domain ID; conserved HYE catalytic triad &amp; NAD+ pocket<span class="sr">Olaparib: 5/1 nM (~1:1&ndash;5&times;, non-selective) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8150716/">PMC8150716</a></span><span class="sr vr">NW full-seq: 24.3% (251/1032), 1014/583&nbsp;aa | NW domain: 50.6% PARP catalytic (788-1014 / 356-583, 227/228&nbsp;aa) &mdash; catalog ~46% &#x2713; | UniProt: P09874/Q9UGN5 | ChEMBL: CHEMBL3105 (6.2K acts, 4.8K IC50) / CHEMBL5366 (1.3K acts, 1.2K IC50)</span></td>
 <td>Redundant SSB repair; dual PARP1/2 trapping maximizes synthetic lethality in BRCA1/2-mutant cancers. <span class="drug">Olaparib approved 2014</span></td></tr>
 
 <tr><td>18</td><td>Epigenetic (HDAC)</td>
 <td class="pair">HDAC1 / HDAC6<br><span class="pdb">4BKX</span> (HDAC1, 3.0&Aring;) / <span class="pdb">5EDU</span> (HDAC6+TSA, 1.6&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1021/acs.jmedchem.0c00830">10.1021/acs.jmedchem.0c00830</a></td>
-<td class="sim"><span class="lvl lvl-l">Low</span> ~25&ndash;30% (Class I vs IIb); conserved Zn<sup>2+</sup> catalytic mechanism<span class="sr">Vorinostat: 10/91 nM (~9&times; HDAC1 pref.) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4990478/">PMC4990478</a></span></td>
+<td class="sim"><span class="lvl lvl-l">Low</span> ~25&ndash;30% (Class I vs IIb); conserved Zn<sup>2+</sup> catalytic mechanism<span class="sr">Vorinostat: 10/91 nM (~9&times; HDAC1 pref.) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4990478/">PMC4990478</a></span><span class="sr vr vr-warn">NW full-seq: 13.2% (171/1295) | UniProt: Q13330/Q9UBN7 | ChEMBL: CHEMBL5724629 (1 acts, 1 IC50) / CHEMBL1865 (10.0K acts, 9.6K IC50)<br><b>Auto-resolution issue:</b> PDB 5EDU = MBP-HDAC6 fusion; 1st entity &rarr; MBP (P0AEX9, E.&nbsp;coli). Human HDAC6 = Q9UBN7</span></td>
 <td>HDAC1 (nuclear, gene expression) + HDAC6 (cytoplasmic, HSP90/tubulin); dual inhibition combines transcriptional reprogramming with proteotoxic stress. <span class="drug">Vorinostat approved 2006</span></td></tr>
 
 <tr><td>19</td><td>Epigenetic (PRC2)</td>
 <td class="pair">EZH2 / EZH1<br><span class="pdb">5LS6</span> (EZH2-PRC2+inh., 2.5&Aring;) / <span class="pdb">5LS6</span> (shared PRC2 architecture)</td>
 <td class="doi"><a href="https://doi.org/10.1111/cas.13840">10.1111/cas.13840</a></td>
-<td class="sim"><span class="lvl lvl-vh">Very High</span> <b>94% SET domain ID</b>; 63% overall protein ID<span class="sr">Valemetostat: &le;10 nM dual; GSK126 &gt;150&times; EZH2 <a href="https://aacrjournals.org/cancerres/article/80/24/5449/646241/">Cancer Res 2020</a></span></td>
+<td class="sim"><span class="lvl lvl-vh">Very High</span> <b>94% SET domain ID</b>; 63% overall protein ID<span class="sr">Valemetostat: &le;10 nM dual; GSK126 &gt;150&times; EZH2 <a href="https://aacrjournals.org/cancerres/article/80/24/5449/646241/">Cancer Res 2020</a></span><span class="sr vr vr-warn">NW full-seq: 63.6% (492/773) | NW domain: 94.0% SET (612-727 / 613-728, 116/116&nbsp;aa) &mdash; catalog 94% &#x2713; | UniProt: Q15910/Q92800 | ChEMBL: CHEMBL2189110 (2.4K acts, 2.3K IC50) / CHEMBL2189116 (142 acts, 140 IC50)<br><b>Auto-resolution issue:</b> Both PDBs = 5LS6 (EZH2-PRC2 complex); auto-resolved to same UniProt Q15910 (EZH2). Human EZH1 = Q92800, no separate PDB exists</span></td>
 <td>EZH1 compensates EZH2 loss by maintaining H3K27me3; EZH2-only inhibitors show incomplete response in lymphomas. <span class="drug">Valemetostat approved JP 2022</span></td></tr>
 
 <tr><td>20</td><td>Epigenetic (BET bromodomain)</td>
 <td class="pair">BRD4 / BRD2<br><span class="pdb">3MXF</span> (BRD4-BD1+JQ1, 1.6&Aring;) / <span class="pdb">3ONI</span> (BRD2-BD1+JQ1, 1.8&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1021/acs.jmedchem.6b01761">10.1021/acs.jmedchem.6b01761</a></td>
-<td class="sim"><span class="lvl lvl-vh">Very High</span> 85&ndash;92% BD1 ID; ~95% binding pocket conservation<span class="sr">JQ1: Kd 49/128 nM (~2.6&times;, pan-BET) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3010259/">Nature 2010</a></span></td>
+<td class="sim"><span class="lvl lvl-vh">Very High</span> 85&ndash;92% BD1 ID; ~95% binding pocket conservation<span class="sr">JQ1: Kd 49/128 nM (~2.6&times;, pan-BET) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3010259/">Nature 2010</a></span><span class="sr vr">NW full-seq: 30.5% (439/1437), 1362/801&nbsp;aa | NW domain: 80.4% Bromo 1 (58-164 / 74-180, 107/107&nbsp;aa) &mdash; catalog 85–92% &#x2248; | UniProt: O60885/P25440 | ChEMBL: CHEMBL1163125 (23.5K acts, 19.2K IC50) / CHEMBL1293289 (1.7K acts, 1.3K IC50)</span></td>
 <td>BRD4 suppresses c-MYC; BRD2 drives inflammatory gene programs; pan-BET inhibition needed for full super-enhancer suppression. <span class="drug">JQ1/I-BET762 Phase I</span></td></tr>
 
 <tr><td>21</td><td>Metabolic enzyme (IDH)</td>
 <td class="pair">IDH1(R132H) / IDH2(R140Q)<br><span class="pdb">6ADG</span> (IDH1-R132H+vorasidenib, 2.3&Aring;) / <span class="pdb">5I96</span> (IDH2-R140Q+enasidenib, 1.55&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1021/acsmedchemlett.9b00509">10.1021/acsmedchemlett.9b00509</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> 72% overall protein ID; conserved allosteric dimer-interface pocket<span class="sr">Vorasidenib: 0.6&ndash;6/7&ndash;12 nM (~2&times;) <a href="https://www.nejm.org/doi/full/10.1056/NEJMoa2304194">NEJM 2023</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> 72% overall protein ID; conserved allosteric dimer-interface pocket<span class="sr">Vorasidenib: 0.6&ndash;6/7&ndash;12 nM (~2&times;) <a href="https://www.nejm.org/doi/full/10.1056/NEJMoa2304194">NEJM 2023</a></span><span class="sr vr">NW full-seq: 62.6% (285/455), 414/452&nbsp;aa | UniProt: O75874/P48735 | ChEMBL: CHEMBL2007625 (13.9K acts, 13.7K IC50) / CHEMBL3991501 (1.8K acts, 1.8K IC50)</span></td>
 <td>Neomorphic IDH mutations produce 2-HG oncometabolite; vorasidenib (dual IDH1/2) crosses BBB for glioma regardless of isoform. <span class="drug">Vorasidenib approved 2024</span></td></tr>
 
 <tr><td>22</td><td>Epigenetic (DNMT)</td>
 <td class="pair">DNMT1 / DNMT3A<br><span class="pdb">3PTA</span> (DNMT1+sinefungin, 2.6&Aring;) / <span class="pdb">2QRV</span> (DNMT3A+SAH, 2.4&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1177/1177271919846454">10.1177/1177271919846454</a></td>
-<td class="sim"><span class="lvl lvl-l">Low</span> &lt;30% catalytic domain ID; conserved AdoMet fold but divergent TRD<span class="sr">Azacitidine: covalent trapper, non-selective <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6316889/">Genes 2018</a></span></td>
+<td class="sim"><span class="lvl lvl-l">Low</span> &lt;30% catalytic domain ID; conserved AdoMet fold but divergent TRD<span class="sr">Azacitidine: covalent trapper, non-selective <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6316889/">Genes 2018</a></span><span class="sr vr">NW full-seq: 14.6% (244/1675), 1616/912&nbsp;aa | NW domain: 16.2% SAM-dependent MTase C5-type (1139-1599 / 634-912, 461/279&nbsp;aa) &mdash; catalog <30% &#x2248; | UniProt: P26358/Q9Y6K1 | ChEMBL: CHEMBL1993 (594 acts, 571 IC50) / CHEMBL1992 (62 acts, 54 IC50)</span></td>
 <td>DNMT1 maintains methylation; DNMT3A de novo methylates; AML shows DNMT3A mutations + DNMT1-dependent survival. <span class="drug">Azacitidine approved (non-selective)</span></td></tr>
 </table>
 
@@ -187,61 +188,61 @@ tr:nth-child(even){background:#f4f4f8}
 <tr><td>23</td><td>Cholinesterase</td>
 <td class="pair">AChE / BChE<br><span class="pdb">4EY7</span> (AChE+donepezil, 2.35&Aring;) / <span class="pdb">4BDS</span> (BChE+tacrine, 2.10&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1016/j.ejmech.2024.116810">10.1016/j.ejmech.2024.116810</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> ~65% overall seq ID; conserved gorge &amp; catalytic triad; BChE gorge ~200&Aring;<sup>3</sup> larger<span class="sr">Rivastigmine: ~8&times; BChE pref. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8071298/">PMC8071298</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> ~65% overall seq ID; conserved gorge &amp; catalytic triad; BChE gorge ~200&Aring;<sup>3</sup> larger<span class="sr">Rivastigmine: ~8&times; BChE pref. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8071298/">PMC8071298</a></span><span class="sr vr">NW full-seq: 51.1% (314/615), 614/602&nbsp;aa | UniProt: P22303/P06276 | ChEMBL: CHEMBL220 (12.0K acts, 9.7K IC50) / CHEMBL1914 (6.0K acts, 5.4K IC50)</span></td>
 <td>AChE dominant in early AD, BChE compensates as disease progresses; dual ChE inhibitors extend efficacy across AD stages. <span class="drug">Rivastigmine approved (dual)</span></td></tr>
 
 <tr><td>24</td><td>Cholinesterase / Protease</td>
 <td class="pair">AChE / BACE1<br><span class="pdb">4EY7</span> (AChE+donepezil, 2.35&Aring;) / <span class="pdb">6EQM</span> (BACE1+CNP520, 1.35&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1016/j.ejmech.2021.113492">10.1016/j.ejmech.2021.113492</a></td>
-<td class="sim"><span class="lvl lvl-vl">Very Low</span> &lt;15%; different folds (&alpha;/&beta;-hydrolase vs aspartyl protease)<span class="sr">MTDL hybrids: 3&ndash;100&times; AChE pref. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9655245/">PMC9655245</a></span></td>
+<td class="sim"><span class="lvl lvl-vl">Very Low</span> &lt;15%; different folds (&alpha;/&beta;-hydrolase vs aspartyl protease)<span class="sr">MTDL hybrids: 3&ndash;100&times; AChE pref. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9655245/">PMC9655245</a></span><span class="sr vr">NW full-seq: 18.7% (126/674), 614/501&nbsp;aa | UniProt: P22303/P56817 | ChEMBL: CHEMBL220 (12.0K acts, 9.7K IC50) / CHEMBL4822 (16.4K acts, 13.7K IC50)</span></td>
 <td>Dual cholinergic + amyloid-beta pathway targeting for AD; tacrine-donepezil hybrids show synergistic activity in mouse models.</td></tr>
 
 <tr><td>25</td><td>Cholinesterase / MAO</td>
 <td class="pair">AChE / MAO-B<br><span class="pdb">4EY7</span> (AChE+donepezil, 2.35&Aring;) / <span class="pdb">2V5Z</span> (MAO-B+safinamide, 1.7&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.2174/1570159X15666170529101938">10.2174/1570159X15666170529101938</a></td>
-<td class="sim"><span class="lvl lvl-vl">Very Low</span> No structural homology (serine hydrolase vs FAD oxidase)<span class="sr">Hybrid 28c: AChE 1.7&micro;M / MAO-B 0.18&micro;M (~9.4&times;) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10653629/">PMC10653629</a></span></td>
+<td class="sim"><span class="lvl lvl-vl">Very Low</span> No structural homology (serine hydrolase vs FAD oxidase)<span class="sr">Hybrid 28c: AChE 1.7&micro;M / MAO-B 0.18&micro;M (~9.4&times;) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10653629/">PMC10653629</a></span><span class="sr vr">NW full-seq: 16.7% (120/717), 614/520&nbsp;aa | UniProt: P22303/P27338 | ChEMBL: CHEMBL220 (12.0K acts, 9.7K IC50) / CHEMBL2039 (9.6K acts, 8.7K IC50)</span></td>
 <td>Multi-target-directed ligands for AD: AChE inhibition + MAO-B inhibition reduces oxidative stress. <span class="drug">Ladostigil Phase II</span></td></tr>
 
 <tr><td>26</td><td>Protease (BACE/GSK)</td>
 <td class="pair">BACE1 / GSK3&beta;<br><span class="pdb">6EQM</span> (BACE1+CNP520, 1.35&Aring;) / <span class="pdb">1Q5K</span> (GSK3&beta;+inh., 2.2&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.2174/1568026618666180112161406">10.2174/1568026618666180112161406</a></td>
-<td class="sim"><span class="lvl lvl-vl">Very Low</span> Different folds (aspartyl protease vs Ser/Thr kinase)<span class="sr">Notopterol: BACE1 26/GSK3&beta; 1 &micro;M (~26&times;) <a href="https://doi.org/10.1002/ctm2.50">Jiang 2020</a></span></td>
+<td class="sim"><span class="lvl lvl-vl">Very Low</span> Different folds (aspartyl protease vs Ser/Thr kinase)<span class="sr">Notopterol: BACE1 26/GSK3&beta; 1 &micro;M (~26&times;) <a href="https://doi.org/10.1002/ctm2.50">Jiang 2020</a></span><span class="sr vr">NW full-seq: 14.7% (88/598), 501/420&nbsp;aa | UniProt: P56817/P49841 | ChEMBL: CHEMBL4822 (16.4K acts, 13.7K IC50) / CHEMBL262 (7.3K acts, 5.0K IC50)</span></td>
 <td>BACE1 reduces A&beta; production; GSK3&beta; reduces tau phosphorylation; dual targeting addresses both hallmarks of AD.</td></tr>
 
 <tr><td>27</td><td>Kinase (DYRK/CLK)</td>
 <td class="pair">DYRK1A / CLK1<br><span class="pdb">3ANR</span> (DYRK1A+INDY, 2.04&Aring;) / <span class="pdb">6FYL</span> (CLK1+inh., 1.79&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1021/acs.jmedchem.8b00185">10.1021/acs.jmedchem.8b00185</a></td>
-<td class="sim"><span class="lvl lvl-mh">Mod-High</span> ~36% ID / ~55% homology (CMGC); identical Phe gatekeeper; similar ATP pocket shape<span class="sr">Leucettinib-21: 2.4/12 nM (~5&times;) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9822041/">PMC9822041</a></span></td>
+<td class="sim"><span class="lvl lvl-mh">Mod-High</span> ~36% ID / ~55% homology (CMGC); identical Phe gatekeeper; similar ATP pocket shape<span class="sr">Leucettinib-21: 2.4/12 nM (~5&times;) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9822041/">PMC9822041</a></span><span class="sr vr">NW full-seq: 18.1% (145/800), 763/499&nbsp;aa | NW domain: 31.6% Protein kinase (159-479 / 163-479, 321/317&nbsp;aa) &mdash; catalog ~36% &#x2713; | UniProt: Q13627/P49760 | ChEMBL: CHEMBL2292 (4.2K acts, 2.5K IC50) / CHEMBL4225 (2.0K acts, 700 IC50)</span></td>
 <td>DYRK1A overexpression in Down syndrome and AD; CLK1 involved in tau splicing; leucettinib-21 dual inhibitor in clinical development. <span class="drug">Leucettinib-21 preclinical</span></td></tr>
 
 <tr><td>28</td><td>Kinase (CDK/GSK)</td>
 <td class="pair">GSK3&beta; / CDK5<br><span class="pdb">1Q5K</span> (GSK3&beta;+inh., 2.2&Aring;) / <span class="pdb">1UNL</span> (CDK5+roscovitine, 2.3&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.3389/neuro.02.002.2009">10.3389/neuro.02.002.2009</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> ~33&ndash;40% kinase domain ID (CMGC family); shared Pro-directed ATP site<span class="sr">Indirubin-3'-monoxime: 22/100 nM (~4.5&times;) <a href="https://doi.org/10.1074/jbc.M006114200">JBC 2001</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> ~33&ndash;40% kinase domain ID (CMGC family); shared Pro-directed ATP site<span class="sr">Indirubin-3'-monoxime: 22/100 nM (~4.5&times;) <a href="https://doi.org/10.1074/jbc.M006114200">JBC 2001</a></span><span class="sr vr">NW full-seq: 24.8% (108/436), 420/292&nbsp;aa | NW domain: 35.2% Protein kinase (56-340 / 4-286, 285/283&nbsp;aa) &mdash; catalog ~33–40% &#x2713; | UniProt: P49841/Q00535 | ChEMBL: CHEMBL262 (7.3K acts, 5.0K IC50) / CHEMBL4036 (2.0K acts, 573 IC50)</span></td>
 <td>Both kinases hyperphosphorylate tau in AD; CDK5 p25 activation + GSK3&beta; overactivity are parallel tauopathy drivers.</td></tr>
 
 <tr><td>29</td><td>Kinase (CDK2/ERK2)</td>
 <td class="pair">CDK2 / ERK2<br><span class="pdb">6OQI</span> (CDK2+selective inh., 2.0&Aring;) / <span class="pdb">4QTB</span> (ERK2+SCH772984, 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1021/acs.jcim.0c00815">10.1021/acs.jcim.0c00815</a></td>
-<td class="sim"><span class="lvl lvl-mh">Mod-High</span> ~52% binding site ID; different gatekeeper (Phe80 vs Gln103)<span class="sr">&gt;100&times; selectivity achievable via DFG-1 pocket <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8310368/">PMC8310368</a></span></td>
+<td class="sim"><span class="lvl lvl-mh">Mod-High</span> ~52% binding site ID; different gatekeeper (Phe80 vs Gln103)<span class="sr">&gt;100&times; selectivity achievable via DFG-1 pocket <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8310368/">PMC8310368</a></span><span class="sr vr">NW full-seq: 30.5% (117/384), 298/379&nbsp;aa | NW domain: 38.1% Protein kinase (4-286 / 42-330, 283/289&nbsp;aa) &mdash; catalog ~52% &#x2248; | UniProt: P24941/P27361 | ChEMBL: CHEMBL301 (5.3K acts, 3.6K IC50) / CHEMBL3385 (2.8K acts, 1.6K IC50)</span></td>
 <td>CDK2 and ERK2 share conserved ATP-binding site; benchmark pair for dual selectivity vs polypharmacology studies.</td></tr>
 
 <tr><td>30</td><td>MAO isozymes</td>
 <td class="pair">MAO-A / MAO-B<br><span class="pdb">2Z5X</span> (MAO-A+harmine, 2.2&Aring;) / <span class="pdb">2V5Z</span> (MAO-B+safinamide, 1.7&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.3390/molecules28124814">10.3390/molecules28124814</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> ~70% overall seq ID; 10/16 substrate-cavity residues conserved (~63%)<span class="sr">Tranylcypromine: ~2.4&times; MAO-B pref. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2710584/">PMC2710584</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> ~70% overall seq ID; 10/16 substrate-cavity residues conserved (~63%)<span class="sr">Tranylcypromine: ~2.4&times; MAO-B pref. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2710584/">PMC2710584</a></span><span class="sr vr">NW full-seq: 71.5% (378/529), 527/520&nbsp;aa | UniProt: P21397/P27338 | ChEMBL: CHEMBL1951 (9.5K acts, 7.7K IC50) / CHEMBL2039 (9.6K acts, 8.7K IC50)</span></td>
 <td>MAO-A degrades serotonin (depression); MAO-B degrades dopamine (PD/AD); dual MAO-A/B balances both neurotransmitter systems. <span class="drug">Phenelzine approved (non-selective)</span></td></tr>
 
 <tr><td>31</td><td>GPCR (adenosine/dopamine)</td>
 <td class="pair">A2A / D2<br><span class="pdb">4EIY</span> (A2A+ZM241385, 1.8&Aring;) / <span class="pdb">6CM4</span> (D2+risperidone, 2.87&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.2174/138161208784480108">10.2174/138161208784480108</a></td>
-<td class="sim"><span class="lvl lvl-vl">Very Low</span> &lt;25% (different GPCR families); allosteric heteromer cross-talk only<span class="sr">No dual orthosteric inh.; istradefylline A2A Ki 2.2 nM <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6125358/">PMC6125358</a></span></td>
+<td class="sim"><span class="lvl lvl-vl">Very Low</span> &lt;25% (different GPCR families); allosteric heteromer cross-talk only<span class="sr">No dual orthosteric inh.; istradefylline A2A Ki 2.2 nM <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6125358/">PMC6125358</a></span><span class="sr vr vr-warn">NW full-seq: 19.0% (109/573) | UniProt: P29274/P14416 | ChEMBL: CHEMBL251 (12.2K acts, 3.0K IC50) / CHEMBL217 (17.4K acts, 2.5K IC50)<br><b>Auto-resolution issue:</b> GPCR fusions: 4EIY 1st entity = cytb562 (P0ABE7), 6CM4 1st entity = T4L (P00720). Correct: A2A&nbsp;=&nbsp;P29274, D2&nbsp;=&nbsp;P14416</span></td>
 <td>A2A-D2 heterodimer in striatum; A2A antagonism potentiates D2 signaling, non-dopaminergic PD therapy approach. <span class="drug">Istradefylline approved 2019</span></td></tr>
 
 <tr><td>32</td><td>GPCR (glutamate)</td>
 <td class="pair">mGluR5 / mGluR1<br><span class="pdb">6FFI</span> (mGluR5+M-MPEP, 2.2&Aring;) / <span class="pdb">4OR2</span> (mGluR1+FITM, 2.6&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1124/pharmrev.120.000167">10.1124/pharmrev.120.000167</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> 100% orthosteric site; allosteric TMD ~60&ndash;72% (TM6)<span class="sr">MPEP: &gt;100,000&times; mGluR5-selective via allosteric site <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4406965/">PMC4406965</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> 100% orthosteric site; allosteric TMD ~60&ndash;72% (TM6)<span class="sr">MPEP: &gt;100,000&times; mGluR5-selective via allosteric site <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4406965/">PMC4406965</a></span><span class="sr vr vr-warn">NW full-seq: 59.3% (748/1262) | UniProt: P41594/Q13255 | ChEMBL: CHEMBL3227 (3.2K acts, 2.5K IC50) / CHEMBL3772 (1.3K acts, 1.2K IC50)<br><b>Auto-resolution issue:</b> GPCR fusions: 6FFI 1st entity = T4L (P00720), 4OR2 1st entity = cytb562 (P0ABE7). Correct: mGluR5&nbsp;=&nbsp;P41594, mGluR1&nbsp;=&nbsp;Q13255</span></td>
 <td>Group I mGluRs (mGluR1/5) are co-expressed in glutamatergic synapses; dual negative allosteric modulation for chronic pain and fragile X syndrome.</td></tr>
 </table>
 
@@ -252,49 +253,49 @@ tr:nth-child(even){background:#f4f4f8}
 <tr><td>33</td><td>JAK (Non-RTK)</td>
 <td class="pair">JAK1 / JAK3<br><span class="pdb">6N7B</span> (JAK1+cmpd38, 2.0&Aring;) / <span class="pdb">3LXK</span> (JAK3+tofacitinib, 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1056/NEJMoa1109071">10.1056/NEJMoa1109071</a></td>
-<td class="sim"><span class="lvl lvl-vh">Very High</span> <b>84% active-site</b> residue identity; unique JAK3 Cys909<span class="sr">Tofacitinib: 112/1 nM (~112&times; JAK3 pref.) <a href="https://pubs.acs.org/doi/10.1021/acsomega.9b02800">ACS Omega 2019</a></span></td>
+<td class="sim"><span class="lvl lvl-vh">Very High</span> <b>84% active-site</b> residue identity; unique JAK3 Cys909<span class="sr">Tofacitinib: 112/1 nM (~112&times; JAK3 pref.) <a href="https://pubs.acs.org/doi/10.1021/acsomega.9b02800">ACS Omega 2019</a></span><span class="sr vr">NW full-seq: 38.0% (461/1214), 1154/1124&nbsp;aa | UniProt: P23458/P52333 | ChEMBL: CHEMBL2835 (19.4K acts, 15.0K IC50) / CHEMBL2148 (14.6K acts, 12.0K IC50)</span></td>
 <td>JAK1/JAK3 heterodimer signals downstream of common &gamma;-chain cytokines (IL-2, IL-15); tofacitinib (FDA 2012) for RA. <span class="drug">Tofacitinib approved</span></td></tr>
 
 <tr><td>34</td><td>Cyclooxygenase</td>
 <td class="pair">COX-1 / COX-2<br><span class="pdb">6Y3C</span> (COX-1, 3.36&Aring;*) / <span class="pdb">5IKR</span> (COX-2+celecoxib analog, 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1021/jm0613166">10.1021/jm0613166</a></td>
-<td class="sim"><span class="lvl lvl-vh">Very High</span> ~87% active-site; single Ile&rarr;Val creates COX-2 side pocket<span class="sr">Ibuprofen ~nonselective (COX-1/2 ratio ~0.15&ndash;1.0) <a href="https://www.pnas.org/doi/10.1073/pnas.96.13.7563">PNAS 1999</a></span></td>
+<td class="sim"><span class="lvl lvl-vh">Very High</span> ~87% active-site; single Ile&rarr;Val creates COX-2 side pocket<span class="sr">Ibuprofen ~nonselective (COX-1/2 ratio ~0.15&ndash;1.0) <a href="https://www.pnas.org/doi/10.1073/pnas.96.13.7563">PNAS 1999</a></span><span class="sr vr">NW full-seq: 59.9% (371/619), 599/604&nbsp;aa | UniProt: P23219/P35354 | ChEMBL: CHEMBL221 (5.3K acts, 4.4K IC50) / CHEMBL230 (9.3K acts, 8.4K IC50)</span></td>
 <td>COX-1 (constitutive, GI protection) / COX-2 (inducible, inflammation); balanced dual COX inhibition reduces CV risk vs COX-2-selective. <span class="note">*Human COX-1 limited; standard: ovine 1EQG 3.1&Aring;</span></td></tr>
 
 <tr><td>35</td><td>Hydrolase / Cyclooxygenase</td>
 <td class="pair">sEH / COX-2<br><span class="pdb">3ANS</span> (sEH+TPPU, 1.71&Aring;) / <span class="pdb">5IKR</span> (COX-2+celecoxib analog, 2.38&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1073/pnas.1410162111">10.1073/pnas.1410162111</a></td>
-<td class="sim"><span class="lvl lvl-n">None</span> Different folds (&alpha;/&beta;-hydrolase vs bis-oxygenase); chimeric design<span class="sr">PTUPB: sEH 0.9 nM / COX-2 1.26 &micro;M (~1,400&times;) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5824635/">PMC5824635</a></span></td>
+<td class="sim"><span class="lvl lvl-n">None</span> Different folds (&alpha;/&beta;-hydrolase vs bis-oxygenase); chimeric design<span class="sr">PTUPB: sEH 0.9 nM / COX-2 1.26 &micro;M (~1,400&times;) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5824635/">PMC5824635</a></span><span class="sr vr">NW full-seq: 15.2% (112/739), 555/604&nbsp;aa | UniProt: P34913/P35354 | ChEMBL: CHEMBL2409 (3.6K acts, 3.4K IC50) / CHEMBL230 (9.3K acts, 8.4K IC50)</span></td>
 <td>sEH converts anti-inflammatory EETs to inactive DHETs; dual sEH/COX-2 inhibition (PTUPB) amplifies resolution of inflammation. <span class="drug">PTUPB preclinical</span></td></tr>
 
 <tr><td>36</td><td>Necroptosis kinase</td>
 <td class="pair">RIPK1 / RIPK3<br><span class="pdb">7FD0</span> (RIPK1+novel inh., 2.2&Aring;) / <span class="pdb">7MX3</span> (RIPK3+inh., 2.5&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1021/acs.jmedchem.3c01351">10.1021/acs.jmedchem.3c01351</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> Homologous TKL kinase domains; divergent gatekeeper (Met vs Thr) &amp; DFG motif<span class="sr">GSK'074: Kd 12/130 nM (~11&times; RIPK1) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7039617/">PMC7039617</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> Homologous TKL kinase domains; divergent gatekeeper (Met vs Thr) &amp; DFG motif<span class="sr">GSK'074: Kd 12/130 nM (~11&times; RIPK1) <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7039617/">PMC7039617</a></span><span class="sr vr">NW full-seq: 22.1% (158/715), 671/518&nbsp;aa | NW domain: 33.2% Protein kinase (17-289 / 21-287, 273/267&nbsp;aa) &mdash; catalog  | UniProt: Q13546/Q9Y572 | ChEMBL: CHEMBL5464 (6.1K acts, 5.0K IC50) / CHEMBL1795199 (654 acts, 306 IC50)</span></td>
 <td>RIPK1-RIPK3 necrosome drives inflammatory necroptosis in IBD, dermatitis, neurodegeneration; dual inhibition (SZM-610) blocks both arms. <span class="drug">SZM-610 preclinical</span></td></tr>
 
 <tr><td>37</td><td>Inflammasome / Kinase</td>
 <td class="pair">NLRP3 / IRAK4<br><span class="pdb">7PZC</span> (NLRP3+MCC950, 2.8&Aring;) / <span class="pdb">2NRU</span> (IRAK4+inh., 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1038/s41573-023-00822-2">10.1038/s41573-023-00822-2</a></td>
-<td class="sim"><span class="lvl lvl-n">None</span> Different families (NLR sensor NACHT domain vs Ser/Thr kinase)<span class="sr">No dual inh.; MCC950 7.5 nM / PF-06650833 0.2 nM <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8671219/">PMC8671219</a></span></td>
+<td class="sim"><span class="lvl lvl-n">None</span> Different families (NLR sensor NACHT domain vs Ser/Thr kinase)<span class="sr">No dual inh.; MCC950 7.5 nM / PF-06650833 0.2 nM <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8671219/">PMC8671219</a></span><span class="sr vr">NW full-seq: 13.4% (141/1055), 1036/460&nbsp;aa | UniProt: Q96P20/Q9NWZ3 | ChEMBL: CHEMBL1741208 (1.1K acts, 1.1K IC50) / CHEMBL3778 (13.0K acts, 11.1K IC50)</span></td>
 <td>IRAK4 activates NF-&kappa;B upstream of NLRP3 priming; dual blockade suppresses both priming and activation in auto-inflammatory diseases.</td></tr>
 
 <tr><td>38</td><td>Kinase (TYK2/JAK2)</td>
 <td class="pair">TYK2 / JAK2<br><span class="pdb">3LXN</span> (TYK2+tofacitinib, 2.2&Aring;) / <span class="pdb">6BBV</span> (JAK2+abrocitinib, 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1056/NEJMoa1806382">10.1056/NEJMoa1806382</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> JH1 ~70&ndash;80% ID (JAK family); JH2 pseudokinase divergent<span class="sr">Deucravacitinib: &ge;2,000&times; TYK2 over JAK2 (allosteric JH2) <a href="https://www.thelancet.com/journals/ebiom/article/PIIS2352-3964(23)00406-1/fulltext">eBioMedicine 2023</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> JH1 ~70&ndash;80% ID (JAK family); JH2 pseudokinase divergent<span class="sr">Deucravacitinib: &ge;2,000&times; TYK2 over JAK2 (allosteric JH2) <a href="https://www.thelancet.com/journals/ebiom/article/PIIS2352-3964(23)00406-1/fulltext">eBioMedicine 2023</a></span><span class="sr vr">NW full-seq: 36.9% (461/1251), 1187/1132&nbsp;aa | NW domain: 43.1% Protein kinase 1 (589-875 / 545-809, 287/265&nbsp;aa) &mdash; catalog ~70–80% &#x2717; | UniProt: P29597/O60674 | ChEMBL: CHEMBL3553 (16.9K acts, 6.3K IC50) / CHEMBL2971 (24.4K acts, 19.2K IC50)</span></td>
 <td>TYK2/JAK2 heterodimer downstream of IL-12/IL-23; deucravacitinib allosteric TYK2 inhibitor approved for psoriasis; dual approach may cover broader cytokine spectrum. <span class="drug">Deucravacitinib approved 2022</span></td></tr>
 
 <tr><td>39</td><td>Kinase (BTK/PI3K&delta;)</td>
 <td class="pair">BTK / PI3K&delta;<br><span class="pdb">8FLL</span> (BTK+pirtobrutinib, 2.0&Aring;) / <span class="pdb">6G6W</span> (PI3K&delta;+LASW1976, 2.5&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1186/s13045-015-0157-x">10.1186/s13045-015-0157-x</a></td>
-<td class="sim"><span class="lvl lvl-l">Low</span> Protein Tyr kinase vs lipid kinase; shared general kinase fold only<span class="sr">No natural cross-reactivity; designed dual inhibitors exist <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5150666/">PMC5150666</a></span></td>
+<td class="sim"><span class="lvl lvl-l">Low</span> Protein Tyr kinase vs lipid kinase; shared general kinase fold only<span class="sr">No natural cross-reactivity; designed dual inhibitors exist <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5150666/">PMC5150666</a></span><span class="sr vr">NW full-seq: 14.4% (164/1138), 659/1044&nbsp;aa | NW domain: 17.0% Protein kinase/PI3K/PI4K catalytic (402-655 / 745-1027, 254/283&nbsp;aa) &mdash; catalog  | UniProt: Q06187/O00329 | ChEMBL: CHEMBL5251 (23.1K acts, 21.6K IC50) / CHEMBL3130 (15.6K acts, 15.1K IC50)</span></td>
 <td>BTK and PI3K&delta; are parallel B-cell survival signals; combined inhibition (ibrutinib+idelalisib) in CLL shows deep responses. <span class="drug">Ibrutinib+Idelalisib both approved</span></td></tr>
 
 <tr><td>40</td><td>Lipoxygenase / Cyclooxygenase</td>
 <td class="pair">5-LOX / COX-2<br><span class="pdb">6NCF</span> (5-LOX+AKBA, 2.4&Aring;) / <span class="pdb">5IKR</span> (COX-2+celecoxib analog, 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1016/s0223-5234(03)00115-6">10.1016/s0223-5234(03)00115-6</a></td>
-<td class="sim"><span class="lvl lvl-l">Low</span> Different folds (non-heme Fe vs heme enzyme); shared AA substrate<span class="sr">Licofelone: COX-2 0.37 / 5-LOX 0.23 &micro;M (~1.6&times;) <a href="https://www.selleckchem.com/products/licofelone.html">Selleck</a></span></td>
+<td class="sim"><span class="lvl lvl-l">Low</span> Different folds (non-heme Fe vs heme enzyme); shared AA substrate<span class="sr">Licofelone: COX-2 0.37 / 5-LOX 0.23 &micro;M (~1.6&times;) <a href="https://www.selleckchem.com/products/licofelone.html">Selleck</a></span><span class="sr vr">NW full-seq: 16.9% (126/744), 674/604&nbsp;aa | UniProt: P09917/P35354 | ChEMBL: CHEMBL215 (4.3K acts, 4.3K IC50) / CHEMBL230 (9.3K acts, 8.4K IC50)</span></td>
 <td>COX-2 inhibition shunts arachidonic acid to 5-LOX; dual 5-LOX/COX-2 (licofelone) prevents NSAID-induced leukotriene surge. <span class="drug">Licofelone Phase II/III</span></td></tr>
 </table>
 
@@ -305,37 +306,37 @@ tr:nth-child(even){background:#f4f4f8}
 <tr><td>41</td><td>Nuclear receptor (PPAR)</td>
 <td class="pair">PPAR&alpha; / PPAR&gamma;<br><span class="pdb">2P54</span> (PPAR&alpha;+GW735, 2.3&Aring;) / <span class="pdb">1FM9</span> (PPAR&gamma;+GI262570, 2.1&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1016/j.coph.2006.06.009">10.1016/j.coph.2006.06.009</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> 60&ndash;70% LBD ID; single Tyr/His difference drives selectivity<span class="sr">Saroglitazar: EC50 0.65 pM / 3 nM (~4,600&times; PPAR&alpha;) <a href="https://doi.org/10.1002/prp2.136">Jain 2015</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> 60&ndash;70% LBD ID; single Tyr/His difference drives selectivity<span class="sr">Saroglitazar: EC50 0.65 pM / 3 nM (~4,600&times; PPAR&alpha;) <a href="https://doi.org/10.1002/prp2.136">Jain 2015</a></span><span class="sr vr vr-warn">NW full-seq: 53.9% (275/510) | NW domain: 55.3% NR LBD (239-466 / 238-503, 228/266&nbsp;aa) &mdash; catalog 60–70% &#x2248; | UniProt: Q07869/P37231 | ChEMBL: CHEMBL239 (1.6K acts, 1.3K IC50) / CHEMBL235 (3.0K acts, 2.3K IC50)<br><b>Auto-resolution issue:</b> PDB 1FM9 = PPAR&gamma;+RXR&alpha; heterodimer; 1st entity &rarr; RXR&alpha; (P19793, 462&nbsp;aa). Correct: PPAR&gamma;&nbsp;=&nbsp;P37231</span></td>
 <td>PPAR&alpha; controls lipids; PPAR&gamma; controls glucose; dual agonism (saroglitazar, DCGI 2013 India) addresses metabolic syndrome holistically. <span class="drug">Saroglitazar approved India</span></td></tr>
 
 <tr><td>42</td><td>PDE isozymes</td>
 <td class="pair">PDE4B / PDE5<br><span class="pdb">3D3P</span> (PDE4B+inh., 2.0&Aring;) / <span class="pdb">3BJC</span> (PDE5+sildenafil deriv., 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1038/nrd4228">10.1038/nrd4228</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> ~25&ndash;50% catalytic domain ID; conserved M-site/Q-pocket, divergent H-pocket<span class="sr">Sildenafil: &gt;700&times; PDE5-selective over PDE4 <a href="https://www.nature.com/articles/3901211">Int J Impot Res 2004</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> ~25&ndash;50% catalytic domain ID; conserved M-site/Q-pocket, divergent H-pocket<span class="sr">Sildenafil: &gt;700&times; PDE5-selective over PDE4 <a href="https://www.nature.com/articles/3901211">Int J Impot Res 2004</a></span><span class="sr vr">NW full-seq: 17.9% (174/971), 736/875&nbsp;aa | NW domain: 26.0% PDEase (330-659 / 536-860, 330/325&nbsp;aa) &mdash; catalog ~25–50% &#x2713; | UniProt: Q07343/O76074 | ChEMBL: CHEMBL275 (3.8K acts, 3.6K IC50) / CHEMBL1827 (4.6K acts, 3.6K IC50)</span></td>
 <td>PDE4 degrades cAMP (inflammation), PDE5 degrades cGMP (vasodilation); dual PDE4/5 inhibition explored for COPD with pulmonary hypertension.</td></tr>
 
 <tr><td>43</td><td>GPCR (bile acid / metabolic)</td>
 <td class="pair">FXR / TGR5<br><span class="pdb">1OSV</span> (FXR+bile acid, 2.5&Aring;) / <span class="pdb">7BW0</span> (TGR5+agonist, 3.9&Aring;*)</td>
 <td class="doi"><a href="https://doi.org/10.1016/j.tips.2009.08.001">10.1016/j.tips.2009.08.001</a></td>
-<td class="sim"><span class="lvl lvl-n">None</span> Nuclear receptor vs GPCR; different folds; shared bile acid pharmacophore<span class="sr">INT-767: FXR 30 / TGR5 630 nM (~21&times;) <a href="https://www.nature.com/articles/s41598-021-88493-0">Sci Rep 2021</a></span></td>
+<td class="sim"><span class="lvl lvl-n">None</span> Nuclear receptor vs GPCR; different folds; shared bile acid pharmacophore<span class="sr">INT-767: FXR 30 / TGR5 630 nM (~21&times;) <a href="https://www.nature.com/articles/s41598-021-88493-0">Sci Rep 2021</a></span><span class="sr vr vr-warn">NW full-seq: 14.1% (74/526) | UniProt: Q62735/Q8TDU6 | ChEMBL: CHEMBL4105917 (0 acts, 0 IC50) / CHEMBL5409 (34 acts, 34 IC50)<br><b>Auto-resolution issue:</b> Cryo-EM 9GYO = TGR5+G&alpha;s complex; 1st entity &rarr; G&alpha;s (P63092). Correct: TGR5/GPBAR1&nbsp;=&nbsp;Q8TDU6</span></td>
 <td>FXR (nuclear receptor, bile acid homeostasis) + TGR5 (GPCR, energy expenditure); dual agonists for NASH/MAFLD. <span class="note">*TGR5 cryo-EM, lower resolution</span></td></tr>
 
 <tr><td>44</td><td>Transporter / Kinase</td>
 <td class="pair">SGLT2 / DPP-4<br><span class="pdb">7VSI</span> (SGLT2+empagliflozin, 2.95&Aring;) / <span class="pdb">1X70</span> (DPP-4+sitagliptin, 2.1&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.2147/DDDT.S294146">10.2147/DDDT.S294146</a></td>
-<td class="sim"><span class="lvl lvl-n">None</span> 14-TM transporter vs serine protease; orthogonal mechanisms<span class="sr">No dual inhibitor; combo therapy only <a href="https://www.nature.com/articles/s41586-021-04212-9">Nature 2022</a></span></td>
+<td class="sim"><span class="lvl lvl-n">None</span> 14-TM transporter vs serine protease; orthogonal mechanisms<span class="sr">No dual inhibitor; combo therapy only <a href="https://www.nature.com/articles/s41586-021-04212-9">Nature 2022</a></span><span class="sr vr">NW full-seq: 14.7% (138/940), 672/766&nbsp;aa | UniProt: P31639/P27487 | ChEMBL: CHEMBL3884 (2.3K acts, 2.3K IC50) / CHEMBL284 (6.5K acts, 5.8K IC50)</span></td>
 <td>SGLT2i (glucosuria) + DPP-4i (incretin) act by orthogonal mechanisms; combination improves glycemic control in T2D with cardiorenal benefits. <span class="drug">Both classes approved separately</span></td></tr>
 
 <tr><td>45</td><td>Dehydrogenase / Nuclear receptor</td>
 <td class="pair">11&beta;-HSD1 / GR<br><span class="pdb">3CZR</span> (11&beta;-HSD1+inh., 2.0&Aring;) / <span class="pdb">1M2Z</span> (GR+dexamethasone, 2.5&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1038/nrd3236">10.1038/nrd3236</a></td>
-<td class="sim"><span class="lvl lvl-n">None</span> SDR dehydrogenase (Rossmann fold) vs nuclear receptor (helical LBD)<span class="sr">Functional link: 11&beta;-HSD1 generates cortisol for GR <a href="https://doi.org/10.1152/physrev.00020.2012">Physiol Rev 2013</a></span></td>
+<td class="sim"><span class="lvl lvl-n">None</span> SDR dehydrogenase (Rossmann fold) vs nuclear receptor (helical LBD)<span class="sr">Functional link: 11&beta;-HSD1 generates cortisol for GR <a href="https://doi.org/10.1152/physrev.00020.2012">Physiol Rev 2013</a></span><span class="sr vr">NW full-seq: 10.6% (83/786), 292/777&nbsp;aa | UniProt: P28845/P04150 | ChEMBL: CHEMBL4235 (5.3K acts, 4.9K IC50) / CHEMBL2034 (7.5K acts, 5.2K IC50)</span></td>
 <td>11&beta;-HSD1 regenerates cortisol in adipose/liver; GR mediates metabolic effects; dual modulation for metabolic syndrome and T2D.</td></tr>
 
 <tr><td>46</td><td>Nuclear receptor (ER)</td>
 <td class="pair">ER&alpha; / ER&beta;<br><span class="pdb">3ERT</span> (ER&alpha;+4-OHT, 1.9&Aring;) / <span class="pdb">1X7B</span> (ER&beta;+ERB-041, 2.3&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1016/j.steroids.2014.06.012">10.1016/j.steroids.2014.06.012</a></td>
-<td class="sim"><span class="lvl lvl-mh">Mod-High</span> ~56% LBD ID; only 2 aa differ in ligand pocket (Leu/Met &rarr; Met/Ile)<span class="sr">Tamoxifen ~equipotent; MPP 670&times; ER&alpha;-selective <a href="https://breast-cancer-research.biomedcentral.com/articles/10.1186/bcr80">BCR 2001</a></span></td>
+<td class="sim"><span class="lvl lvl-mh">Mod-High</span> ~56% LBD ID; only 2 aa differ in ligand pocket (Leu/Met &rarr; Met/Ile)<span class="sr">Tamoxifen ~equipotent; MPP 670&times; ER&alpha;-selective <a href="https://breast-cancer-research.biomedcentral.com/articles/10.1186/bcr80">BCR 2001</a></span><span class="sr vr">NW full-seq: 45.5% (275/605), 595/530&nbsp;aa | NW domain: 59.7% NR LBD (311-547 / 264-498, 237/235&nbsp;aa) &mdash; catalog ~56% &#x2713; | UniProt: P03372/Q92731 | ChEMBL: CHEMBL206 (9.4K acts, 7.6K IC50) / CHEMBL242 (5.2K acts, 3.7K IC50)</span></td>
 <td>ER&alpha; (proliferative in breast cancer) vs ER&beta; (anti-proliferative); selective dual ER modulators (SERMs) balance tissue-specific effects. <span class="drug">Tamoxifen/Raloxifene approved</span></td></tr>
 </table>
 
@@ -346,25 +347,25 @@ tr:nth-child(even){background:#f4f4f8}
 <tr><td>47</td><td>Viral protease</td>
 <td class="pair">SARS-CoV-2 Mpro / PLpro<br><span class="pdb">7VLQ</span> (Mpro+nirmatrelvir, 1.7&Aring;) / <span class="pdb">7LBR</span> (PLpro+XR8-89, 2.2&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1126/science.abl4784">10.1126/science.abl4784</a></td>
-<td class="sim"><span class="lvl lvl-n">None</span> Different Cys protease clans (PA vs CA); chymotrypsin-like vs papain-like<span class="sr">No potent dual inh. yet <a href="https://www.nature.com/articles/s42003-022-03090-9">Commun Biol 2022</a></span></td>
+<td class="sim"><span class="lvl lvl-n">None</span> Different Cys protease clans (PA vs CA); chymotrypsin-like vs papain-like<span class="sr">No potent dual inh. yet <a href="https://www.nature.com/articles/s42003-022-03090-9">Commun Biol 2022</a></span><span class="sr vr vr-warn">NW full-seq: 62.1% (4404/7096) | UniProt: P0DTD1/P0DTC1 | ChEMBL: CHEMBL4523582 (5.8K acts, 5.4K IC50)<br><b>Auto-resolution issue:</b> UniProt entries are full polyproteins (pp1ab 7096&nbsp;aa / pp1a 4405&nbsp;aa), not individual proteases. Mpro&nbsp;=&nbsp;nsp5 ~306&nbsp;aa, PLpro&nbsp;=&nbsp;nsp3 ~316&nbsp;aa</span></td>
 <td>Mpro cleaves polyprotein; PLpro additionally suppresses innate immunity; dual protease inhibition could prevent resistance and restore interferon response. <span class="drug">Nirmatrelvir approved 2023 (Mpro only)</span></td></tr>
 
 <tr><td>48</td><td>Nuclear receptor (AR/GR)</td>
 <td class="pair">AR / GR<br><span class="pdb">1XQ3</span> (AR+metribolone, 2.4&Aring;) / <span class="pdb">1M2Z</span> (GR+dexamethasone, 2.5&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1158/1535-7163.MCT-16-0024">10.1158/1535-7163.MCT-16-0024</a></td>
-<td class="sim"><span class="lvl lvl-mh">Mod-High</span> ~51% LBD ID; 79% DBD ID; same NR3C subfamily<span class="sr">HD57: AR 0.39 / GR 17.8 &micro;M (~45&times;) <a href="https://www.nature.com/articles/s41401-022-01038-7">Acta Pharmacol Sin 2023</a></span></td>
+<td class="sim"><span class="lvl lvl-mh">Mod-High</span> ~51% LBD ID; 79% DBD ID; same NR3C subfamily<span class="sr">HD57: AR 0.39 / GR 17.8 &micro;M (~45&times;) <a href="https://www.nature.com/articles/s41401-022-01038-7">Acta Pharmacol Sin 2023</a></span><span class="sr vr">NW full-seq: 30.0% (302/1008), 920/777&nbsp;aa | NW domain: 50.0% NR LBD (669-900 / 524-758, 232/235&nbsp;aa) &mdash; catalog ~51% &#x2713; | UniProt: P10275/P04150 | ChEMBL: CHEMBL1871 (5.8K acts, 4.4K IC50) / CHEMBL2034 (7.5K acts, 5.2K IC50)</span></td>
 <td>GR activation is emerging resistance mechanism to AR-targeted therapy in prostate cancer; dual AR/GR blockade may overcome castration resistance. <span class="drug">Enzalutamide+GR inh. clinical trials</span></td></tr>
 
 <tr><td>49</td><td>Epigenetic (KDM)</td>
 <td class="pair">KDM4A / KDM5A<br><span class="pdb">2VD7</span> (KDM4A+NOG, 2.0&Aring;) / <span class="pdb">5CEH</span> (KDM5A+inh., 2.0&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.1016/j.drudis.2023.103519">10.1016/j.drudis.2023.103519</a></td>
-<td class="sim"><span class="lvl lvl-m">Moderate</span> ~25&ndash;35% inter-family JmjC domain ID; conserved Fe(II)/2-OG binding<span class="sr">JIB-04: 440/230 nM (~2&times; KDM5A pref.) <a href="https://www.nature.com/articles/ncomms14773">Nat Commun 2017</a></span></td>
+<td class="sim"><span class="lvl lvl-m">Moderate</span> ~25&ndash;35% inter-family JmjC domain ID; conserved Fe(II)/2-OG binding<span class="sr">JIB-04: 440/230 nM (~2&times; KDM5A pref.) <a href="https://www.nature.com/articles/ncomms14773">Nat Commun 2017</a></span><span class="sr vr">NW full-seq: 17.3% (313/1810), 1064/1690&nbsp;aa | NW domain: 39.5% JmjC (142-308 / 437-603, 167/167&nbsp;aa) &mdash; catalog ~25–35% &#x2248; | UniProt: O75164/P29375 | ChEMBL: CHEMBL5896 (625 acts, 583 IC50) / CHEMBL2424504 (2.5K acts, 2.5K IC50)</span></td>
 <td>KDM4A demethylates H3K9me3/H3K36me3; KDM5A demethylates H3K4me3; dual inhibition restricts both gene activation and heterochromatin remodeling in drug-tolerant persister cancer cells.</td></tr>
 
 <tr><td>50</td><td>Sirtuin (deacetylase)</td>
 <td class="pair">SIRT1 / SIRT2<br><span class="pdb">4I5I</span> (SIRT1+activator, 2.7&Aring;) / <span class="pdb">4RMG</span> (SIRT2+SirReal2, 1.9&Aring;)</td>
 <td class="doi"><a href="https://doi.org/10.4155/fmc-2017-0207">10.4155/fmc-2017-0207</a></td>
-<td class="sim"><span class="lvl lvl-h">High</span> ~40&ndash;60% catalytic core (Class I sirtuins); SIRT2-specific selectivity pocket<span class="sr">EX-527: 98/19,600 nM (~200&times; SIRT1) <a href="https://www.nature.com/articles/ncomms7263">Nat Commun 2015</a></span></td>
+<td class="sim"><span class="lvl lvl-h">High</span> ~40&ndash;60% catalytic core (Class I sirtuins); SIRT2-specific selectivity pocket<span class="sr">EX-527: 98/19,600 nM (~200&times; SIRT1) <a href="https://www.nature.com/articles/ncomms7263">Nat Commun 2015</a></span><span class="sr vr">NW full-seq: 21.1% (159/754), 747/389&nbsp;aa | NW domain: 40.5% Deacetylase sirtuin-type (236-496 / 57-338, 261/282&nbsp;aa) &mdash; catalog ~40–60% &#x2713; | UniProt: Q96EB6/Q8IXJ6 | ChEMBL: CHEMBL4506 (1.3K acts, 1.3K IC50) / CHEMBL4462 (2.0K acts, 1.9K IC50)</span></td>
 <td>SIRT1 (nuclear) and SIRT2 (cytoplasmic) deacetylate distinct substrates including p53 and &alpha;-tubulin; dual modulation relevant for neurodegeneration and cancer metabolism.</td></tr>
 </table>
 
@@ -427,8 +428,8 @@ tr:nth-child(even){background:#f4f4f8}
 <p><b>Recommended Validation Steps.</b></p>
 <ol style="margin:4px 0 8px 20px;padding:0">
 <li>Spot-check: open 5&ndash;10 hyperlinked references and verify the cited values match</li>
-<li>For &ldquo;est.&rdquo; pairs: run pairwise BLAST on UniProt kinase/LBD domain sequences to confirm or refine %</li>
-<li>For quantitative rigor: query ChEMBL (compound_search &rarr; get_bioactivity) for IC<sub>50</sub> distributions across multiple assays</li>
+<li><s>For &ldquo;est.&rdquo; pairs: run pairwise BLAST on UniProt kinase/LBD domain sequences to confirm or refine %</s> &mdash; Done: NW alignment on all 50 pairs &mdash; both full-length and domain-specific (kinase, LBD, SET, BD1, BH3, JmjC, catalytic domains auto-detected from UniProt). 8 pairs had PDB&rarr;UniProt auto-resolution issues (now fixed with manual overrides). Domain identity compared against catalog literature claims</li>
+<li><s>For quantitative rigor: query ChEMBL for IC<sub>50</sub> distributions across multiple assays</s> &mdash; Done: all 50 pairs auto-resolved to ChEMBL target IDs via UniProt; activity counts (IC<sub>50</sub>, K<sub>i</sub>, K<sub>d</sub>) retrieved. 8 pairs have wrong PDB&rarr;UniProt resolution (fusion proteins, shared PDB, cryo-EM complexes, polyproteins)</li>
 <li>For structural validation: superpose PDB structures and compute binding-site RMSD + Tanimoto coefficient for residue composition</li>
 </ol>
 

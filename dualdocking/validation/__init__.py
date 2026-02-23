@@ -50,4 +50,34 @@ render_md_figures
     - ``plot_sasa()``               -- SASA time series
     - ``plot_pca_variance()``       -- PCA eigenvalue spectrum
     - ``discover_targets()``        -- find completed MD target directories
+
+nw_align
+    Needleman-Wunsch global alignment with BLOSUM62 substitution matrix.
+
+    - ``AlignmentResult``           -- alignment identity statistics
+    - ``nw_align()``                -- affine-gap NW alignment
+    - ``BLOSUM62``                  -- substitution matrix dict
+
+pair_catalog
+    HTML catalog parser for the 50-pair target catalog.
+
+    - ``PairRecord``                -- one row from the catalog table
+    - ``parse_catalog()``           -- parse HTML to list of PairRecord
+
+domain_identity
+    Domain-specific sequence identity analysis.
+
+    - ``DomainIdentityReport``      -- domain NW identity result
+    - ``select_domains_for_pair()`` -- auto-discover & select domain ranges
+    - ``fetch_uniprot_domains()``   -- (in pair_verify) fetch from UniProt API
+
+pair_verify
+    Orchestrator for target pair verification (PDB, DOI, sequence, ChEMBL).
+    Re-exports all public symbols from the above submodules.
+
+    - ``verify_pair()``             -- run all requested checks for one pair
+    - ``verify_pdb()``              -- RCSB PDB metadata check
+    - ``verify_doi()``              -- DOI resolution check
+    - ``verify_sequence_identity()``-- NW alignment on UniProt sequences
+    - ``verify_chembl()``           -- ChEMBL bioactivity summary
 """

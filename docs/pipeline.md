@@ -295,6 +295,121 @@ uv run python cli/s5_analyze/summarize.py
 | `s5_analyze/threshold_sensitivity.py` | SCI-06 | Robustness at T = -1, 0, +1 (Parquet output) |
 | `s5_analyze/proxy_correlation.py` | SCI-07 | Spearman rho (docking vs Boltz-2) (Parquet output) |
 | `s7_audit/claim_audit.py` | SCI-10 | Claim traceability (8 checks) |
+| `s7_audit/verify_pair.py` | — | Target pair catalog verification (PDB, DOI, sequence, domain identity, ChEMBL) |
+
+## Target Pair Catalog Verification
+
+Parses `target_pairs_catalog.html` and verifies extracted metadata against
+external APIs (RCSB, doi.org, UniProt, ChEMBL).  Includes both full-length
+and **domain-specific** Needleman-Wunsch sequence identity.
+
+### Why domain-specific identity?
+
+Literature-cited similarity percentages (e.g. "~80% kinase domain ID") refer
+to **functional domain** identity, not full-protein identity.  Drugs bind to a
+specific pocket within a domain (kinase ATP site, NR LBD pocket), so the
+relevant comparison is between those domain sequences.  Two proteins with only
+20% full-length identity can share 80% identity in their kinase domain
+ATP-pocket, allowing a single inhibitor to bind both.
+
+The verification pipeline auto-discovers domain boundaries from UniProt
+(e.g. "Protein kinase 712-979"), computes domain-specific NW identity, and
+compares with catalog claims.  8 pairs with wrong PDB-to-UniProt
+auto-resolution (fusion proteins, cryo-EM complexes, shared PDBs, polyproteins)
+have manual UniProt overrides.
+
+### Quick start
+
+```bash
+# Parse + verify DOI for a single pair (by number)
+uv run python cli/s7_audit/verify_pair.py --pair 1 --verify-doi
+
+# By pair name
+uv run python cli/s7_audit/verify_pair.py --pair "EGFR/HER2" --verify-pdb --verify-doi
+
+# Full verification: PDB + DOI + sequence identity + domain identity + ChEMBL
+uv run python cli/s7_audit/verify_pair.py --pair 1 --full
+
+# Full verification with explicit domain ranges
+uv run python cli/s7_audit/verify_pair.py --pair 1 \
+  --verify-pdb --verify-doi --verify-sequence \
+  --uniprot-a P00533 --uniprot-b P04626 \
+  --domain-a 712-979 --domain-b 720-987
+
+# Verify all 50 pairs with all checks, save JSON
+uv run python cli/s7_audit/verify_pair.py --all --full \
+  --output-json report/data/verify_all.json
+
+# Inject results into HTML catalog
+python3 scripts/update_catalog_verification.py
+```
+
+### CLI options
+
+| Option | Description |
+|--------|-------------|
+| `--pair N` or `--pair "NAME"` | Pair number (1-50) or target names (e.g. `"EGFR/HER2"`) |
+| `--all` | Verify all 50 pairs |
+| `--full` | Enable all checks (PDB + DOI + sequence + ChEMBL) |
+| `--catalog PATH` | Path to HTML catalog (default: `target_pairs_catalog.html`) |
+| `--verify-pdb / --no-verify-pdb` | Check PDB metadata against RCSB (resolution, organism, ligands) |
+| `--verify-doi / --no-verify-doi` | Check DOI resolves via doi.org |
+| `--verify-sequence / --no-verify-sequence` | Compute full-length + domain NW identity (auto-resolves UniProt) |
+| `--verify-chembl / --no-verify-chembl` | Query ChEMBL bioactivity (auto-resolves target IDs) |
+| `--uniprot-a ID`, `--uniprot-b ID` | UniProt accessions (override auto-resolution) |
+| `--domain-a RANGE`, `--domain-b RANGE` | Domain range (e.g. `671-998`) to slice before alignment |
+| `--chembl-a ID`, `--chembl-b ID` | ChEMBL target IDs (override auto-resolution) |
+| `--output-json PATH` | Write JSON report to file |
+| `--cache-dir PATH` | Disk cache directory (default: `output/cache/verify`) |
+| `--no-cache` | Disable disk cache |
+
+### What it checks
+
+- **PDB metadata**: resolution, organism (Homo sapiens), gene names, bound ligands via RCSB API
+- **DOI resolution**: HTTP HEAD to doi.org, reports status code and redirect
+- **Full-length sequence identity**: Needleman-Wunsch alignment (BLOSUM62, affine gaps) on UniProt canonical sequences
+- **Domain-specific identity**: Auto-discovers domain boundaries from UniProt features (kinase, LBD, SET, BD1, BH3, JmjC, sirtuin, catalytic, HDAC, PDE domains), computes NW identity on domain subsequences, compares with catalog literature claims
+- **ChEMBL bioactivity**: IC50/Ki/Kd counts per target
+
+### Module architecture
+
+The verification library is split into focused modules:
+
+| Module | Lines | Purpose |
+|--------|-------|---------|
+| `nw_align.py` | ~180 | BLOSUM62 + Needleman-Wunsch global alignment |
+| `pair_catalog.py` | ~350 | HTML catalog parser, `PairRecord` dataclass |
+| `domain_identity.py` | ~330 | Domain boundary discovery, selection, match quality |
+| `pair_verify.py` | ~670 | Orchestrator: cache, PDB/DOI/ChEMBL/sequence verification |
+
+All public symbols are re-exported from `pair_verify` for backward compatibility.
+
+### Programmatic use
+
+```python
+from dualdocking.validation.pair_verify import parse_catalog, verify_pair, nw_align
+
+pairs = parse_catalog("target_pairs_catalog.html")  # -> list[PairRecord]
+result = verify_pair(pairs[0], do_pdb=True, do_doi=True, do_sequence=True)
+
+# Full-length identity
+si = result["verification"]["sequence_identity"]["alignment"]
+print(f"Full-seq: {si['identity_pct']}% ({si['matches']}/{si['aligned_length']})")
+
+# Domain-specific identity
+di = result["verification"]["domain_identity"]
+if di["alignment"]:
+    print(f"Domain: {di['alignment']['identity_pct']}% {di['domain_a']} vs catalog {di['catalog_claim_pct']}")
+
+# Standalone NW alignment
+aln = nw_align("ACDEFGHIK", "ACDXFGHIK")
+print(f"{aln.identity_pct}% identity, {aln.matches}/{aln.aligned_length}")
+
+# Direct submodule imports also work
+from dualdocking.validation.nw_align import nw_align, AlignmentResult
+from dualdocking.validation.pair_catalog import PairRecord, parse_catalog
+from dualdocking.validation.domain_identity import select_domains_for_pair
+```
 
 ## MD Validation (Optional, Post-Hoc)
 

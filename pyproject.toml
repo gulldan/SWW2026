@@ -49,6 +49,7 @@ dd-summarize = "cli.s5_analyze.summarize:main"
 dd-gnina = "cli.s8_gnina.score_gnina:main"
 dd-md = "cli.s9_md.run_md:main"
 dd-audit = "cli.s7_audit.claim_audit:main"
+dd-verify-pair = "cli.s7_audit.verify_pair:main"
 
 [build-system]
 requires = ["hatchling"]
