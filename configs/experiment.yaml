@@ -51,7 +51,7 @@ pareto_analysis:
 # Generator settings
 # Set generator.name to "FREED++" or "REINVENT4" to switch backends.
 generator:
-  name: "REINVENT4"
+  name: "FREED++"
   freedpp:
     epochs: 100
     num_sub_proc: 0            # 0 = auto-detect: 12 for 4090/24GB, 24 for H100/80GB
