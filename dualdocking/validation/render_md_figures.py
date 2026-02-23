@@ -9,7 +9,7 @@ Produces a multi-panel figure suitable for Nature/JACS/JMC:
   Panel F: Summary dashboard (2x2)
 
 Usage:
-    uv run python scripts/s6_md/render_md_figures.py --pair CDK2_ERK2 --mode single_a --mol 0
+    uv run python -m dualdocking.validation.render_md_figures --pair CDK2_ERK2 --mode single_a --mol 0
 """
 
 from __future__ import annotations
@@ -19,12 +19,13 @@ import warnings
 from pathlib import Path
 
 import click
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from loguru import logger
 
-matplotlib.use("Agg")
+mpl.use("Agg")
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -37,7 +38,7 @@ COLORS = {
 # Okabe-Ito colorblind-safe
 CB_PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#F0E442", "#56B4E9"]
 
-matplotlib.rcParams.update(
+mpl.rcParams.update(
     {
         "figure.dpi": 300,
         "savefig.dpi": 300,
@@ -66,7 +67,6 @@ def render_binding_pose(
     gro_path: Path,
     xtc_path: Path,
     out_png: Path,
-    target_label: str,
     *,
     frame: int = -1,
     width: int = 1800,
@@ -155,7 +155,7 @@ def render_binding_pose(
     cmd.ray(width, height)
     cmd.png(str(out_png))
     cmd.delete("all")
-    print(f"  [PyMOL] Saved binding pose: {out_png}")
+    logger.info(f"[PyMOL] Saved binding pose: {out_png}")
 
 
 # ── Panel B: RMSD time series ───────────────────────────────────────
@@ -191,7 +191,7 @@ def plot_rmsd(targets: dict[str, Path], out_dir: Path) -> None:
     fig.savefig(out_dir / "panel_BC_rmsd.png")
     fig.savefig(out_dir / "panel_BC_rmsd.svg")
     plt.close(fig)
-    print(f"  Saved RMSD panels: {out_dir / 'panel_BC_rmsd.png'}")
+    logger.info(f"Saved RMSD panels: {out_dir / 'panel_BC_rmsd.png'}")
 
 
 # ── Panel C: RMSF ───────────────────────────────────────────────────
@@ -214,7 +214,7 @@ def plot_rmsf(targets: dict[str, Path], out_dir: Path) -> None:
     fig.savefig(out_dir / "panel_D_rmsf.png")
     fig.savefig(out_dir / "panel_D_rmsf.svg")
     plt.close(fig)
-    print(f"  Saved RMSF panel: {out_dir / 'panel_D_rmsf.png'}")
+    logger.info(f"Saved RMSF panel: {out_dir / 'panel_D_rmsf.png'}")
 
 
 # ── Panel D: ProLIF interaction fingerprint ──────────────────────────
@@ -226,10 +226,10 @@ def plot_prolif_interactions(
 ) -> None:
     """2D protein-ligand interaction fingerprint from MD trajectory."""
     try:
-        import MDAnalysis as mda
+        import MDAnalysis as mda  # noqa: N813
         import prolif
     except ImportError:
-        print("  [SKIP] ProLIF not available")
+        logger.info("[SKIP] ProLIF not available")
         return
 
     target_name = target_label
@@ -239,7 +239,7 @@ def plot_prolif_interactions(
     lig = u.select_atoms("resname LIG")
 
     if lig.n_atoms == 0:
-        print(f"  [SKIP] No LIG atoms found for {target_name}")
+        logger.info(f"[SKIP] No LIG atoms found for {target_name}")
         return
 
     # Run fingerprint analysis (sample every 10th frame for speed)
@@ -248,7 +248,7 @@ def plot_prolif_interactions(
 
     df = fp.to_dataframe()
     if df.empty:
-        print(f"  [SKIP] No interactions found for {target_name}")
+        logger.info(f"[SKIP] No interactions found for {target_name}")
         return
 
     # Interaction barcode plot
@@ -261,18 +261,18 @@ def plot_prolif_interactions(
         fig.savefig(out_dir / f"panel_E_prolif_{target_label}.png")
         fig.savefig(out_dir / f"panel_E_prolif_{target_label}.svg")
         plt.close(fig)
-        print(f"  Saved ProLIF barcode: panel_E_prolif_{target_label}.png")
+        logger.info(f"Saved ProLIF barcode: panel_E_prolif_{target_label}.png")
     except Exception as exc:
-        print(f"  [WARN] ProLIF barcode failed: {exc}")
+        logger.warning(f"ProLIF barcode failed: {exc}")
         plt.close(fig)
 
     # Ligand interaction network (2D diagram)
     try:
         net = fp.plot_lignetwork(lig)
         net.save(str(out_dir / f"lignetwork_{target_label}.html"))
-        print(f"  Saved LigNetwork: lignetwork_{target_label}.html")
+        logger.info(f"Saved LigNetwork: lignetwork_{target_label}.html")
     except Exception as exc:
-        print(f"  [WARN] LigNetwork failed: {exc}")
+        logger.warning(f"LigNetwork failed: {exc}")
 
 
 # ── Panel E: Rg + H-bonds ───────────────────────────────────────────
@@ -307,7 +307,7 @@ def plot_rg_hbonds(targets: dict[str, Path], out_dir: Path) -> None:
     fig.savefig(out_dir / "panel_FG_rg_hbonds.png")
     fig.savefig(out_dir / "panel_FG_rg_hbonds.svg")
     plt.close(fig)
-    print(f"  Saved Rg + H-bonds: {out_dir / 'panel_FG_rg_hbonds.png'}")
+    logger.info(f"Saved Rg + H-bonds: {out_dir / 'panel_FG_rg_hbonds.png'}")
 
 
 # ── Summary table ────────────────────────────────────────────────────
@@ -345,7 +345,7 @@ def render_summary_table(targets: dict[str, Path], out_dir: Path) -> None:
         cellLoc="center",
         loc="center",
     )
-    table.auto_set_font_size(False)
+    table.auto_set_font_size(False)  # noqa: FBT003
     table.set_fontsize(7)
     table.scale(1.0, 1.4)
 
@@ -358,7 +358,7 @@ def render_summary_table(targets: dict[str, Path], out_dir: Path) -> None:
     fig.savefig(out_dir / "summary_table.png")
     fig.savefig(out_dir / "summary_table.svg")
     plt.close(fig)
-    print(f"  Saved summary table: {out_dir / 'summary_table.png'}")
+    logger.info(f"Saved summary table: {out_dir / 'summary_table.png'}")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -369,7 +369,7 @@ def _load_target_name(target_dir: Path) -> str:
     return target_dir.name
 
 
-def _add_panel_labels(fig: plt.Figure, axes: list, labels: list[str]) -> None:
+def _add_panel_labels(_fig: plt.Figure, axes: list, labels: list[str]) -> None:
     for ax, lbl in zip(axes, labels):
         ax.text(
             -0.12,
@@ -383,6 +383,39 @@ def _add_panel_labels(fig: plt.Figure, axes: list, labels: list[str]) -> None:
         )
 
 
+def _resolve_gro_path(target_dir: Path) -> Path | None:
+    """Find the GRO reference structure in a target directory.
+
+    Checks ``reference.gro`` first (production output), then falls back
+    to ``reference_npt.gro`` (NPT equilibration snapshot).
+
+    Returns:
+        Path to the GRO file, or ``None`` if neither exists.
+    """
+    for name in ("reference.gro", "reference_npt.gro"):
+        gro = target_dir / name
+        if gro.exists():
+            return gro
+    return None
+
+
+def discover_targets(base: Path) -> dict[str, Path]:
+    """Discover completed MD target directories under *base*.
+
+    Looks for ``target_A/`` and ``target_B/`` sub-directories that
+    contain an ``md_result.json`` file.
+
+    Returns:
+        Mapping of label (``"A"``/``"B"``) to directory path.
+    """
+    targets: dict[str, Path] = {}
+    for label in ("A", "B"):
+        d = base / f"target_{label}"
+        if d.exists() and (d / "md_result.json").exists():
+            targets[label] = d
+    return targets
+
+
 # ── Main ─────────────────────────────────────────────────────────────
 @click.command()
 @click.option("--pair", required=True, help="Pair ID (e.g., CDK2_ERK2)")
@@ -393,39 +426,29 @@ def main(pair: str, mode: str, mol: int, output_dir: str | None) -> None:
     """Render publication-quality MD validation figures."""
     base = PROJECT_ROOT / "output" / "md" / pair / mode / f"mol_{mol}"
 
-    if output_dir is None:
-        out = PROJECT_ROOT / "output" / "md_plots" / pair / mode / f"mol_{mol}"
-    else:
-        out = Path(output_dir)
+    out = (PROJECT_ROOT / "output" / "md_plots" / pair / mode / f"mol_{mol}") if output_dir is None else Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    targets = {}
-    for label in ["A", "B"]:
-        d = base / f"target_{label}"
-        if d.exists() and (d / "md_result.json").exists():
-            targets[label] = d
+    targets = discover_targets(base)
 
     if not targets:
-        print(f"No completed MD results found in {base}")
+        logger.info(f"No completed MD results found in {base}")
         return
 
-    print(f"=== Rendering MD figures for {pair}/{mode}/mol_{mol} ===")
-    print(f"Output: {out}")
-    print(f"Targets: {list(targets.keys())}")
+    logger.info(f"=== Rendering MD figures for {pair}/{mode}/mol_{mol} ===")
+    logger.info(f"Output: {out}")
+    logger.info(f"Targets: {list(targets.keys())}")
 
     # Panel A: 3D binding poses
-    for label, d in targets.items():
-        gro = d / "reference.gro"
-        if not gro.exists():
-            gro = d / "reference_npt.gro"
+    for d in targets.values():
+        gro = _resolve_gro_path(d)
         xtc = d / "trajectory.xtc"
-        if gro.exists():
+        if gro is not None:
             target_name = _load_target_name(d)
             render_binding_pose(
                 gro,
                 xtc,
                 out / f"panel_A_pose_{target_name}.png",
-                target_name,
             )
 
     # Panel B+C: RMSD
@@ -435,12 +458,10 @@ def main(pair: str, mode: str, mol: int, output_dir: str | None) -> None:
     plot_rmsf(targets, out)
 
     # Panel E: ProLIF interactions
-    for label, d in targets.items():
-        gro = d / "reference.gro"
-        if not gro.exists():
-            gro = d / "reference_npt.gro"
+    for d in targets.values():
+        gro = _resolve_gro_path(d)
         xtc = d / "trajectory.xtc"
-        if gro.exists() and xtc.exists():
+        if gro is not None and xtc.exists():
             target_name = _load_target_name(d)
             plot_prolif_interactions(gro, xtc, out, target_name)
 
@@ -450,10 +471,10 @@ def main(pair: str, mode: str, mol: int, output_dir: str | None) -> None:
     # Summary table
     render_summary_table(targets, out)
 
-    print(f"\n=== Done. Figures saved to: {out} ===")
-    print("Files:")
+    logger.info(f"=== Done. Figures saved to: {out} ===")
+    logger.info("Files:")
     for f in sorted(out.iterdir()):
-        print(f"  {f.name} ({f.stat().st_size // 1024} KB)")
+        logger.info(f"  {f.name} ({f.stat().st_size // 1024} KB)")
 
 
 if __name__ == "__main__":

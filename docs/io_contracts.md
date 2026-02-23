@@ -376,7 +376,7 @@ Score columns: `affinity_a`, `affinity_b`, `combined_min`, + configured objectiv
 
 ## Stage 5b — GNINA Cross-Validation
 
-**Script**: `cli/s6_report/score_gnina.py`
+**Script**: `cli/s8_gnina/score_gnina.py`
 
 Scores generated molecules with GNINA CNN-based scoring as a third
 independent scorer alongside Boltz-2 and UniDock.
@@ -400,7 +400,7 @@ independent scorer alongside Boltz-2 and UniDock.
 
 ## Stage 5c — MD Validation
 
-**Script**: `cli/s6_md/run_md.py`
+**Script**: `cli/s9_md/run_md.py`
 
 Runs publication-quality molecular dynamics simulations for top candidate
 molecules from each generation mode. Validates binding stability via

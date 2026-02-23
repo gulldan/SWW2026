@@ -132,7 +132,7 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 | Topic | Location |
 |-------|----------|
 | SLURM cluster execution | `slurm/` directory, [pipeline.md (SLURM section)](pipeline.md#slurm-cluster-execution), [setup.md (SLURM)](setup.md#slurm-cluster-optional) |
-| MD validation pipeline | `dualdocking/validation/md_*.py` (6 modules), `cli/s6_md/run_md.py`, [io_contracts.md](io_contracts.md) (Stage 5c) |
+| MD validation pipeline | `dualdocking/validation/md_*.py` (6 modules), `cli/s9_md/run_md.py`, [io_contracts.md](io_contracts.md) (Stage 5c) |
 | Generator/scorer backend selection | `configs/experiment.yaml` (`generator.backend`, `scorer.engine`) |
 | Reward config Docker passthrough (model-dependent) | `configs/experiment.yaml` (`generator.freedpp.pass_reward_modes_to_container`, `generator.freedpp.reward_modes_path_in_container`) |
 | Reward mode declarations and overrides | `configs/reward_modes.yaml` + `reward_modes.md` |

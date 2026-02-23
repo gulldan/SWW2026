@@ -136,6 +136,14 @@ rsync_code() {
         --exclude='.env' \
         --exclude='*.key' \
         --exclude='*.egg-info' \
+        --exclude='.local/' \
+        --exclude='Uni-Dock/' \
+        --exclude='.cache/' \
+        --exclude='.claude/' \
+        --exclude='.coverage' \
+        --exclude='.ruff_cache/' \
+        --exclude='.pytest_cache/' \
+        --exclude='*_catalog.html' \
         "$PROJECT_DIR/" \
         "$REMOTE_HOST:$REMOTE_PATH/"
 
@@ -178,6 +186,40 @@ rsync_data() {
         "$REMOTE_HOST:$REMOTE_PATH/"
 
     ok "Модельный кеш синхронизирован"
+
+    step "Синхронизация FREED++ моделей (output/cache/freedpp_models/)"
+
+    rsync -avz --relative \
+        $DRY_RUN \
+        --compress \
+        --partial \
+        --progress \
+        --include='output/cache/freedpp_models/***' \
+        --include='output/cache/' \
+        --include='output/' \
+        --exclude='*' \
+        "$PROJECT_DIR/./" \
+        "$REMOTE_HOST:$REMOTE_PATH/"
+
+    ok "FREED++ модели синхронизированы"
+
+    step "Синхронизация Boltz-2 score cache (output/cache/*.json)"
+
+    rsync -avz --relative \
+        $DRY_RUN \
+        --compress \
+        --partial \
+        --progress \
+        --include='output/cache/boltz_scores/***' \
+        --include='output/cache/*.json' \
+        --include='output/cache/' \
+        --include='output/' \
+        --exclude='output/cache/*.lock' \
+        --exclude='*' \
+        "$PROJECT_DIR/./" \
+        "$REMOTE_HOST:$REMOTE_PATH/"
+
+    ok "Boltz-2 score cache синхронизирован"
 
     step "Синхронизация данных (output/data/)"
 
@@ -249,7 +291,9 @@ summary() {
         echo "Что было скопировано:"
         echo "  - Код, скрипты, конфиги"
         echo "  - Docker-образы (freedpp + Boltz-2)"
-        echo "  - Модельный кеш Boltz-2"
+        echo "  - Модельный кеш Boltz-2 (NIM)"
+        echo "  - FREED++ pretrained модели"
+        echo "  - Boltz-2 score cache"
         echo "  - Данные (targets, calibration, baseline)"
         echo "  - MSA-кеш"
         echo ""

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=dd-task
+#SBATCH --job-name=dd-generate
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -15,14 +15,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 # Resolve (pair, mode, seed) from array index
 eval "$(uv run python slurm/task_matrix.py --index "$SLURM_ARRAY_TASK_ID" --format env)"
 
-echo "[$(date -u)] START task=$SLURM_ARRAY_TASK_ID  pair=$TASK_PAIR  mode=$TASK_MODE  seed=$TASK_SEED  job=$SLURM_JOB_ID"
-
-# Optional: start NIM container for Boltz-2 scoring
-if [[ "${DD_USE_NIM:-0}" == "1" ]]; then
-    source "$DD_ROOT/slurm/nim/lifecycle.sh"
-    nim_start_single
-    trap 'nim_stop_single' EXIT
-fi
+echo "[$(date -u)] START generate  task=$SLURM_ARRAY_TASK_ID  pair=$TASK_PAIR  mode=$TASK_MODE  seed=$TASK_SEED  job=$SLURM_JOB_ID"
 
 # Generate molecules
 uv run python cli/s3_generate/generate.py \
@@ -30,10 +23,4 @@ uv run python cli/s3_generate/generate.py \
     --mode "$TASK_MODE" \
     --seed "$TASK_SEED"
 
-# Score molecules with Boltz-2
-uv run python cli/s4_score/score.py \
-    --pair "$TASK_PAIR" \
-    --mode "$TASK_MODE" \
-    --seed "$TASK_SEED"
-
-echo "[$(date -u)] DONE  task=$SLURM_ARRAY_TASK_ID  pair=$TASK_PAIR  mode=$TASK_MODE  seed=$TASK_SEED"
+echo "[$(date -u)] DONE  generate  task=$SLURM_ARRAY_TASK_ID  pair=$TASK_PAIR  mode=$TASK_MODE  seed=$TASK_SEED"

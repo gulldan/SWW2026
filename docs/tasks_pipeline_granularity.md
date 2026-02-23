@@ -127,7 +127,7 @@ Veber rules (oral bioavailability). **Не удаляет молекулы** —
 MW max 500→600) можно перефильтровать за секунды без пересчёта Boltz-2 скоров.
 
 ### Stage 8 — `gnina`
-**Script:** `s6_report/score_gnina.py`
+**Script:** `s8_gnina/score_gnina.py`
 **Depends on:** score
 **Зачем:** Кросс-валидация с третьим независимым скорером. GNINA — CNN-based
 скорер, ортогональный и UniDock (RL reward), и Boltz-2 (evaluation surrogate).
@@ -237,7 +237,7 @@ heatmap hit-rates, violin/box plots score distributions, scatter plots
 с данными (пропущен пакет, битая ссылка). Перезапуск только этой стадии.
 
 ### Stage 16 — `md`
-**Script:** `s6_md/run_md.py`
+**Script:** `s9_md/run_md.py`
 **Depends on:** score
 **Зачем:** Молекулярная динамика (50 ns GROMACS) для top-3 молекул
 каждого mode. Проверяет, что предсказанные хиты действительно стабильно
@@ -303,7 +303,7 @@ endpoint, но критична для credibility в Q1.
 - [ ] **T6** Update `dualdocking/script_dispatch.py`
   - Add entries: `s5_filter/apply_filters.py`, `s2_calibrate/validate_redocking.py`,
     `s2_calibrate/enrichment_benchmark.py`, `s2_calibrate/power_analysis.py`,
-    `s6_report/score_gnina.py`, `s6_md/run_md.py`
+    `s8_gnina/score_gnina.py`, `s9_md/run_md.py`
 
 - [ ] **T7** Update `docs/pipeline.md`
   - Rewrite stage table and CLI examples for 17 stages

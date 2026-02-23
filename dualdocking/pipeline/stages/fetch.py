@@ -26,7 +26,6 @@ from dualdocking.data.fetch.docker import (
 _SCRIPT_STEP_SPECS: dict[str, tuple[str, int]] = {
     "calibration": ("cli/s0_fetch/fetch_calibration_smiles.py", 300),
     "baseline": ("cli/s0_fetch/fetch_zinc_baseline.py", 1800),
-    "targets": ("cli/s1_prepare/prepare_targets.py", 7200),
     "chembl": ("cli/s0_fetch/fetch_chembl_actives.py", 600),
     "gnina": ("cli/s0_fetch/fetch_gnina.py", 300),
 }
@@ -183,24 +182,6 @@ def step_fetch_baseline(project_root: Path, *, dry_run: bool, url: str | None = 
     return _run_named_script_step(project_root, step_key="baseline", dry_run=dry_run, extra_args=extra_args)
 
 
-def step_prepare_targets(project_root: Path, *, dry_run: bool) -> bool:
-    """Download PDB, FASTA, pre-compute MSA, and convert to PDBQT.
-
-    Args:
-        project_root: Project root directory.
-        dry_run: If True, only log the command.
-
-    Returns:
-        True on success.
-    """
-    return _run_named_script_step(
-        project_root,
-        step_key="targets",
-        dry_run=dry_run,
-        extra_args=["--prepare-all"],
-    )
-
-
 def step_fetch_chembl_actives(project_root: Path, *, dry_run: bool) -> bool:
     """Download ChEMBL actives for all targets.
 
@@ -295,7 +276,7 @@ def fetch_all(  # noqa: PLR0913
     skip_docker_build: bool = False,
     skip_calibration: bool = False,
     skip_baseline: bool = False,
-    skip_targets: bool = False,
+    skip_targets: bool = False,  # noqa: ARG001  # kept for backward compat
     skip_chembl: bool = False,
     skip_gnina: bool = False,
     baseline_url: str | None = None,
@@ -312,7 +293,8 @@ def fetch_all(  # noqa: PLR0913
         skip_docker_build: Skip Docker image build.
         skip_calibration: Skip calibration SMILES.
         skip_baseline: Skip baseline ZINC.
-        skip_targets: Skip PDB/FASTA/MSA/PDBQT.
+        skip_targets: Ignored (kept for backward compatibility).
+            Target preparation is now a separate pipeline stage (s1 prepare).
         skip_chembl: Skip ChEMBL actives fetch.
         skip_gnina: Skip GNINA binary download.
         baseline_url: Optional URL for baseline archive.
@@ -346,10 +328,6 @@ def fetch_all(  # noqa: PLR0913
     if not skip_baseline:
         ok = step_fetch_baseline(project_root, dry_run=dry_run, url=baseline_url)
         steps.append(("Baseline ZINC", ok))
-
-    if not skip_targets:
-        ok = step_prepare_targets(project_root, dry_run=dry_run)
-        steps.append(("Targets (PDB/FASTA/MSA/PDBQT)", ok))
 
     if not skip_chembl:
         ok = step_fetch_chembl_actives(project_root, dry_run=dry_run)

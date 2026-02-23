@@ -243,6 +243,7 @@ def main(
         config: Path to pairs.yaml.
         thresholds: Path to metrics.yaml (threshold definitions).
         output: Output text file path.
+        pair: Tuple of pair IDs to filter to. Default: all pairs.
     """
     in_path = PROJECT_ROOT / input_path
     if not in_path.exists():

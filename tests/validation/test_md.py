@@ -1053,7 +1053,7 @@ class TestCLI:
     def test_help(self) -> None:
         from click.testing import CliRunner
 
-        from cli.s6_md.run_md import main
+        from cli.s9_md.run_md import main
 
         runner = CliRunner()
         result = runner.invoke(main, ["--help"])
@@ -1068,7 +1068,7 @@ class TestCLI:
     def test_missing_tool_exits(self) -> None:
         from click.testing import CliRunner
 
-        from cli.s6_md.run_md import main
+        from cli.s9_md.run_md import main
 
         runner = CliRunner()
         with patch("shutil.which", return_value=None):

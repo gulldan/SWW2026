@@ -52,8 +52,23 @@ def check_fetch_outputs(project_root: Path) -> list[str]:
     """
     return _missing_paths(
         [
-            project_root / "output" / "data" / "targets",
             project_root / "output" / "data" / "calibration",
+        ]
+    )
+
+
+def check_prepare_outputs(project_root: Path) -> list[str]:
+    """Check that prepare stage outputs exist.
+
+    Args:
+        project_root: Project root directory.
+
+    Returns:
+        List of missing filesystem paths.
+    """
+    return _missing_paths(
+        [
+            project_root / "output" / "data" / "targets",
         ]
     )
 
@@ -180,8 +195,10 @@ def preflight_check(
     """
     if stage == "fetch":
         return []  # No prerequisites
-    if stage == "calibrate":
+    if stage == "prepare":
         return check_fetch_outputs(project_root)
+    if stage == "calibrate":
+        return check_prepare_outputs(project_root)
     if stage == "generate":
         return check_calibration_outputs(project_root)
     if stage == "score":

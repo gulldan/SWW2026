@@ -9,6 +9,6 @@
 #SBATCH --output=%x_%j.out
 source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 
-echo "[$(date -u)] START fetch  job=$SLURM_JOB_ID"
+echo "[$(date -u)] START fetch (s0)  job=$SLURM_JOB_ID"
 uv run python cli/s0_fetch/fetch_all.py --skip-baseline
-echo "[$(date -u)] DONE  fetch  job=$SLURM_JOB_ID"
+echo "[$(date -u)] DONE  fetch (s0)  job=$SLURM_JOB_ID"

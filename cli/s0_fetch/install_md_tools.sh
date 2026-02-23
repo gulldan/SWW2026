@@ -203,4 +203,4 @@ if [[ $WITH_MMPBSA -eq 1 ]]; then
 fi
 log ""
 log "Run MD validation:"
-log "  uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --dry-run"
+log "  uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run"

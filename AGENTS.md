@@ -200,11 +200,12 @@ cli/                          # CLI entry points (organized by pipeline stage)
   s1_prepare/                 #   Target preparation (PDB -> PDBQT, binding box, MSA, baseline)
   s2_calibrate/               #   Calibration and validation (docking, normalization, redocking, enrichment)
   s3_generate/                #   Molecule generation (configured backend; default FREED++)
-  s4_score/                   #   Affinity scoring (configured engine; default Boltz-2) + GNINA
+  s4_score/                   #   Affinity scoring (configured engine; default Boltz-2)
   s5_analyze/                 #   Statistical analysis (aggregate, metrics, correlation, sensitivity)
   s6_report/                  #   Visualization and manuscript (plots, molecules, LaTeX)
-  s6_md/                      #   MD validation (GROMACS, post-hoc binding stability)
   s7_audit/                   #   Post-hoc verification (claim traceability, duplication check)
+  s8_gnina/                   #   GNINA cross-validation scoring
+  s9_md/                      #   MD validation (GROMACS, post-hoc binding stability)
   pipeline/                   #   End-to-end orchestrators (full experiment, pilot, post, stages)
   smoke/                      #   Smoke tests (Boltz-2 health check, reward capping)
 tests/                        # pytest suite (~1160 tests), monkeypatch-heavy

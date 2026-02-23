@@ -128,6 +128,8 @@ def main(
         # Execute stage
         if stage == "fetch":
             runner.run_stage_fetch()
+        elif stage == "prepare":
+            runner.run_stage_prepare()
         elif stage == "calibrate":
             runner.run_stage_calibrate()
         elif stage == "generate":

@@ -105,7 +105,7 @@ def predict_affinity_sync(
     return float("nan")
 
 
-async def predict_batch_async(
+async def predict_batch_async(  # noqa: PLR0913
     sequence: str,
     smiles_indices: list[tuple[int, str]],
     *,

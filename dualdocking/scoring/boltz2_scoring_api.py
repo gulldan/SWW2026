@@ -8,10 +8,13 @@ import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 from tqdm import tqdm
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 class _LoggerLike(Protocol):

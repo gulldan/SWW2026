@@ -23,5 +23,5 @@ if [[ -n "${DD_MD_SIM_TIME:-}" ]]; then
 fi
 
 echo "[$(date -u)] START md  task=$SLURM_ARRAY_TASK_ID  pair=$PAIR  job=$SLURM_JOB_ID"
-uv run python cli/s6_md/run_md.py --pair "$PAIR" --docker $SIM_TIME_ARG
+uv run python cli/s9_md/run_md.py --pair "$PAIR" --docker $SIM_TIME_ARG
 echo "[$(date -u)] DONE  md  task=$SLURM_ARRAY_TASK_ID  pair=$PAIR"

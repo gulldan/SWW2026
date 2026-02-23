@@ -56,8 +56,8 @@ docker build -f docker/md/Dockerfile -t dualdocking/md:latest .
 | Image | Used by | Required |
 |------|---------|----------|
 | `dualdocking/freedpp:latest` | FREED++ generation backend | Yes |
-| `dualdocking/gnina:latest` | `cli/s4_score/score_gnina.py` with `--docker-image` override | No |
-| `dualdocking/md:latest` | `cli/s6_md/run_md.py --docker` | No (unless MD Docker mode) |
+| `dualdocking/gnina:latest` | `cli/s8_gnina/score_gnina.py` with `--docker-image` override | No |
+| `dualdocking/md:latest` | `cli/s9_md/run_md.py --docker` | No (unless MD Docker mode) |
 
 ## Docker (FREED++ Generator)
 
@@ -126,14 +126,14 @@ Patch/runtime tuning env vars (inside FREED++ container):
 
 The primary GNINA workflow in this project uses the binary at `output/bin/gnina`
 (downloaded by Stage 0 fetch). A custom GNINA container is optional and mostly
-useful for isolated experiments with `cli/s4_score/score_gnina.py`.
+useful for isolated experiments with `cli/s8_gnina/score_gnina.py`.
 
 ```bash
 # Build custom image from docker/gnina/Dockerfile
 docker build -f docker/gnina/Dockerfile -t dualdocking/gnina:latest .
 
 # Use the custom image in docker-based GNINA scoring
-uv run python cli/s4_score/score_gnina.py \
+uv run python cli/s8_gnina/score_gnina.py \
   --pair CDK2_ERK2 --mode double --seed 42 \
   --docker-image dualdocking/gnina:latest
 ```
@@ -185,7 +185,7 @@ uv run python cli/s1_prepare/sample_baseline.py \
 
 ## MD Validation Prerequisites (Optional)
 
-Required only for `cli/s6_md/run_md.py` — post-hoc molecular dynamics
+Required only for `cli/s9_md/run_md.py` — post-hoc molecular dynamics
 validation of top candidate molecules.
 
 ### Option A: Docker (Recommended)
@@ -198,20 +198,20 @@ in a reproducible environment. No host installation required beyond Docker itsel
 docker build -f docker/md/Dockerfile -t dualdocking/md:latest .
 
 # Run MD via Docker (auto-builds image if missing)
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker
 
 # Dry-run (no build needed)
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker --dry-run
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --dry-run
 
 # Custom image tag
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker --docker-image myrepo/md:v2
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --docker-image myrepo/md:v2
 
 # Override simulation time, single mode
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker \
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker \
   --mode single_a --top-n 1 --simulation-time 10
 
 # With MM-GBSA
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker --mmpbsa
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --mmpbsa
 ```
 
 The `--docker` flag bind-mounts the project directories into the container:
@@ -359,19 +359,19 @@ gmx_MMPBSA --help      # MM-GBSA (only needed with --mmpbsa flag)
 
 ```bash
 # Docker mode (recommended — no local tools needed):
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker
 
 # Local mode (requires all tools in PATH):
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2
 
 # Dry-run (works in both modes)
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --dry-run
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run
 
 # Custom simulation time, disable GPU
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --simulation-time 100 --no-gpu
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --simulation-time 100 --no-gpu
 
 # With MM-GBSA binding free energy
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --mmpbsa
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --mmpbsa
 ```
 
 See [io_contracts.md](io_contracts.md) (Stage 5c) for complete output specification.

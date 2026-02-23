@@ -22,7 +22,7 @@ fi
 echo "[$(date -u)] START md validation  job=$SLURM_JOB_ID  pairs=$PAIRS"
 for pair in $PAIRS; do
     echo "[$(date -u)]   MD $pair"
-    uv run python cli/s6_md/run_md.py --pair "$pair" --docker $SIM_TIME_ARG || {
+    uv run python cli/s9_md/run_md.py --pair "$pair" --docker $SIM_TIME_ARG || {
         echo "[$(date -u)]   WARN: MD failed for $pair (continuing)"
     }
 done

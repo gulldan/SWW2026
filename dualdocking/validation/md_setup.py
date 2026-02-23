@@ -191,8 +191,8 @@ def _parse_ndx(ndx_path: Path) -> dict[str, list[int]]:
     """Parse a GROMACS index file into {group_name: [atom_indices]}."""
     groups: dict[str, list[int]] = {}
     current: str | None = None
-    for line in ndx_path.read_text().splitlines():
-        line = line.strip()
+    for raw_line in ndx_path.read_text().splitlines():
+        line = raw_line.strip()
         if line.startswith("[") and line.endswith("]"):
             current = line[1:-1].strip()
             groups[current] = []
@@ -206,8 +206,7 @@ def _write_ndx(groups: dict[str, list[int]], ndx_path: Path) -> None:
     lines: list[str] = []
     for name, indices in groups.items():
         lines.append(f"[ {name} ]")
-        for i in range(0, len(indices), 15):
-            lines.append(" ".join(str(x) for x in indices[i : i + 15]))
+        lines.extend(" ".join(str(x) for x in indices[i : i + 15]) for i in range(0, len(indices), 15))
     ndx_path.write_text("\n".join(lines) + "\n")
 
 

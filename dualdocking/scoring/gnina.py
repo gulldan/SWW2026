@@ -230,7 +230,7 @@ def _build_docker_cmd(
     return cmd
 
 
-def _run_gnina_on_sdf(
+def _run_gnina_on_sdf(  # noqa: PLR0913
     combined_sdf: Path,
     receptor_pdb: Path,
     output_sdf: Path,
@@ -399,8 +399,7 @@ def score_batch(
                 seed=seed,
             )
 
-            for idx, scores in zip(chunk_indices, scored):
-                score_map[idx] = scores
+            score_map.update(dict(zip(chunk_indices, scored)))
 
             n_ok = sum(1 for s in scored if not (np.isnan(s[0]) or np.isnan(s[1])))
             logger.info(

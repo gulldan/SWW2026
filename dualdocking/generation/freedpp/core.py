@@ -232,6 +232,15 @@ def _run_freedpp(
     """Run FREED++ inside a Docker container.
 
     Args:
+        config: Generation configuration.
+        workspace: Host workspace directory.
+        pdbqt_a: Primary receptor PDBQT path.
+        center_a: Primary binding-box center string.
+        size_a: Primary binding-box size string.
+        pdbqt_b: Optional secondary receptor PDBQT path.
+        center_b: Optional secondary binding-box center string.
+        size_b: Optional secondary binding-box size string.
+        commands: FREED++ command string (default: ``"train,sample"``).
         checkpoint: Container path to ``model_*.pth`` for resuming training.
     """
 

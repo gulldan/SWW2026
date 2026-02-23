@@ -1,7 +1,7 @@
 """Validation: MD simulation and audit checks for top candidate molecules.
 
 Post-generation validation using molecular dynamics and structural auditing.
-Used by pipeline stages s6_md and s7_audit.
+Used by pipeline stages s9_md and s7_audit.
 
 Modules
 -------
@@ -38,4 +38,14 @@ audit
     - ``check_significance()``      -- re-derive significance per SAP 4.4
     - ``load_core_pairs()``         -- extract core pairs from pairs.yaml
     - ``EVIDENCE_MAP``              -- claim scenario -> evidence mapping
+
+render_md_figures
+    Publication-quality figure generation for MD validation.
+
+    - ``render_binding_pose()``     -- PyMOL ray-traced binding pose
+    - ``plot_rmsd()``               -- RMSD time series (backbone + ligand)
+    - ``plot_rmsf()``               -- per-residue RMSF
+    - ``plot_rg_hbonds()``          -- Rg + H-bond count
+    - ``render_summary_table()``    -- styled metrics table
+    - ``discover_targets()``        -- find completed MD target directories
 """

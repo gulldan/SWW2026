@@ -35,7 +35,8 @@ class StageDefinition:
 # All available pipeline stages in execution order
 STAGE_DEFINITIONS: list[StageDefinition] = [
     StageDefinition("fetch", "Download PDB, FASTA, SMILES, Docker image", []),
-    StageDefinition("calibrate", "Dock calibration set, compute normalization", ["fetch"]),
+    StageDefinition("prepare", "Prepare targets: PDB cleanup, FASTA, MSA, PDBQT", ["fetch"]),
+    StageDefinition("calibrate", "Dock calibration set, compute normalization", ["prepare"]),
     StageDefinition("generate", "Run FREED++ molecule generation", ["calibrate"]),
     StageDefinition("score", "Score molecules with Boltz-2", ["generate"]),
     StageDefinition("analyze", "Aggregate results, compute metrics, sensitivity, correlation", ["score"]),
@@ -73,6 +74,15 @@ def build_fetch_command() -> list[str]:
         Command tokens for subprocess execution.
     """
     return ["uv", "run", "python", "cli/s0_fetch/fetch_all.py"]
+
+
+def build_prepare_command() -> list[str]:
+    """Build command to run the prepare stage.
+
+    Returns:
+        Command tokens for subprocess execution.
+    """
+    return ["uv", "run", "python", "cli/s1_prepare/prepare_all.py"]
 
 
 def build_calibrate_commands() -> list[list[str]]:
@@ -195,7 +205,7 @@ def build_gnina_command(task: StageTask) -> list[str]:
     Returns:
         Command tokens for subprocess execution.
     """
-    return _build_task_command("cli/s6_report/score_gnina.py", task)
+    return _build_task_command("cli/s8_gnina/score_gnina.py", task)
 
 
 def build_md_command(pair: str) -> list[str]:
@@ -207,7 +217,7 @@ def build_md_command(pair: str) -> list[str]:
     Returns:
         Command tokens for subprocess execution.
     """
-    return ["uv", "run", "python", "cli/s6_md/run_md.py", "--pair", pair]
+    return ["uv", "run", "python", "cli/s9_md/run_md.py", "--pair", pair]
 
 
 def build_prepare_commands(

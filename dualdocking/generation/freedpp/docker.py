@@ -287,7 +287,8 @@ def run_freedpp(  # noqa: PLR0913
         pipe: Sentinel equivalent to ``subprocess.PIPE``.
         getenv: Environment lookup callback.
         tqdm_factory: Progress-bar factory callback.
-        log: Logger-like instance.
+        log: Logger instance.
+        extra_docker_args: Optional extra arguments to pass to ``docker run``.
 
     Returns:
         Completed process object with combined stdout.

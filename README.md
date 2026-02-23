@@ -80,8 +80,8 @@ Results land in `output/results/` and `report/`. See [Pipeline](docs/pipeline.md
 Post-hoc molecular dynamics validation of top candidates — see [Setup](docs/setup.md) for dependencies.
 
 ```bash
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --dry-run   # preview
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2              # run (50 ns, auto-GPU)
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run   # preview
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2              # run (50 ns, auto-GPU)
 ```
 
 ### Smoke Test

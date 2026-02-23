@@ -9,7 +9,10 @@ Operations in order:
   3. docker build         -- Docker image FREED++ (CUDA, PyTorch, DGL, UniDock, FFREED)
   4. fetch_calibration    -- data/calibration/*.smi (HuggingFace/URL)
   5. fetch_baseline       -- data/baseline/*.tar.xz (optional, URL)
-  6. prepare_targets      -- PDB (RCSB), FASTA (UniProt), MSA (ColabFold), PDBQT
+  6. fetch_chembl         -- ChEMBL actives for enrichment validation
+  7. fetch_gnina          -- GNINA static binary
+
+Note: Target preparation (PDB, FASTA, MSA, PDBQT) is now a separate stage (s1 prepare).
 
 Usage::
 
@@ -198,7 +201,7 @@ def step_fetch_gnina(dry_run: bool) -> bool:
 @click.option("--skip-docker-build", is_flag=True, default=False, help="Skip Docker image build")
 @click.option("--skip-calibration", is_flag=True, default=False, help="Skip calibration SMILES")
 @click.option("--skip-baseline", is_flag=True, default=False, help="Skip baseline ZINC")
-@click.option("--skip-targets", is_flag=True, default=False, help="Skip PDB/FASTA/MSA/PDBQT")
+@click.option("--skip-targets", is_flag=True, default=False, help="Ignored (kept for backward compat; use s1 prepare stage)")
 @click.option("--skip-chembl", is_flag=True, default=False, help="Skip ChEMBL actives fetch")
 @click.option("--skip-gnina", is_flag=True, default=False, help="Skip GNINA binary download")
 @click.option("--baseline-url", default=None, help="URL for baseline archive")
@@ -222,10 +225,11 @@ def main(  # noqa: PLR0913
 ) -> None:
     """Fetch all artifacts needed for offline experiment execution.
 
-    Runs eight sequential steps (uv sync, FREED data, Docker build,
-    calibration SMILES, baseline ZINC, target preparation, ChEMBL
-    actives, GNINA binary) with per-step skip flags.  Use
-    ``--verify-only`` to check readiness without downloading anything.
+    Runs seven sequential steps (uv sync, FREED data, Docker build,
+    calibration SMILES, baseline ZINC, ChEMBL actives, GNINA binary)
+    with per-step skip flags.  Target preparation (PDB/FASTA/MSA/PDBQT)
+    is now a separate stage (s1 prepare).  Use ``--verify-only`` to
+    check readiness without downloading anything.
     """
     if verify_only:
         missing = verify_offline_readiness()

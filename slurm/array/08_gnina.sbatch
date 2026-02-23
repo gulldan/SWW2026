@@ -16,7 +16,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 eval "$(uv run python slurm/task_matrix.py --index "$SLURM_ARRAY_TASK_ID" --format env)"
 
 echo "[$(date -u)] START gnina  task=$SLURM_ARRAY_TASK_ID  pair=$TASK_PAIR  mode=$TASK_MODE  seed=$TASK_SEED"
-uv run python cli/s4_score/score_gnina.py \
+uv run python cli/s8_gnina/score_gnina.py \
     --pair "$TASK_PAIR" \
     --mode "$TASK_MODE" \
     --seed "$TASK_SEED"

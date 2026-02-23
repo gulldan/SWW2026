@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=dd-gen-score
+#SBATCH --job-name=dd-score
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -20,10 +20,6 @@ if [[ "${DD_USE_NIM:-0}" == "1" ]]; then
     trap 'nim_stop_all' EXIT
 fi
 
-echo "[$(date -u)] START generate+score  job=$SLURM_JOB_ID  gpus=$N_GPUS"
-uv run python cli/pipeline/run_full_experiment.py \
-    --resume \
-    --parallel "$N_GPUS" \
-    --skip-prepare-freed-data \
-    --skip-prepare-baseline
-echo "[$(date -u)] DONE  generate+score  job=$SLURM_JOB_ID"
+echo "[$(date -u)] START score (s4)  job=$SLURM_JOB_ID  gpus=$N_GPUS"
+uv run python cli/pipeline/run_stages.py --stages score --skip-preflight
+echo "[$(date -u)] DONE  score (s4)  job=$SLURM_JOB_ID"

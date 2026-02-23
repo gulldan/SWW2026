@@ -12,6 +12,7 @@ directory, the component is discovered automatically.
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import tempfile
 from collections.abc import Callable
@@ -289,7 +290,7 @@ def _parse_sdf_energy(text: str) -> list[float]:
     return scores
 
 
-def _run_gpu_sub_batch(
+def _run_gpu_sub_batch(  # noqa: PLR0913
     chunk: list[Path],
     receptor_pdbqt: Path,
     cx: str,
@@ -396,7 +397,7 @@ def _run_gpu_sub_batch(
         )
 
 
-def _run_cpu_fallback(
+def _run_cpu_fallback(  # noqa: PLR0913
     chunk: list[Path],
     receptor_pdbqt: Path,
     cx: str,
@@ -441,7 +442,7 @@ def _run_cpu_fallback(
             "--out",
             str(out_pdbqt),
         ]
-        try:
+        with contextlib.suppress(subprocess.TimeoutExpired, OSError):
             subprocess.run(  # noqa: S603
                 cmd,
                 capture_output=True,
@@ -449,8 +450,6 @@ def _run_cpu_fallback(
                 timeout=per_lig_timeout,
                 check=False,
             )
-        except (subprocess.TimeoutExpired, OSError):
-            pass
 
 
 def dock_gpu_batch(
@@ -484,25 +483,23 @@ def dock_gpu_batch(
     sx, sy, sz = size.split(",")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Split into sub-batches
-    chunks = [ligand_pdbqts[i : i + _GPU_SUB_BATCH] for i in range(0, len(ligand_pdbqts), _GPU_SUB_BATCH)]
-    if len(chunks) > 1:
-        logger.debug("Split {} ligands into {} sub-batches of <={}", len(ligand_pdbqts), len(chunks), _GPU_SUB_BATCH)
-
-    for chunk in chunks:
-        _run_gpu_sub_batch(
-            chunk,
-            receptor_pdbqt,
-            cx.strip(),
-            cy.strip(),
-            cz.strip(),
-            sx.strip(),
-            sy.strip(),
-            sz.strip(),
-            output_dir,
-            vina_program,
-            exhaustiveness,
-        )
+    # CPU-only mode: dock each ligand individually (--ligand).
+    # GPU batch (--gpu_batch) hangs on complex REINVENT4 molecules,
+    # making CPU-only faster overall (no timeout waits).
+    logger.debug("Docking {} ligands via CPU (--ligand each)", len(ligand_pdbqts))
+    _run_cpu_fallback(
+        ligand_pdbqts,
+        receptor_pdbqt,
+        cx.strip(),
+        cy.strip(),
+        cz.strip(),
+        sx.strip(),
+        sy.strip(),
+        sz.strip(),
+        output_dir,
+        vina_program,
+        exhaustiveness,
+    )
 
     # Parse results
     scores: dict[Path, float | None] = {}

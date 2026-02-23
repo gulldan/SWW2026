@@ -52,7 +52,7 @@ Stage 0 builds `dualdocking/freedpp:latest` only. To build all images
 | GNINA binary | GitHub releases | `output/bin/gnina` |
 | Fetch manifest | — (generated) | `output/data/targets/fetch_manifest.json` |
 
-## Stage 0.5: Calibration & Validation (offline, GPU)
+## Stage 2: Calibration & Validation (offline, GPU)
 
 ```bash
 uv run python cli/s2_calibrate/dock_calibration.py
@@ -66,7 +66,7 @@ available — each target gets its own Docker container pinned to a specific GPU
 Targets without existing score files are skipped by `compute_normalization.py`
 (incremental calibration).
 
-## Stage 1 + 2: Full Experiment (offline)
+## Stage 3 + 4: Full Experiment (offline)
 
 Orchestrated run — generation, scoring, and analysis:
 
@@ -115,10 +115,10 @@ Advanced override:
 Or split into stages:
 
 ```bash
-# Stage 1: generate + score (all pairs x modes x seeds)
+# Stage 3+4: generate + score (all pairs x modes x seeds)
 EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_full_experiment.py --resume --parallel 1
 
-# Stage 2: aggregate + metrics + plots + report
+# Stage 5+6: aggregate + metrics + plots + report
 EXPERIMENT_RUN_ID=run01 uv run python cli/pipeline/run_post_pipeline.py --latex-mode draft
 ```
 
@@ -318,7 +318,7 @@ See [setup.md](setup.md) for full installation options.
    Check if already built: `docker images dualdocking/md`
 
 2. **Scored results** must exist in `output/results/{pair}/{mode}/seed_{N}/scored_joined.parquet`.
-   These are produced by Stage 1+2 (generate + score).
+   These are produced by Stage 3+4 (generate + score).
 
 3. **PDB structures** must exist in `output/data/targets/{pair}/{A,B}/{pdb_id}.pdb`.
    Produced by Stage 0 (fetch).
@@ -327,33 +327,33 @@ See [setup.md](setup.md) for full installation options.
 
 ```bash
 # 1. Check what molecules would be selected (no Docker needed)
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --dry-run
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run
 
 # 2. Quick smoke test: 1 molecule, 1 target mode, 1 ns simulation
 #    (~5-10 min on RTX 4090 with GPU acceleration)
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker \
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker \
   --mode single_a --top-n 1 --simulation-time 1
 
 # 3. Full run: top-3 molecules, all modes, default 50 ns
 #    (~2-4 hours per molecule×target on RTX 4090)
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker
 
 # 4. Shorter simulation (10 ns) for faster turnaround
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker --simulation-time 10
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --simulation-time 10
 
 # 5. With MM-GBSA binding free energy (requires gmx_MMPBSA in image)
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker --mmpbsa
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --mmpbsa
 
 # 6. Disable GPU (CPU-only GROMACS)
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --docker --no-gpu
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --no-gpu
 
 # 7. Local mode (requires all tools in PATH — see setup.md Option B)
-uv run python cli/s6_md/run_md.py --pair CDK2_ERK2
+uv run python cli/s9_md/run_md.py --pair CDK2_ERK2
 ```
 
 ### What `--docker` Does Under the Hood
 
-The CLI (`cli/s6_md/run_md.py --docker`) calls `dualdocking.validation.md_docker`:
+The CLI (`cli/s9_md/run_md.py --docker`) calls `dualdocking.validation.md_docker`:
 
 1. **Builds image** if missing (`docker build -f docker/md/Dockerfile ...`)
 2. **Runs container** with bind mounts:
@@ -367,7 +367,7 @@ The CLI (`cli/s6_md/run_md.py --docker`) calls `dualdocking.validation.md_docker
    | `pyproject.toml` | `/workspace/pyproject.toml` | read-only |
 
 3. **Entrypoint** (`docker/md/entrypoint.sh`) sources GMXRC, sets up AmberTools/conda
-   paths, then runs `python /workspace/cli/s6_md/run_md.py <args>` (without `--docker`).
+   paths, then runs `python /workspace/cli/s9_md/run_md.py <args>` (without `--docker`).
 
 The actual `docker run` command generated:
 ```bash
@@ -403,11 +403,11 @@ obabel --version
 python -c "from dualdocking.validation.md_config import MDConfig; print('OK')"
 
 # Run MD manually (see full output/errors):
-python /workspace/cli/s6_md/run_md.py --pair CDK2_ERK2 \
+python /workspace/cli/s9_md/run_md.py --pair CDK2_ERK2 \
   --mode single_a --top-n 1 --simulation-time 1
 
 # Or run with --dry-run to check molecule selection:
-python /workspace/cli/s6_md/run_md.py --pair CDK2_ERK2 --dry-run
+python /workspace/cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run
 ```
 
 ### Pipeline Per Molecule×Target
@@ -496,8 +496,8 @@ Output: `report/manuscript.tex`, `report/manuscript.pdf`.
 
 ## Logs
 
-- Stage 1: `report/experiment_<run_id>_<utc>.log`
-- Stage 2: `report/post_<run_id>_<utc>.log`
+- Stage 3+4: `report/experiment_<run_id>_<utc>.log`
+- Stage 5+6: `report/post_<run_id>_<utc>.log`
 - Run manifests: `report/run_manifest_<run_id>.json`
 
 ## Data Migration (CSV to Parquet)
@@ -553,29 +553,31 @@ slurm/array/submit.sh --max-concurrent=4
 
 ### Dependency Chain
 
-Both strategies submit a core 6-stage chain plus optional validation stages:
+Both strategies submit a core 8-stage chain plus optional validation stages:
 
 ```
-fetch (s0+s1, CPU) -> calibrate (s2, 1 GPU) -> gen+score (s3+s4, GPU)
+fetch (s0, CPU) -> prepare (s1, CPU) -> calibrate (s2, 1 GPU) -> generate (s3, GPU) -> score (s4, GPU)
     -> analyze (s5, CPU) -> report (s6, CPU)
                          -> audit  (s7, CPU)
-    -> gnina  (optional, GPU)
-    -> md     (optional, GPU)
+    -> gnina  (s8, optional, GPU)
+    -> md     (s9, optional, GPU)
 ```
 
 Report and audit both depend on analyze but run in parallel with each other.
-GNINA and MD depend on gen+score and run in parallel with analyze.
+GNINA and MD depend on score and run in parallel with analyze.
 
 | sbatch | Stages | Partition | Resources | Wall time |
 |--------|--------|-----------|-----------|-----------|
-| `01_fetch` | s0 fetch + s1 prepare | cpu | 4 CPU, 16G | 2h |
+| `00_fetch` | s0 fetch | cpu | 4 CPU, 16G | 2h |
+| `01_prepare` | s1 prepare | cpu | 4 CPU, 16G | 2h |
 | `02_calibrate` | s2 calibrate | gpu | 1 GPU, 16 CPU, 64G | 4h |
-| `03_generate_score` | s3 generate + s4 score | gpu | 1–N GPU, 16–64 CPU, 48–256G | 12h–7d |
-| `04_analyze` | s5 analyze | cpu | 8 CPU, 32G | 2h |
-| `05_report` | s6 report | cpu | 8 CPU, 32G | 2h |
-| `06_audit` | s7 audit | cpu | 4 CPU, 16G | 1h |
-| `07_gnina` | GNINA cross-validation | gpu | 1 GPU, 8–16 CPU, 32–64G | 4–12h |
-| `08_md` | MD validation (GROMACS) | gpu | 1 GPU, 16 CPU, 64G | 3d |
+| `03_generate` | s3 generate | gpu | 1 GPU, 16–64 CPU, 48–256G | 12h–7d |
+| `04_score` | s4 score | gpu | 1 GPU, 16–64 CPU, 48–256G | 12h–7d |
+| `05_analyze` | s5 analyze | cpu | 8 CPU, 32G | 2h |
+| `06_report` | s6 report | cpu | 8 CPU, 32G | 2h |
+| `07_audit` | s7 audit | cpu | 4 CPU, 16G | 1h |
+| `08_gnina` | s8 GNINA cross-validation | gpu | 1 GPU, 8–16 CPU, 32–64G | 4–12h |
+| `09_md` | s9 MD validation (GROMACS) | gpu | 1 GPU, 16 CPU, 64G | 3d |
 
 Enable optional stages with `--with-gnina` and/or `--with-md`:
 
@@ -584,7 +586,7 @@ slurm/array/submit.sh --with-gnina --with-md
 ```
 
 In the array strategy, GNINA runs as a 180-element array (same task matrix as
-gen+score), while MD runs as a 12-element array (one per active pair).
+generate), while MD runs as a 12-element array (one per active pair).
 
 ### Task Matrix (Array Strategy)
 
@@ -612,7 +614,7 @@ specific failed array elements:
 
 ```bash
 # Retry tasks 3, 17, and 42
-sbatch --array=3,17,42 slurm/array/03_generate_score.sbatch
+sbatch --array=3,17,42 slurm/array/03_generate.sbatch
 ```
 
 The pipeline's built-in resume logic (check for `scored_joined` / `generated`)

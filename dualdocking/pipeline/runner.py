@@ -147,6 +147,17 @@ class PipelineRunner:
         self.run_cmd(stages.build_fetch_command(), log_path)
         logger.info("=== Stage fetch complete ===")
 
+    def run_stage_prepare(self, log_path: Path | None = None) -> None:
+        """Run the prepare stage (PDB cleanup, FASTA, MSA, PDBQT).
+
+        Args:
+            log_path: Optional log file path (auto-generated if ``None``).
+        """
+        log_path = log_path or self.get_log_path("prepare")
+        logger.info("=== Stage: prepare ===")
+        self.run_cmd(stages.build_prepare_command(), log_path)
+        logger.info("=== Stage prepare complete ===")
+
     def run_stage_calibrate(self, log_path: Path | None = None) -> None:
         """Run the calibration stage (dock calibration set, compute normalization).
 

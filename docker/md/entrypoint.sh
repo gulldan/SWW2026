@@ -30,4 +30,4 @@ case "$1" in
 esac
 
 # ── Default: run MD validation CLI ──────────────────────────────────
-exec python /workspace/cli/s6_md/run_md.py "$@"
+exec python /workspace/cli/s9_md/run_md.py "$@"
