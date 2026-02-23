@@ -283,9 +283,9 @@ def run_correlation(config: CorrelationConfig) -> CorrelationResult:
                 if dock_col not in all_merged.columns:
                     continue
 
-                valid = all_merged[[aff_col, dock_col]].dropna()
-                x = valid[dock_col].to_numpy()
-                y = valid[aff_col].to_numpy()
+                valid = all_merged[[aff_col, dock_col]].apply(pd.to_numeric, errors="coerce").dropna()
+                x = valid[dock_col].to_numpy(dtype=float)
+                y = valid[aff_col].to_numpy(dtype=float)
 
                 if len(x) < 3:
                     continue
