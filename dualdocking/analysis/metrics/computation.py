@@ -584,8 +584,6 @@ def load_all_data(
     Returns:
         Tuple of (data dict, missing_runs list).
     """
-    import sys
-
     from dualdocking.analysis.fairness import validate_fairness, validate_reward_quality
     from dualdocking.data.io_utils import stem_exists
 

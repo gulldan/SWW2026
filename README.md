@@ -8,23 +8,14 @@ Single-target vs dual-target RL molecule generation using **FREED++** or **REINV
 
 ## Data Flow
 
-```
-Stage 0: Fetch              Generation (FREED++ / REINVENT4)        Scoring (Boltz-2)
----------------------     ----------------------------      --------------------------
- PDB structures                                               Boltz-2 affinity (a_A, a_B)
- UniProt FASTA          ->  For each of 5 core pairs:    ->   per molecule, both targets
- ZINC calibration sets       3 modes x 5 seeds                 (log10 IC50-like uM)
- ChEMBL actives              - single_a: reward=f(d_A)
-                              - single_b: reward=f(d_B)         |
-                              - double:   reward=f(max(d_A,d_B))  v
+flowchart TB
 
-                              UniDock GPU docking             Analysis & Report
-                              (d_A, d_B in kcal/mol)     --------------------------
-                                                           Dual hit-rate comparison
-                                                           Bootstrap CI (m=5 seeds)
-                                                           Cliff's delta effect size
-                                                           LaTeX manuscript + figures
-```
+  A["Stage 0 · Fetch<br/>PDB · FASTA · ZINC · ChEMBL"] --> 
+  B["Generation (FREED++ / REINVENT4)<br/>5 core pairs · 3 modes × 5 seeds<br/>reward: f(dA) | f(dB) | f(max)"] --> 
+  C["UniDock GPU docking<br/>(dA, dB in kcal/mol)"] --> 
+  D["Boltz-2 scoring<br/>aA, aB (log10 IC50-like μM)"] --> 
+  E["Analysis & Report<br/>hit-rate · bootstrap CI (m=5) · Cliff's delta<br/>LaTeX + figures"]
+
 
 **75 runs total** (core): 5 core pairs x 3 modes x 5 seeds. Auxiliary pairs (7) for robustness checks.
 

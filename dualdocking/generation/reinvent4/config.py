@@ -124,6 +124,7 @@ minsimilarity = 0.4
     norm_mean_b = tb.norm_mean if tb else 0.0
     norm_std_b = tb.norm_std if tb else 1.0
 
+    out_dir = str(config.output_dir)
     toml = f"""\
 # Auto-generated REINVENT4 config — do not edit manually.
 run_type = "staged_learning"
@@ -133,7 +134,7 @@ seed = {config.seed}
 [parameters]
 prior_file = {_quote(prior)}
 agent_file = {_quote(agent)}
-summary_csv_prefix = "scaffold_memory"
+summary_csv_prefix = {_quote(out_dir + "/scaffold_memory")}
 batch_size = {config.batch_size}
 unique_sequences = true
 randomize_smiles = true
@@ -147,7 +148,7 @@ rate = {config.learning_rate}
 [[stage]]
 max_score = 1.0
 max_steps = {config.n_steps}
-chkpt_file = "agent.ckpt"
+chkpt_file = {_quote(out_dir + "/agent.ckpt")}
 
 [stage.scoring]
 type = "custom_sum"

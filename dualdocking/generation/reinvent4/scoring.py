@@ -55,6 +55,9 @@ SCORE_MIN: float = -20.0
 SCORE_MAX: float = 10.0
 MAX_Z_ABS: float = 10.0
 INVALID_Z_PENALTY: float = 4.0
+_GPU_SUB_BATCH: int = 16
+_TIMEOUT_PER_LIGAND: float = 5.0  # seconds per ligand for timeout calculation
+_TIMEOUT_MIN: float = 60.0  # minimum timeout (seconds)
 
 
 # ---------------------------------------------------------------------------
@@ -267,6 +270,261 @@ def dock_single(
         return None
 
 
+def _parse_sdf_energy(text: str) -> list[float]:
+    """Extract ENERGY scores from a UniDock SDF output."""
+    scores: list[float] = []
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        if not line.startswith("> <Uni-Dock RESULT>"):
+            continue
+        if idx + 1 >= len(lines):
+            continue
+        payload = lines[idx + 1].strip()
+        for token in payload.replace(";", " ").split():
+            if token.startswith("ENERGY="):
+                try:
+                    scores.append(float(token.split("=", 1)[1]))
+                except ValueError:
+                    continue
+    return scores
+
+
+def _run_gpu_sub_batch(
+    chunk: list[Path],
+    receptor_pdbqt: Path,
+    cx: str,
+    cy: str,
+    cz: str,
+    sx: str,
+    sy: str,
+    sz: str,
+    output_dir: Path,
+    vina_program: str,
+    exhaustiveness: int,
+) -> None:
+    """Run one GPU sub-batch of UniDock, with CPU fallback on failure.
+
+    On timeout, partial results already written to *output_dir* are kept.
+    """
+    timeout = max(_TIMEOUT_MIN, len(chunk) * _TIMEOUT_PER_LIGAND)
+    cmd = [
+        vina_program,
+        "--receptor",
+        str(receptor_pdbqt),
+    ]
+    for lig in chunk:
+        cmd += ["--gpu_batch", str(lig)]
+    cmd += [
+        "--center_x",
+        cx,
+        "--center_y",
+        cy,
+        "--center_z",
+        cz,
+        "--size_x",
+        sx,
+        "--size_y",
+        sy,
+        "--size_z",
+        sz,
+        "--exhaustiveness",
+        str(exhaustiveness),
+        "--num_modes",
+        "1",
+        "--dir",
+        str(output_dir),
+        "--verbosity",
+        "0",
+    ]
+
+    try:
+        result = subprocess.run(  # noqa: S603
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+        if result.returncode != 0:
+            logger.warning(
+                "GPU sub-batch failed (rc={}, n={}), falling back to CPU",
+                result.returncode,
+                len(chunk),
+            )
+            _run_cpu_fallback(
+                chunk,
+                receptor_pdbqt,
+                cx,
+                cy,
+                cz,
+                sx,
+                sy,
+                sz,
+                output_dir,
+                vina_program,
+                exhaustiveness,
+            )
+    except subprocess.TimeoutExpired:
+        logger.warning("GPU sub-batch timed out ({:.0f}s, n={}), CPU fallback for missing", timeout, len(chunk))
+        _run_cpu_fallback(
+            chunk,
+            receptor_pdbqt,
+            cx,
+            cy,
+            cz,
+            sx,
+            sy,
+            sz,
+            output_dir,
+            vina_program,
+            exhaustiveness,
+        )
+    except OSError as exc:
+        logger.warning("GPU sub-batch OS error: {}, CPU fallback", exc)
+        _run_cpu_fallback(
+            chunk,
+            receptor_pdbqt,
+            cx,
+            cy,
+            cz,
+            sx,
+            sy,
+            sz,
+            output_dir,
+            vina_program,
+            exhaustiveness,
+        )
+
+
+def _run_cpu_fallback(
+    chunk: list[Path],
+    receptor_pdbqt: Path,
+    cx: str,
+    cy: str,
+    cz: str,
+    sx: str,
+    sy: str,
+    sz: str,
+    output_dir: Path,
+    vina_program: str,
+    exhaustiveness: int,
+) -> None:
+    """Dock ligands one-by-one via CPU (``--ligand``) as last resort."""
+    per_lig_timeout = max(30.0, _TIMEOUT_PER_LIGAND * 3)
+    for lig in chunk:
+        out_sdf = output_dir / f"{lig.stem}_out.sdf"
+        out_pdbqt = output_dir / f"{lig.stem}_out.pdbqt"
+        if out_sdf.exists() or out_pdbqt.exists():
+            continue  # already have result from partial GPU run
+        cmd = [
+            vina_program,
+            "--receptor",
+            str(receptor_pdbqt),
+            "--ligand",
+            str(lig),
+            "--center_x",
+            cx,
+            "--center_y",
+            cy,
+            "--center_z",
+            cz,
+            "--size_x",
+            sx,
+            "--size_y",
+            sy,
+            "--size_z",
+            sz,
+            "--exhaustiveness",
+            str(exhaustiveness),
+            "--num_modes",
+            "1",
+            "--out",
+            str(out_pdbqt),
+        ]
+        try:
+            subprocess.run(  # noqa: S603
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=per_lig_timeout,
+                check=False,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+
+def dock_gpu_batch(
+    ligand_pdbqts: list[Path],
+    receptor_pdbqt: Path,
+    center: str,
+    size: str,
+    output_dir: Path,
+    vina_program: str = "unidock",
+    exhaustiveness: int = 8,
+) -> dict[Path, float | None]:
+    """Dock a batch of ligands via UniDock ``--gpu_batch`` on GPU.
+
+    Splits into sub-batches of ``_GPU_SUB_BATCH`` to avoid timeouts
+    and VRAM exhaustion.  Falls back to single-ligand CPU docking
+    for failed sub-batches.
+
+    Args:
+        ligand_pdbqts: Ligand PDBQT files.
+        receptor_pdbqt: Receptor PDBQT file.
+        center: Comma-separated ``"cx,cy,cz"`` center coordinates.
+        size: Comma-separated ``"sx,sy,sz"`` box dimensions.
+        output_dir: Directory for output files.
+        vina_program: Docking binary name/path.
+        exhaustiveness: Docking exhaustiveness.
+
+    Returns:
+        Mapping from ligand path to best score (or ``None``).
+    """
+    cx, cy, cz = center.split(",")
+    sx, sy, sz = size.split(",")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Split into sub-batches
+    chunks = [ligand_pdbqts[i : i + _GPU_SUB_BATCH] for i in range(0, len(ligand_pdbqts), _GPU_SUB_BATCH)]
+    if len(chunks) > 1:
+        logger.debug("Split {} ligands into {} sub-batches of <={}", len(ligand_pdbqts), len(chunks), _GPU_SUB_BATCH)
+
+    for chunk in chunks:
+        _run_gpu_sub_batch(
+            chunk,
+            receptor_pdbqt,
+            cx.strip(),
+            cy.strip(),
+            cz.strip(),
+            sx.strip(),
+            sy.strip(),
+            sz.strip(),
+            output_dir,
+            vina_program,
+            exhaustiveness,
+        )
+
+    # Parse results
+    scores: dict[Path, float | None] = {}
+    for lig in ligand_pdbqts:
+        sdf_path = output_dir / f"{lig.stem}_out.sdf"
+        pdbqt_out = output_dir / f"{lig.stem}_out.pdbqt"
+        if sdf_path.exists():
+            energy_list = _parse_sdf_energy(sdf_path.read_text())
+            if energy_list:
+                best = min(energy_list)
+                scores[lig] = best if SCORE_MIN <= best <= SCORE_MAX else None
+            else:
+                scores[lig] = None
+            sdf_path.unlink(missing_ok=True)
+        elif pdbqt_out.exists():
+            scores[lig] = parse_vina_score(pdbqt_out)
+            pdbqt_out.unlink(missing_ok=True)
+        else:
+            scores[lig] = None
+    return scores
+
+
 def parse_vina_score(pdbqt_path: Path) -> float | None:
     """Parse best docking score from Vina/UniDock output PDBQT.
 
@@ -332,7 +590,10 @@ def score_batch(
     reward_mode: str,
     vina_program: str = "unidock",
 ) -> np.ndarray:
-    """Score a batch of SMILES via docking + reward-mode scalarization.
+    """Score a batch of SMILES via GPU batch docking + reward-mode scalarization.
+
+    Uses UniDock ``--gpu_batch`` to dock all ligands at once on GPU,
+    falling back to ``--ligand_index`` if GPU batch fails.
 
     Args:
         smiles_list: SMILES strings to score.
@@ -352,44 +613,68 @@ def score_batch(
 
     with tempfile.TemporaryDirectory(prefix="reinvent4_dock_") as tmpdir:
         tmp = Path(tmpdir)
+
+        # --- Phase 1: Prepare all ligand PDBQTs ---
+        valid_indices: list[int] = []
+        lig_paths: list[Path] = []
         for i, smi in enumerate(smiles_list):
             lig_pdbqt = tmp / f"lig_{i}.pdbqt"
-            if not smiles_to_pdbqt(smi, lig_pdbqt):
-                _reward_stats.record(
-                    valid_a=False,
-                    valid_b=False if needs_target_b else None,
-                )
+            if smiles_to_pdbqt(smi, lig_pdbqt):
+                valid_indices.append(i)
+                lig_paths.append(lig_pdbqt)
+
+        if not lig_paths:
+            for _ in smiles_list:
+                _reward_stats.record(valid_a=False, valid_b=False if needs_target_b else None)
+            return rewards
+
+        # --- Phase 2: GPU batch dock against target A ---
+        out_a = tmp / "out_a"
+        scores_a_map = dock_gpu_batch(
+            lig_paths,
+            target_a.pdbqt_path,
+            target_a.center,
+            target_a.size,
+            out_a,
+            vina_program,
+        )
+
+        # --- Phase 3: GPU batch dock against target B (if needed) ---
+        scores_b_map: dict[Path, float | None] = {}
+        if needs_target_b and target_b is not None:
+            out_b = tmp / "out_b"
+            scores_b_map = dock_gpu_batch(
+                lig_paths,
+                target_b.pdbqt_path,
+                target_b.center,
+                target_b.size,
+                out_b,
+                vina_program,
+            )
+
+        # --- Phase 4: Compute rewards ---
+        valid_set = set(valid_indices)
+        for i in range(len(smiles_list)):
+            if i not in valid_set:
+                _reward_stats.record(valid_a=False, valid_b=False if needs_target_b else None)
                 continue
 
-            # Dock against target A
-            score_a = dock_single(lig_pdbqt, target_a.pdbqt_path, target_a.center, target_a.size, vina_program)
+            lig_pdbqt = tmp / f"lig_{i}.pdbqt"
+            score_a = scores_a_map.get(lig_pdbqt)
             if score_a is None:
-                _reward_stats.record(
-                    valid_a=False,
-                    valid_b=False if needs_target_b else None,
-                )
+                _reward_stats.record(valid_a=False, valid_b=False if needs_target_b else None)
                 continue
             z_a = capped_zscore(score_a, target_a.norm_mean, target_a.norm_std)
 
-            # Dock against target B if the reward mode uses z_b (e.g. single_b,
-            # double, selective_a, etc.).  The check is requires_secondary_target
-            # — NOT requires_dual_docking — because single_b needs only z_b but
-            # has requires_dual_docking=false.
             z_b: float | None = None
             if needs_target_b and target_b is not None:
-                score_b = dock_single(lig_pdbqt, target_b.pdbqt_path, target_b.center, target_b.size, vina_program)
+                score_b = scores_b_map.get(lig_pdbqt)
                 if score_b is None:
                     _reward_stats.record(valid_a=True, valid_b=False)
                     continue
                 z_b = capped_zscore(score_b, target_b.norm_mean, target_b.norm_std)
 
-            _reward_stats.record(
-                valid_a=True,
-                valid_b=True if needs_target_b else None,
-            )
-
-            # Negate: our z-scores follow "lower = better" (docking convention),
-            # but REINVENT4 DAP expects "higher = better" (reward convention).
+            _reward_stats.record(valid_a=True, valid_b=True if needs_target_b else None)
             rewards[i] = -mode.evaluate(z_a=z_a, z_b=z_b)
 
     return rewards

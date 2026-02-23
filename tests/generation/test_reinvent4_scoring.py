@@ -8,6 +8,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
+from collections.abc import Callable
+
 from dualdocking.generation.reinvent4.scoring import (
     INVALID_Z_PENALTY,
     MAX_Z_ABS,
@@ -80,6 +82,31 @@ class TestParseVinaScore:
 # --- score_batch ---
 
 
+def _make_gpu_batch_mock(score_value: float | None) -> Callable:
+    """Return a mock for ``dock_gpu_batch`` that assigns *score_value* to all ligands."""
+
+    def _mock(
+        ligand_pdbqts: list[Path], *_args: object, **_kwargs: object,
+    ) -> dict[Path, float | None]:
+        return {lig: score_value for lig in ligand_pdbqts}
+
+    return _mock
+
+
+def _make_gpu_batch_mock_ab(score_a: float | None, score_b: float | None) -> Callable:
+    """Return a mock for ``dock_gpu_batch`` that returns *score_a* on first call, *score_b* on second."""
+    call_count = {"n": 0}
+
+    def _mock(
+        ligand_pdbqts: list[Path], *_args: object, **_kwargs: object,
+    ) -> dict[Path, float | None]:
+        val = score_a if call_count["n"] == 0 else score_b
+        call_count["n"] += 1
+        return {lig: val for lig in ligand_pdbqts}
+
+    return _mock
+
+
 class TestScoreBatch:
     @pytest.fixture(autouse=True)
     def _reset_stats(self) -> None:
@@ -120,24 +147,18 @@ class TestScoreBatch:
         """single_a mode returns negated z_a (REINVENT4: higher = better)."""
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", return_value=-8.0),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch", side_effect=_make_gpu_batch_mock(-8.0)),
         ):
             rewards = score_batch(["CCO"], target_a, None, "single_a")
         # z = (-8.0 - (-7.0)) / 1.0 = -1.0; negated → +1.0
         assert rewards[0] == pytest.approx(1.0)
 
     def test_single_b_mode(self, target_a: DockingTarget, target_b: DockingTarget) -> None:
-        """single_b mode docks target B and returns negated z_b.
-
-        Regression: single_b has requires_dual_docking=false but still
-        needs z_b computed.  The old code gated z_b on requires_dual_docking,
-        causing a ValueError at runtime.
-        """
-        dock_scores = iter([-8.0, -8.8])  # A then B
-
+        """single_b mode docks both targets; reward uses z_b only."""
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", side_effect=lambda *a, **kw: next(dock_scores)),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch",
+                  side_effect=_make_gpu_batch_mock_ab(-8.0, -8.8)),
         ):
             rewards = score_batch(["CCO"], target_a, target_b, "single_b")
         # z_b = (-8.8 - (-8.0)) / 0.8 = -1.0; negated → +1.0
@@ -145,11 +166,10 @@ class TestScoreBatch:
 
     def test_double_mode(self, target_a: DockingTarget, target_b: DockingTarget) -> None:
         """double mode returns negated max(z_a, z_b)."""
-        dock_scores = iter([-8.0, -8.8])
-
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", side_effect=lambda *a, **kw: next(dock_scores)),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch",
+                  side_effect=_make_gpu_batch_mock_ab(-8.0, -8.8)),
         ):
             rewards = score_batch(["CCO"], target_a, target_b, "double")
         # z_a = (-8.0 - (-7.0)) / 1.0 = -1.0
@@ -161,18 +181,17 @@ class TestScoreBatch:
         """Docking failure (None score) returns penalty."""
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", return_value=None),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch", side_effect=_make_gpu_batch_mock(None)),
         ):
             rewards = score_batch(["CCO"], target_a, None, "single_a")
         assert rewards[0] == pytest.approx(-INVALID_Z_PENALTY)
 
     def test_selective_a_mode(self, target_a: DockingTarget, target_b: DockingTarget) -> None:
         """selective_a mode returns negated (z_a - z_b)."""
-        dock_scores = iter([-9.0, -8.0])
-
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", side_effect=lambda *a, **kw: next(dock_scores)),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch",
+                  side_effect=_make_gpu_batch_mock_ab(-9.0, -8.0)),
         ):
             rewards = score_batch(["CCO"], target_a, target_b, "selective_a")
         # z_a = (-9.0 - (-7.0)) / 1.0 = -2.0
@@ -182,11 +201,10 @@ class TestScoreBatch:
 
     def test_linear_equal_mode(self, target_a: DockingTarget, target_b: DockingTarget) -> None:
         """linear_equal mode returns negated (z_a + z_b)."""
-        dock_scores = iter([-8.0, -8.8])
-
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", side_effect=lambda *a, **kw: next(dock_scores)),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch",
+                  side_effect=_make_gpu_batch_mock_ab(-8.0, -8.8)),
         ):
             rewards = score_batch(["CCO"], target_a, target_b, "linear_equal")
         # z_a = -1.0, z_b = -1.0 -> -1.0 + -1.0 = -2.0; negated → +2.0
@@ -194,11 +212,10 @@ class TestScoreBatch:
 
     def test_biased_a_mode(self, target_a: DockingTarget, target_b: DockingTarget) -> None:
         """biased_a mode returns negated (z_a + 0.3*z_b)."""
-        dock_scores = iter([-8.0, -8.8])
-
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", side_effect=lambda *a, **kw: next(dock_scores)),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch",
+                  side_effect=_make_gpu_batch_mock_ab(-8.0, -8.8)),
         ):
             rewards = score_batch(["CCO"], target_a, target_b, "biased_a")
         # z_a = -1.0, z_b = -1.0 -> -1.0 + 0.3 * -1.0 = -1.3; negated → +1.3
@@ -457,7 +474,7 @@ class TestScoreBatchStats:
         """Successful docking is tracked."""
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", return_value=-8.0),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch", side_effect=_make_gpu_batch_mock(-8.0)),
         ):
             score_batch(["CCO"], target_a, None, "single_a")
         assert _reward_stats.total == 1
@@ -467,7 +484,7 @@ class TestScoreBatchStats:
         """Docking failure on target A is tracked."""
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", return_value=None),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch", side_effect=_make_gpu_batch_mock(None)),
         ):
             score_batch(["CCO"], target_a, None, "single_a")
         assert _reward_stats.total == 1
@@ -475,10 +492,10 @@ class TestScoreBatchStats:
 
     def test_dock_b_failure_counted(self, target_a: DockingTarget, target_b: DockingTarget) -> None:
         """Docking failure on target B is tracked (target A succeeds)."""
-        dock_scores = iter([-8.0, None])  # A succeeds, B fails
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", side_effect=lambda *a, **kw: next(dock_scores)),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch",
+                  side_effect=_make_gpu_batch_mock_ab(-8.0, None)),
         ):
             score_batch(["CCO"], target_a, target_b, "double")
         assert _reward_stats.total == 1
@@ -487,10 +504,10 @@ class TestScoreBatchStats:
 
     def test_dual_success_counted(self, target_a: DockingTarget, target_b: DockingTarget) -> None:
         """Both targets succeed in dual mode."""
-        dock_scores = iter([-8.0, -8.8])
         with (
             patch("dualdocking.generation.reinvent4.scoring.smiles_to_pdbqt", return_value=True),
-            patch("dualdocking.generation.reinvent4.scoring.dock_single", side_effect=lambda *a, **kw: next(dock_scores)),
+            patch("dualdocking.generation.reinvent4.scoring.dock_gpu_batch",
+                  side_effect=_make_gpu_batch_mock_ab(-8.0, -8.8)),
         ):
             score_batch(["CCO"], target_a, target_b, "double")
         assert _reward_stats.total == 1

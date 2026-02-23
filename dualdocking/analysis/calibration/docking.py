@@ -360,7 +360,7 @@ def _detect_gpu_count() -> int:
     """Detect number of available NVIDIA GPUs."""
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--list-gpus"],  # noqa: S603, S607
+            ["nvidia-smi", "--list-gpus"],  # noqa: S607
             capture_output=True,
             text=True,
             check=True,

@@ -136,7 +136,7 @@ def _load_reward_params_from_env() -> dict[str, float]:
 def _receptor_label(receptor: str) -> str:
     """Return a short receptor label for logs."""
     stem = Path(receptor).stem
-    return stem if stem else receptor
+    return stem or receptor
 
 
 def _short_value(value: str, max_len: int = 80) -> str:

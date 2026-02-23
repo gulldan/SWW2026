@@ -22,9 +22,9 @@ modes:
   - single_a       # optimize for target A only, then evaluate on both        [pre-registered]
   - single_b       # optimize for target B only, then evaluate on both        [pre-registered]
   - double         # optimize for combined(A, B) simultaneously               [pre-registered]
-  - linear_equal   # z_a + z_b — equally weighted linear combination          [exploratory]
-  - biased_a       # z_a + 0.3*z_b — target A priority                       [exploratory]
-  - selective_a    # z_a - z_b — maximize selectivity for A                   [exploratory]
+  # - linear_equal   # z_a + z_b — equally weighted linear combination          [exploratory]
+  # - biased_a       # z_a + 0.3*z_b — target A priority                       [exploratory]
+  # - selective_a    # z_a - z_b — maximize selectivity for A                   [exploratory]
 
 # Objective functions for double-target mode
 # Baseline + alternatives for sensitivity analysis
@@ -51,7 +51,7 @@ pareto_analysis:
 # Generator settings
 # Set generator.name to "FREED++" or "REINVENT4" to switch backends.
 generator:
-  name: "FREED++"
+  name: "REINVENT4"
   freedpp:
     epochs: 100
     num_sub_proc: 0            # 0 = auto-detect: 12 for 4090/24GB, 24 for H100/80GB
@@ -67,12 +67,12 @@ generator:
     algorithm: dap             # DAP learning strategy (recommended by REINVENT4 authors)
     generator_type: reinvent   # cache key only; architecture follows the prior model
     batch_size: 128
-    n_steps: 500
+    n_steps: 50
     use_cache: true
     use_diversity_filter: true
     prior_model: ""            # empty = built-in ChEMBL prior
     box_padding: 10.0          # Å
-    vina_program: unidock      # native UniDock (not GPU batch mode)
+    vina_program: /home/qwerty/bin/unidock
     training_timeout: 86400    # 24h
 
 # Reward run quality threshold (quality gate)

@@ -376,6 +376,36 @@ uv run python cli/s6_md/run_md.py --pair CDK2_ERK2 --mmpbsa
 
 See [io_contracts.md](io_contracts.md) (Stage 5c) for complete output specification.
 
+## SLURM Cluster (optional)
+
+For running the full experiment on an HPC cluster. Requires SLURM workload
+manager. See [`pipeline.md`](pipeline.md#slurm-cluster-execution) for detailed
+usage.
+
+**Prerequisites on compute nodes:**
+- `uv` in `PATH` (or load via `module load`)
+- Docker or Apptainer for FREED++ generation and optional NIM scoring
+- NVIDIA GPU with driver supporting CUDA 12.x
+- Shared filesystem (NFS/Lustre) for `output/` directory
+
+**Cluster-specific configuration:**
+
+Edit `slurm/common.sh` to match your cluster:
+
+```bash
+# Uncomment and adapt module loads
+module purge
+module load cuda/12.4
+module load apptainer/1.3
+
+# Set container runtime if Docker is not available
+export DD_CONTAINER_RUNTIME=apptainer
+```
+
+Edit partition names and resource requests in `slurm/{monolithic,array}/*.sbatch`
+to match your cluster's SLURM configuration (partition names, GPU types,
+memory limits).
+
 ## LaTeX (optional)
 
 For PDF report generation. On Arch Linux:

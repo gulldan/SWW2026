@@ -524,3 +524,150 @@ Not migrated: Boltz MSA cache, FREED++ training CSVs, Docker data files.
 Default seeds from `configs/experiment.yaml`: `[42, 137, 256, 512, 1024]`.
 Multiple seeds reduce variance. Metrics are computed across independent seeds.
 For smoke/debug use one seed with small budget (`--epochs 2 --n-molecules 10`).
+
+## SLURM Cluster Execution
+
+For HPC clusters with SLURM workload manager. Two strategies are provided in
+`slurm/`:
+
+| Strategy | When to use | Parallelism |
+|----------|-------------|-------------|
+| **Monolithic** (`slurm/monolithic/`) | DGX / multi-GPU workstation | 1 node, N GPUs via `--parallel` |
+| **Array** (`slurm/array/`) | HPC cluster, many nodes | 1 GPU per task, up to 180 array elements |
+
+### Quick Start
+
+```bash
+# Strategy A: single node, 4 GPUs
+slurm/monolithic/submit.sh
+
+# Strategy B: array jobs, max 8 concurrent
+slurm/array/submit.sh
+
+# Skip fetch stage (data already present)
+slurm/array/submit.sh --skip-fetch
+
+# Limit concurrent array tasks
+slurm/array/submit.sh --max-concurrent=4
+```
+
+### Dependency Chain
+
+Both strategies submit a core 6-stage chain plus optional validation stages:
+
+```
+fetch (s0+s1, CPU) -> calibrate (s2, 1 GPU) -> gen+score (s3+s4, GPU)
+    -> analyze (s5, CPU) -> report (s6, CPU)
+                         -> audit  (s7, CPU)
+    -> gnina  (optional, GPU)
+    -> md     (optional, GPU)
+```
+
+Report and audit both depend on analyze but run in parallel with each other.
+GNINA and MD depend on gen+score and run in parallel with analyze.
+
+| sbatch | Stages | Partition | Resources | Wall time |
+|--------|--------|-----------|-----------|-----------|
+| `01_fetch` | s0 fetch + s1 prepare | cpu | 4 CPU, 16G | 2h |
+| `02_calibrate` | s2 calibrate | gpu | 1 GPU, 16 CPU, 64G | 4h |
+| `03_generate_score` | s3 generate + s4 score | gpu | 1–N GPU, 16–64 CPU, 48–256G | 12h–7d |
+| `04_analyze` | s5 analyze | cpu | 8 CPU, 32G | 2h |
+| `05_report` | s6 report | cpu | 8 CPU, 32G | 2h |
+| `06_audit` | s7 audit | cpu | 4 CPU, 16G | 1h |
+| `07_gnina` | GNINA cross-validation | gpu | 1 GPU, 8–16 CPU, 32–64G | 4–12h |
+| `08_md` | MD validation (GROMACS) | gpu | 1 GPU, 16 CPU, 64G | 3d |
+
+Enable optional stages with `--with-gnina` and/or `--with-md`:
+
+```bash
+slurm/array/submit.sh --with-gnina --with-md
+```
+
+In the array strategy, GNINA runs as a 180-element array (same task matrix as
+gen+score), while MD runs as a 12-element array (one per active pair).
+
+### Task Matrix (Array Strategy)
+
+Each array element maps to a single (pair, mode, seed) combination:
+
+```bash
+# Total task count (12 active pairs × 3 modes × 5 seeds = 180)
+uv run python slurm/task_matrix.py --count
+
+# Print full mapping
+uv run python slurm/task_matrix.py --list
+
+# Single task lookup (used inside sbatch)
+uv run python slurm/task_matrix.py --index 0 --format env
+# -> export TASK_PAIR=CDK2_ERK2 TASK_MODE=single_a TASK_SEED=42
+```
+
+`task_matrix.py` uses the same `PipelineConfig.generate_tasks()` as the Python
+orchestrator, so task ordering is identical.
+
+### Retry Failed Tasks
+
+SLURM `--requeue` handles preemption automatically. For manually retrying
+specific failed array elements:
+
+```bash
+# Retry tasks 3, 17, and 42
+sbatch --array=3,17,42 slurm/array/03_generate_score.sbatch
+```
+
+The pipeline's built-in resume logic (check for `scored_joined` / `generated`)
+makes retry idempotent — completed tasks are skipped at no cost.
+
+### NIM on Compute Nodes
+
+To use Boltz-2 NIM containers on SLURM compute nodes, set `DD_USE_NIM=1`:
+
+```bash
+DD_USE_NIM=1 slurm/monolithic/submit.sh
+DD_USE_NIM=1 slurm/array/submit.sh
+```
+
+This sources `slurm/nim/lifecycle.sh`, which starts NIM containers before
+generation and stops them on exit. Requires Docker access on compute nodes
+and `NGC_API_KEY` in environment.
+
+### Shared Filesystem & Caching
+
+- Boltz-2 cache uses `fcntl.flock` — safe on NFS (advisory locking)
+- Array tasks targeting the same protein compete on cache files; flock serializes
+- No additional configuration needed for shared filesystems
+
+### Environment Variables
+
+All SLURM scripts inherit from `slurm/common.sh`:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DD_ROOT` | Auto-detected from script location | Project root |
+| `EXPERIMENT_RUN_ID` | `slurm_<timestamp>` | Shared run ID across all jobs |
+| `DD_LOG_DIR` | `$DD_ROOT/slurm/logs/$EXPERIMENT_RUN_ID` | Log directory |
+| `DD_CONTAINER_RUNTIME` | `docker` | Container runtime (`docker` or `apptainer`) |
+| `DD_USE_NIM` | `0` | Enable NIM Boltz-2 containers |
+| `DD_LATEX_MODE` | `draft` | LaTeX report mode (`off`, `draft`, `full`) |
+
+### Customization
+
+Resource requests (`--mem`, `--gres`, `--time`, `--partition`) are set in each
+`.sbatch` file and should be adjusted for your cluster. Common changes:
+
+- **Partition names**: Replace `cpu`/`gpu` with your cluster's partition names
+- **GPU type**: Change `--gres=gpu:4` to `--gres=gpu:a100:4` for specific GPU models
+- **Module loads**: Uncomment and edit `module load` lines in `slurm/common.sh`
+
+### Docker vs Apptainer
+
+Most HPC clusters do not allow Docker. Conversion to Apptainer/Singularity
+images is a one-time operation:
+
+```bash
+apptainer build freedpp.sif docker-daemon://dualdocking/freedpp:latest
+apptainer build boltz2_nim.sif docker-daemon://nvcr.io/nim/mit/boltz2:1.5.0
+```
+
+Set `DD_CONTAINER_RUNTIME=apptainer` in `slurm/common.sh`. Full Apptainer
+integration (container runtime shim) is planned as a separate task.

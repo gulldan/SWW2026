@@ -6,8 +6,9 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
-import yaml
+
 import pandas as pd
+import yaml
 
 
 class _LoggerLike(Protocol):
@@ -55,7 +56,6 @@ def resolve_pdb_path(target_id: str, *, data_dir: Path) -> Path:
     Raises:
         FileNotFoundError: Target or matching PDB was not found.
     """
-
     for pair_dir in data_dir.iterdir():
         if not pair_dir.is_dir():
             continue
@@ -148,7 +148,6 @@ def parse_output_smiles(workspace: Path, *, log: _LoggerLike) -> list[str]:
     Returns:
         Parsed SMILES list.
     """
-
     mols_dir = workspace / "output" / "run" / "mols"
     all_smiles: list[str] = []
 

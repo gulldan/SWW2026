@@ -33,6 +33,7 @@ All documents describe the **same experiment** and must stay consistent. When ch
 | `docs/goal.md`          | `report/chapters/` (methods, protocol, limitations)                              |
 | `report/references.bib` | All `\cite{}` in `report/chapters/*.tex`                                         |
 | Install/Docker/pipeline | `docs/setup.md`, `docs/pipeline.md`                                             |
+| SLURM scripts/resources | `docs/pipeline.md` (SLURM section), `docs/setup.md` (SLURM section)             |
 | Scoring/caching/FREED++ | `docs/architecture.md`                                                           |
 
 **Before finishing any task**, verify cross-document consistency for the entities you touched. If you change a number in one place and the same number appears elsewhere, update all occurrences or flag the discrepancy.
@@ -222,6 +223,12 @@ docker/                       # Container definitions
   gnina/                      #   GNINA CNN scoring image
   boltz2/                     #   Boltz-2 NIM launch script
   md/                         #   GROMACS MD simulation image
+slurm/                        # SLURM HPC integration (zero Python code changes)
+  common.sh                   #   Shared environment setup (modules, paths, run ID)
+  task_matrix.py              #   Array index -> (pair, mode, seed) mapper
+  monolithic/                 #   Strategy A: single node, N GPUs (submit.sh + 6 sbatch)
+  array/                      #   Strategy B: multi-node array jobs (submit.sh + 6 sbatch)
+  nim/                        #   NIM Boltz-2 container lifecycle (start/stop/health)
 docs/                         # Project documentation (14 files, see Documentation Map in README)
 report/                       # LaTeX manuscript (chapters/, figures/, templates/)
 scripts/                      # Standalone runnable scripts (mirrors cli/ structure)

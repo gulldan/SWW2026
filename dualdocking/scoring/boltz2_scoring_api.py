@@ -263,7 +263,6 @@ def score_batch(  # noqa: PLR0913
     Returns:
         Numpy array of scores aligned to ``smiles_list``.
     """
-
     sequence = load_sequence(target_id)
     msa_path = get_msa_path(target_id) if backend == "nim" else require_msa_path(target_id)
 

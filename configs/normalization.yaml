@@ -4,7 +4,7 @@ subset_name: zinc_druglike_calibration_1000_v2024
 n: 1000
 seed: 137
 checksum: ee4f11d1f9d56aeeadaf8a23a47dc40787225c745c880b42396a87096662a19b
-date: '2026-02-14'
+date: '2026-02-20'
 boltz_version: 2.2.1
 docking_program: unidock_gpu
 docking_version: Uni-Dock v1.1.3
@@ -150,6 +150,102 @@ targets:
     ci_std:
     - 1.1243110708401565
     - 1.2932776008257323
+    n_samples: 1000
+    stable_mean: true
+    stable_std: true
+  MEK1:
+    mean: -7.691714
+    std: 0.734082725346164
+    ci_mean:
+    - -7.739706725
+    - -7.643440399999999
+    ci_std:
+    - 0.7037832538531872
+    - 0.7650072794816443
+    n_samples: 1000
+    stable_mean: true
+    stable_std: true
+  MEK2:
+    mean: -7.777693999999999
+    std: 0.7824943666236823
+    ci_mean:
+    - -7.8267629
+    - -7.7286912
+    ci_std:
+    - 0.7504882232280911
+    - 0.8157687594193831
+    n_samples: 1000
+    stable_mean: true
+    stable_std: true
+  FGFR1:
+    mean: -7.520719
+    std: 0.7625867193595385
+    ci_mean:
+    - -7.5682635000000005
+    - -7.474562375
+    ci_std:
+    - 0.7303434414291714
+    - 0.7935046487158328
+    n_samples: 1000
+    stable_mean: true
+    stable_std: true
+  FGFR2:
+    mean: -7.302531
+    std: 0.7324604831650636
+    ci_mean:
+    - -7.347274725000001
+    - -7.2555352
+    ci_std:
+    - 0.7023177824290635
+    - 0.7620519943659514
+    n_samples: 1000
+    stable_mean: true
+    stable_std: true
+  EZH2:
+    mean: -8.375111
+    std: 0.8420709686215261
+    ci_mean:
+    - -8.423233975000002
+    - -8.32218445
+    ci_std:
+    - 0.8105093906447324
+    - 0.875353447183603
+    n_samples: 1000
+    stable_mean: true
+    stable_std: true
+  EZH1:
+    mean: -8.370814999999999
+    std: 0.8382811855941424
+    ci_mean:
+    - -8.41956935
+    - -8.318176925000001
+    ci_std:
+    - 0.8063584124534005
+    - 0.8714580172093321
+    n_samples: 1000
+    stable_mean: true
+    stable_std: true
+  BRD4:
+    mean: -7.268667
+    std: 0.7010149799491543
+    ci_mean:
+    - -7.311606575000001
+    - -7.227957324999999
+    ci_std:
+    - 0.6693058574438827
+    - 0.7285696041587184
+    n_samples: 1000
+    stable_mean: true
+    stable_std: true
+  BRD2:
+    mean: -7.107595
+    std: 0.6565503844964089
+    ci_mean:
+    - -7.147990050000001
+    - -7.06422755
+    ci_std:
+    - 0.6269797489535895
+    - 0.6825193768828207
     n_samples: 1000
     stable_mean: true
     stable_std: true

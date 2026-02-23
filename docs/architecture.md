@@ -280,6 +280,25 @@ Parmchk2 → Acpype (AMBER→GROMACS) → `gmx genrestr` (ligand position restra
 COX1_COX2 is blocked (COX1 = Ovis aries, COX2 = Mus musculus).
 Bypass: `DUALDOCKING_ALLOW_NON_HUMAN=true`.
 
+## SLURM Integration
+
+For HPC clusters, `slurm/` provides shell-only integration with **zero changes
+to Python code**. Two strategies:
+
+- **Monolithic** (`slurm/monolithic/`): single node, N GPUs — wraps
+  `run_full_experiment.py --parallel N`
+- **Array** (`slurm/array/`): multi-node — each array element runs one
+  (pair, mode, seed) task via `generate.py` + `score.py`
+
+`slurm/task_matrix.py` maps `SLURM_ARRAY_TASK_ID` to (pair, mode, seed) using
+the same `PipelineConfig.generate_tasks()` as the Python orchestrator. This
+guarantees identical task ordering.
+
+Both strategies submit a 6-stage SLURM dependency chain matching the pipeline
+stages: fetch → calibrate → gen+score → analyze → report + audit.
+
+See [`pipeline.md`](pipeline.md#slurm-cluster-execution) for usage.
+
 ## Run Manifest
 
 Each `run_full_experiment.py` invocation creates

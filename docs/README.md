@@ -26,9 +26,10 @@ Updated: 2026-02-15
 
 1. [`setup.md`](setup.md) -- Environment, Docker image, calibration
 2. [`pipeline.md`](pipeline.md) -- Stage 0 fetch through analysis
-3. [`architecture.md`](architecture.md) -- Troubleshooting, backend architecture, score conventions
-4. [`receptor_qc.md`](receptor_qc.md) -- Per-target structural quality checks
-5. [`nim_benchmark.md`](nim_benchmark.md) -- CLI vs NIM performance comparison
+3. [`pipeline.md` (SLURM section)](pipeline.md#slurm-cluster-execution) -- HPC cluster execution (monolithic / array jobs)
+4. [`architecture.md`](architecture.md) -- Troubleshooting, backend architecture, score conventions
+5. [`receptor_qc.md`](receptor_qc.md) -- Per-target structural quality checks
+6. [`nim_benchmark.md`](nim_benchmark.md) -- CLI vs NIM performance comparison
 
 ### "I'm developing code"
 
@@ -130,6 +131,7 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 
 | Topic | Location |
 |-------|----------|
+| SLURM cluster execution | `slurm/` directory, [pipeline.md (SLURM section)](pipeline.md#slurm-cluster-execution), [setup.md (SLURM)](setup.md#slurm-cluster-optional) |
 | MD validation pipeline | `dualdocking/validation/md_*.py` (6 modules), `cli/s6_md/run_md.py`, [io_contracts.md](io_contracts.md) (Stage 5c) |
 | Generator/scorer backend selection | `configs/experiment.yaml` (`generator.backend`, `scorer.engine`) |
 | Reward config Docker passthrough (model-dependent) | `configs/experiment.yaml` (`generator.freedpp.pass_reward_modes_to_container`, `generator.freedpp.reward_modes_path_in_container`) |

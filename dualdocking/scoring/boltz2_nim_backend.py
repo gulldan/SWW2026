@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import random
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
-import asyncio
+
 import aiohttp
-import random
-import time
 
 
 class _LoggerLike(Protocol):
@@ -63,7 +64,6 @@ def predict_affinity_sync(
     Returns:
         Predicted affinity score, or NaN on failure.
     """
-
     n_urls = len(nim_urls)
     data = json.dumps(payload_builder(sequence, smiles, msa_content)).encode()
 
@@ -137,7 +137,6 @@ async def predict_batch_async(
     Returns:
         List of ``(index, affinity)`` aligned to submitted indices.
     """
-
     n_urls = len(nim_urls)
     urls = [f"{url}{predict_endpoint}" for url in nim_urls]
     semaphores = [asyncio.Semaphore(concurrency) for _ in range(n_urls)]
