@@ -8,14 +8,14 @@ Single-target vs dual-target RL molecule generation using **FREED++** or **REINV
 
 ## Data Flow
 
+```mermaid
 flowchart TB
-
   A["Stage 0 · Fetch<br/>PDB · FASTA · ZINC · ChEMBL"] --> 
   B["Generation (FREED++ / REINVENT4)<br/>5 core pairs · 3 modes × 5 seeds<br/>reward: f(dA) | f(dB) | f(max)"] --> 
   C["UniDock GPU docking<br/>(dA, dB in kcal/mol)"] --> 
   D["Boltz-2 scoring<br/>aA, aB (log10 IC50-like μM)"] --> 
   E["Analysis & Report<br/>hit-rate · bootstrap CI (m=5) · Cliff's delta<br/>LaTeX + figures"]
-
+```
 
 **75 runs total** (core): 5 core pairs x 3 modes x 5 seeds. Auxiliary pairs (7) for robustness checks.
 
