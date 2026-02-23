@@ -132,10 +132,10 @@ def build_gromacs_commands() -> list[list[str]]:
 
     Pure function for unit testing — does not execute commands.
     Modern protocol: amber14sb, 1.0 nm cutoffs, C-rescale NPT barostat,
-    Protein_LIG / Water_and_ions tc-grps, hbond-legacy.
+    Protein_LIG / Water_and_ions tc-grps, hbond-legacy, SASA, PCA.
 
     Returns:
-        List of command argument lists.
+        List of 24 command argument lists.
     """
     w = Path("/work")
     ndx = str(w / "index.ndx")
@@ -378,7 +378,7 @@ def build_gromacs_commands() -> list[list[str]]:
         ]
     )
 
-    # ── Analysis (5 commands) ────────────────────────────────────
+    # ── Analysis (7 commands) ────────────────────────────────────
     # 18. backbone RMSD
     commands.append(
         [
@@ -459,6 +459,42 @@ def build_gromacs_commands() -> list[list[str]]:
             str(w / "hbond.xvg"),
             "-tu",
             "ns",
+        ]
+    )
+    # 23. SASA
+    commands.append(
+        [
+            "gmx",
+            "sasa",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md_fit.xtc"),
+            "-n",
+            ndx,
+            "-o",
+            str(w / "sasa.xvg"),
+            "-tu",
+            "ns",
+        ]
+    )
+    # 24. PCA (covariance analysis)
+    commands.append(
+        [
+            "gmx",
+            "covar",
+            "-s",
+            str(w / "md.tpr"),
+            "-f",
+            str(w / "md_fit.xtc"),
+            "-n",
+            ndx,
+            "-o",
+            str(w / "covar.xvg"),
+            "-v",
+            str(w / "eigenvec.xvg"),
+            "-e",
+            str(w / "eigenval.xvg"),
         ]
     )
 

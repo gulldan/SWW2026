@@ -160,8 +160,8 @@ class TestDetectGpu:
 class TestBuildGromacsCommands:
     def test_command_count(self) -> None:
         commands = build_gromacs_commands()
-        # 14 setup + 3 preprocess + 5 analysis = 22
-        assert len(commands) == 22
+        # 14 setup + 3 preprocess + 7 analysis = 24
+        assert len(commands) == 24
 
     def test_all_commands_start_with_gmx(self) -> None:
         commands = build_gromacs_commands()
@@ -227,8 +227,8 @@ class TestBuildGromacsCommands:
 
     def test_analysis_commands_use_index(self) -> None:
         commands = build_gromacs_commands()
-        # Analysis commands are 17-21 (backbone rmsd, ligand rmsd, rmsf, rg, hbond-legacy)
-        for i in range(17, 22):
+        # Analysis commands are 17-23 (backbone rmsd, ligand rmsd, rmsf, rg, hbond-legacy, sasa, covar)
+        for i in range(17, 24):
             assert "-n" in commands[i], f"Command {i} missing -n: {commands[i]}"
 
     def test_grompp_commands_use_index_after_make_ndx(self) -> None:
@@ -252,6 +252,19 @@ class TestBuildGromacsCommands:
         commands = build_gromacs_commands()
         hbond_cmd = commands[21]
         assert hbond_cmd[1] == "hbond-legacy"
+
+    def test_sasa_command(self) -> None:
+        commands = build_gromacs_commands()
+        sasa_cmd = commands[22]
+        assert sasa_cmd[1] == "sasa"
+        assert "-tu" in sasa_cmd
+        assert "ns" in sasa_cmd
+
+    def test_covar_command(self) -> None:
+        commands = build_gromacs_commands()
+        covar_cmd = commands[23]
+        assert covar_cmd[1] == "covar"
+        assert "-e" in covar_cmd  # eigenvalue output
 
     def test_no_energy_command(self) -> None:
         """Interaction energy command removed (no energygrps in prod MDP)."""
@@ -582,6 +595,20 @@ class TestMDResult:
         assert r.converged is True
         assert r.mmpbsa_dg == -8.5
 
+    def test_creation_with_sasa_pca_fields(self) -> None:
+        r = MDResult(
+            pair="CDK2_ERK2", mode="double", mol_id=0,
+            target="CDK2", target_label="A", smiles="CCO",
+            mean_rmsd=1.5, max_rmsd=2.8, stable=True,
+            mean_hbonds=3.2, mean_energy=-150.5,
+            sasa_mean=5200.0, sasa_std=120.0,
+            pca_pc1_variance=45.3, pca_pc2_variance=18.7,
+        )
+        assert r.sasa_mean == 5200.0
+        assert r.sasa_std == 120.0
+        assert r.pca_pc1_variance == 45.3
+        assert r.pca_pc2_variance == 18.7
+
     def test_frozen(self) -> None:
         r = MDResult(
             pair="CDK2_ERK2", mode="double", mol_id=0,
@@ -801,8 +828,17 @@ class TestAnalyzeTrajectory:
             "n_hbonds": [3.0, 4.0, 3.0],
         })
 
-        # 5 parse calls: bb rmsd, lig rmsd, rmsf, rg, hbond
-        parse_returns = [mock_df, mock_df, rmsf_df, rg_df, hbond_df]
+        sasa_df = pd.DataFrame({
+            "time_ns": [0.0, 25.0, 50.0],
+            "sasa_nm2": [50.0, 51.0, 49.0],
+        })
+        eigenval_df = pd.DataFrame({
+            "mode": [1.0, 2.0, 3.0],
+            "eigenvalue": [5.0, 3.0, 2.0],
+        })
+
+        # 7 parse calls: bb rmsd, lig rmsd, rmsf, rg, hbond, sasa, eigenval
+        parse_returns = [mock_df, mock_df, rmsf_df, rg_df, hbond_df, sasa_df, eigenval_df]
         call_idx = {"i": 0}
 
         def mock_parse_xvg(path, columns):
@@ -816,8 +852,8 @@ class TestAnalyzeTrajectory:
             mock_run.return_value = MagicMock(returncode=0)
             result = _analyze_trajectory(work_dir, ndx, xtc_fit, out_dir, cfg)
 
-        # Verify 5 _run calls (bb rmsd, lig rmsd, rmsf, rg, hbond-legacy)
-        assert mock_run.call_count == 5
+        # Verify 7 _run calls (bb rmsd, lig rmsd, rmsf, rg, hbond-legacy, sasa, covar)
+        assert mock_run.call_count == 7
 
         # Verify stdin passed to each
         calls = mock_run.call_args_list
@@ -826,16 +862,28 @@ class TestAnalyzeTrajectory:
         assert calls[2][1]["input_text"] == "Backbone\n"  # rmsf
         assert calls[3][1]["input_text"] == "Protein\n"  # rg
         assert calls[4][1]["input_text"] == "Protein\nLIG\n"  # hbond-legacy
+        assert calls[5][1]["input_text"] == "Protein\n"  # sasa
+        assert calls[6][1]["input_text"] == "Backbone\nBackbone\n"  # covar
 
         # Verify hbond-legacy is used
         hbond_cmd = calls[4][0][0]
         assert "hbond-legacy" in hbond_cmd
+
+        # Verify sasa and covar commands
+        sasa_cmd = calls[5][0][0]
+        assert "sasa" in sasa_cmd
+        covar_cmd = calls[6][0][0]
+        assert "covar" in covar_cmd
 
         # Verify result keys
         assert "mean_rmsd" in result
         assert "backbone_rmsd_mean" in result
         assert "rg_mean" in result
         assert "converged" in result
+        assert "sasa_mean" in result
+        assert "sasa_std" in result
+        assert "pca_pc1_variance" in result
+        assert "pca_pc2_variance" in result
         # Interaction energy fields are NaN (no energygrps in prod MDP)
         assert "coulomb_sr" in result
         assert "lj_sr" in result

@@ -56,6 +56,7 @@ Updated: 2026-02-15
 | 11 | [`io_contracts.md`](io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages. |
 | 12 | [`novelty_report.md`](novelty_report.md) | Reference | Gap analysis vs prior work, novelty assessment. |
 | 13 | [`tasks_pipeline_granularity.md`](tasks_pipeline_granularity.md) | Living log | Pipeline stage refactoring plan (9→17 stages). |
+| 14 | [`md.md`](md.md) | Reference | MD validation protocol: force field, equilibration, analyses (SASA, PCA), literature comparison. |
 
 **Status definitions:**
 - **Operational spec** -- single source of truth; changes require explicit approval

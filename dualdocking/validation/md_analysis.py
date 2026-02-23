@@ -314,6 +314,76 @@ def _analyze_trajectory(
             hbond_df = pd.DataFrame(columns=["time_ns", "n_hbonds"])
     hbond_df.to_csv(out_dir / "hbonds.csv", index=False)
 
+    # ── SASA ──────────────────────────────────────────────────────
+    sasa_xvg = work_dir / "sasa.xvg"
+    sasa_df: pd.DataFrame
+    try:
+        _run(
+            [
+                "gmx",
+                "sasa",
+                "-s",
+                str(tpr),
+                "-f",
+                str(xtc_fit),
+                "-n",
+                str(ndx_path),
+                "-o",
+                str(sasa_xvg),
+                "-tu",
+                "ns",
+            ],
+            cwd=work_dir,
+            input_text="Protein\n",
+            timeout=t,
+        )
+        sasa_df = _parse_xvg(sasa_xvg, columns=["time_ns", "sasa_nm2"])
+        sasa_df["sasa_A2"] = sasa_df["sasa_nm2"] * 100.0  # nm² → Å²
+    except RuntimeError:
+        logger.warning("gmx sasa failed — skipping")
+        sasa_df = pd.DataFrame(columns=["time_ns", "sasa_A2"])
+    sasa_df[["time_ns", "sasa_A2"] if "sasa_A2" in sasa_df.columns else list(sasa_df.columns)].to_csv(
+        out_dir / "sasa.csv", index=False,
+    )
+
+    # ── PCA (covariance analysis) ─────────────────────────────────
+    eigenval_xvg = work_dir / "eigenval.xvg"
+    eigenval_df: pd.DataFrame
+    pc1_var = float("nan")
+    pc2_var = float("nan")
+    try:
+        _run(
+            [
+                "gmx",
+                "covar",
+                "-s",
+                str(tpr),
+                "-f",
+                str(xtc_fit),
+                "-n",
+                str(ndx_path),
+                "-o",
+                str(work_dir / "covar.xvg"),
+                "-v",
+                str(work_dir / "eigenvec.xvg"),
+                "-e",
+                str(eigenval_xvg),
+            ],
+            cwd=work_dir,
+            input_text="Backbone\nBackbone\n",
+            timeout=t,
+        )
+        eigenval_df = _parse_xvg(eigenval_xvg, columns=["mode", "eigenvalue"])
+        if len(eigenval_df) >= 2:
+            total = eigenval_df["eigenvalue"].sum()
+            if total > 0:
+                pc1_var = float(eigenval_df["eigenvalue"].iloc[0] / total * 100)
+                pc2_var = float(eigenval_df["eigenvalue"].iloc[1] / total * 100)
+    except RuntimeError:
+        logger.warning("gmx covar failed — skipping PCA")
+        eigenval_df = pd.DataFrame(columns=["mode", "eigenvalue"])
+    eigenval_df.to_csv(out_dir / "eigenvalues.csv", index=False)
+
     # Copy trajectory + reference structure (needed for visualization)
     if xtc_fit.exists():
         shutil.copy2(xtc_fit, out_dir / "trajectory.xtc")
@@ -342,6 +412,10 @@ def _analyze_trajectory(
     rg_m = float(rg_df["rg_A"].mean()) if len(rg_df) > 0 else float("nan")
     rg_s = float(rg_df["rg_A"].std()) if len(rg_df) > 0 else float("nan")
 
+    # SASA
+    sasa_m = float(sasa_df["sasa_A2"].mean()) if "sasa_A2" in sasa_df.columns and len(sasa_df) > 0 else float("nan")
+    sasa_s = float(sasa_df["sasa_A2"].std()) if "sasa_A2" in sasa_df.columns and len(sasa_df) > 0 else float("nan")
+
     # H-bonds
     mean_hbonds = float(hbond_df["n_hbonds"].mean()) if len(hbond_df) > 0 else float("nan")
 
@@ -366,6 +440,10 @@ def _analyze_trajectory(
         "convergence_ks_pvalue": round(ks_pvalue, 4),
         "coulomb_sr": float("nan"),
         "lj_sr": float("nan"),
+        "sasa_mean": round(sasa_m, 1),
+        "sasa_std": round(sasa_s, 1),
+        "pca_pc1_variance": round(pc1_var, 2),
+        "pca_pc2_variance": round(pc2_var, 2),
     }
 
 

@@ -85,6 +85,10 @@ class MDResult:
     coulomb_sr: float = float("nan")
     lj_sr: float = float("nan")
     mmpbsa_dg: float = float("nan")
+    sasa_mean: float = float("nan")
+    sasa_std: float = float("nan")
+    pca_pc1_variance: float = float("nan")
+    pca_pc2_variance: float = float("nan")
 
 
 # ── Utility: external command runner ─────────────────────────────────

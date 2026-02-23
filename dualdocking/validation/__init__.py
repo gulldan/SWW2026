@@ -47,5 +47,7 @@ render_md_figures
     - ``plot_rmsf()``               -- per-residue RMSF
     - ``plot_rg_hbonds()``          -- Rg + H-bond count
     - ``render_summary_table()``    -- styled metrics table
+    - ``plot_sasa()``               -- SASA time series
+    - ``plot_pca_variance()``       -- PCA eigenvalue spectrum
     - ``discover_targets()``        -- find completed MD target directories
 """

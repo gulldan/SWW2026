@@ -436,7 +436,7 @@ or via Docker image.
 | Top-N molecules per mode (from `scored_joined.parquet`) | Parquet | Stage 3 |
 | `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | Stage 0 |
 
-### GROMACS Pipeline (22 commands)
+### GROMACS Pipeline (24 commands)
 
 **Setup (14 commands):**
 pdb2gmx (`-ff amber14sb`) → editconf → solvate → grompp ions → genion (`stdin: SOL`) →
@@ -448,12 +448,14 @@ trjconv `-pbc whole` (`stdin: System`) →
 trjconv `-center -pbc mol` (`stdin: Protein / System`) →
 trjconv `-fit rot+trans` (`stdin: Backbone / System`)
 
-**Analysis (5 commands):**
+**Analysis (7 commands):**
 `gmx rms` backbone (`stdin: Backbone/Backbone`) →
 `gmx rms` ligand (`stdin: LIG/LIG`) →
 `gmx rmsf` per-residue (`stdin: Backbone`) →
 `gmx gyrate` (`stdin: Protein`) →
-`gmx hbond-legacy` (`stdin: Protein/LIG`, falls back to `gmx hbond`)
+`gmx hbond-legacy` (`stdin: Protein/LIG`, falls back to `gmx hbond`) →
+`gmx sasa` (`stdin: Protein`) →
+`gmx covar` (`stdin: Backbone/Backbone`)
 
 ### MDP Protocol (Modern: amber14sb + C-rescale)
 
@@ -485,6 +487,8 @@ If an NVIDIA GPU is found, all `mdrun` calls receive:
 | `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/rmsf.csv` | CSV | Per-residue backbone RMSF (residue, Å) |
 | `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/radius_gyration.csv` | CSV | Per-frame protein radius of gyration (ps, Å) |
 | `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/hbonds.csv` | CSV | Per-frame protein-ligand hydrogen bond count |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/sasa.csv` | CSV | Per-frame protein SASA (ns, Å²) |
+| `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/eigenvalues.csv` | CSV | PCA eigenvalue spectrum (mode, eigenvalue) |
 | `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/trajectory.xtc` | XTC | PBC-corrected, centered, fitted trajectory |
 | `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/mmpbsa.csv` | CSV | MM-GBSA binding ΔG (optional, kcal/mol) |
 | `output/md/{pair}/{mode}/mol_{id}/target_{A,B}/md_result.json` | JSON | All metrics for this molecule×target run |
@@ -515,6 +519,10 @@ If an NVIDIA GPU is found, all `mdrun` calls receive:
 | `coulomb_sr` | float64 | Mean short-range Coulomb interaction energy (kJ/mol) |
 | `lj_sr` | float64 | Mean short-range LJ interaction energy (kJ/mol) |
 | `mmpbsa_dg` | float64 | MM-GBSA binding ΔG (kcal/mol, NaN if not run) |
+| `sasa_mean` | float64 | Mean protein SASA (Å²) |
+| `sasa_std` | float64 | Std of protein SASA (Å²) |
+| `pca_pc1_variance` | float64 | PC1 explained variance (%) |
+| `pca_pc2_variance` | float64 | PC2 explained variance (%) |
 
 ### Convergence Assessment
 

@@ -412,13 +412,13 @@ python /workspace/cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run
 
 ### Pipeline Per Molecule×Target
 
-22 GROMACS commands per molecule×target:
+24 GROMACS commands per molecule×target:
 
 | Phase | Commands | What |
 |-------|----------|------|
 | **Setup** (14) | pdb2gmx, editconf, solvate, grompp×4, genion, mdrun×3, make_ndx | PDB repair → topology → solvation → ions → EM → NVT → NPT → production MD |
 | **Preprocessing** (3) | trjconv ×3 | PBC fix → center → least-squares fit |
-| **Analysis** (5) | rms ×2, rmsf, gyrate, hbond | Backbone RMSD, ligand RMSD, RMSF, Rg, H-bonds |
+| **Analysis** (7) | rms ×2, rmsf, gyrate, hbond, sasa, covar | Backbone RMSD, ligand RMSD, RMSF, Rg, H-bonds, SASA, PCA |
 
 MDP protocol: **amber14sb** (Maier et al. 2015) + TIP3P water, **C-rescale**
 (Bernetti & Bussi 2020, NPT equil) → Parrinello-Rahman (production),
@@ -438,8 +438,10 @@ Results go to `output/md/{pair}/{mode}/mol_{N}/target_{A,B}/`:
 | `rmsf.csv` | residue, rmsf_A |
 | `radius_gyration.csv` | time_ps, rg_A |
 | `hbonds.csv` | time_ns, n_hbonds |
+| `sasa.csv` | time_ns, sasa_A2 |
+| `eigenvalues.csv` | mode, eigenvalue |
 | `trajectory.xtc` | Fitted trajectory (PBC-corrected, centered) |
-| `md_result.json` | All summary metrics (21 fields) |
+| `md_result.json` | All summary metrics (25 fields) |
 | `mmpbsa.csv` | MM-GBSA output (only with `--mmpbsa`) |
 
 Global summary: `output/md/md_summary.parquet` (appended after each run).

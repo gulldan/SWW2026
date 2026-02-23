@@ -7,6 +7,8 @@ Produces a multi-panel figure suitable for Nature/JACS/JMC:
   Panel D: 2D protein-ligand interaction fingerprint (ProLIF)
   Panel E: Radius of gyration + H-bonds
   Panel F: Summary dashboard (2x2)
+  Panel H: SASA time series
+  Panel I: PCA eigenvalue spectrum
 
 Usage:
     uv run python -m dualdocking.validation.render_md_figures --pair CDK2_ERK2 --mode single_a --mol 0
@@ -310,6 +312,76 @@ def plot_rg_hbonds(targets: dict[str, Path], out_dir: Path) -> None:
     logger.info(f"Saved Rg + H-bonds: {out_dir / 'panel_FG_rg_hbonds.png'}")
 
 
+# ── Panel H: SASA time series ──────────────────────────────────────
+def plot_sasa(targets: dict[str, Path], out_dir: Path) -> None:
+    """SASA time series (Angstrom squared vs ns)."""
+    fig, ax = plt.subplots(figsize=(5.5, 2.2))
+
+    for label, d in targets.items():
+        color = COLORS[label]
+        target_name = _load_target_name(d)
+        csv_path = d / "sasa.csv"
+        if not csv_path.exists():
+            continue
+        df = pd.read_csv(csv_path)
+        if df.empty or "sasa_A2" not in df.columns:
+            continue
+        ax.plot(df["time_ns"], df["sasa_A2"], color=color, lw=0.6, label=f"{target_name}", alpha=0.85)
+
+    ax.set_xlabel("Time (ns)")
+    ax.set_ylabel("SASA (\u00c5\u00b2)")
+    ax.set_ylim(bottom=0)
+    ax.legend(frameon=False)
+
+    _add_panel_labels(fig, [ax], ["H"])
+    plt.tight_layout()
+    fig.savefig(out_dir / "panel_H_sasa.png")
+    fig.savefig(out_dir / "panel_H_sasa.svg")
+    plt.close(fig)
+    logger.info(f"Saved SASA panel: {out_dir / 'panel_H_sasa.png'}")
+
+
+# ── Panel I: PCA eigenvalue spectrum ──────────────────────────────
+def plot_pca_variance(targets: dict[str, Path], out_dir: Path) -> None:
+    """Bar chart of top-10 eigenvalue % variance per target."""
+    fig, ax = plt.subplots(figsize=(5.5, 2.2))
+
+    bar_width = 0.35
+    has_data = False
+    for i, (label, d) in enumerate(targets.items()):
+        color = COLORS[label]
+        target_name = _load_target_name(d)
+        csv_path = d / "eigenvalues.csv"
+        if not csv_path.exists():
+            continue
+        df = pd.read_csv(csv_path)
+        if df.empty or "eigenvalue" not in df.columns:
+            continue
+        total = df["eigenvalue"].sum()
+        if total <= 0:
+            continue
+        top = df.head(10).copy()
+        top["variance_pct"] = top["eigenvalue"] / total * 100
+        x = np.arange(len(top))
+        ax.bar(x + i * bar_width, top["variance_pct"], bar_width,
+               color=color, alpha=0.8, label=f"{target_name}")
+        has_data = True
+
+    if has_data:
+        ax.set_xlabel("Principal Component")
+        ax.set_ylabel("Variance (%)")
+        ax.set_xticks(np.arange(10) + bar_width / 2)
+        ax.set_xticklabels([f"PC{j+1}" for j in range(10)])
+        ax.legend(frameon=False)
+
+    _add_panel_labels(fig, [ax], ["I"])
+    plt.tight_layout()
+    fig.savefig(out_dir / "panel_I_pca.png")
+    fig.savefig(out_dir / "panel_I_pca.svg")
+    plt.close(fig)
+    logger.info(f"Saved PCA panel: {out_dir / 'panel_I_pca.png'}")
+
+
 # ── Summary table ────────────────────────────────────────────────────
 def render_summary_table(targets: dict[str, Path], out_dir: Path) -> None:
     """Render summary metrics as a styled table image."""
@@ -330,6 +402,16 @@ def render_summary_table(targets: dict[str, Path], out_dir: Path) -> None:
                 "Stable": "\u2713" if r["stable"] else "\u2717",
                 "Converged": "\u2713" if r["converged"] else "\u2717",
                 "MM-GBSA (kcal/mol)": f"{r['mmpbsa_dg']:.1f}" if not np.isnan(r.get("mmpbsa_dg", float("nan"))) else "\u2014",
+                "SASA (\u00c5\u00b2)": (
+                    f"{r['sasa_mean']:.0f} \u00b1 {r['sasa_std']:.0f}"
+                    if not np.isnan(r.get("sasa_mean", float("nan")))
+                    else "\u2014"
+                ),
+                "PC1 var (%)": (
+                    f"{r['pca_pc1_variance']:.1f}"
+                    if not np.isnan(r.get("pca_pc1_variance", float("nan")))
+                    else "\u2014"
+                ),
             }
         )
 
@@ -467,6 +549,12 @@ def main(pair: str, mode: str, mol: int, output_dir: str | None) -> None:
 
     # Panel F+G: Rg + H-bonds
     plot_rg_hbonds(targets, out)
+
+    # Panel H: SASA
+    plot_sasa(targets, out)
+
+    # Panel I: PCA variance
+    plot_pca_variance(targets, out)
 
     # Summary table
     render_summary_table(targets, out)

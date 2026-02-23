@@ -19,9 +19,11 @@ from dualdocking.validation.render_md_figures import (
     _load_target_name,
     _resolve_gro_path,
     discover_targets,
+    plot_pca_variance,
     plot_rg_hbonds,
     plot_rmsd,
     plot_rmsf,
+    plot_sasa,
     render_binding_pose,
     render_summary_table,
 )
@@ -36,6 +38,10 @@ def _make_md_result(
     stable: bool = True,
     converged: bool = True,
     mmpbsa_dg: float = -8.5,
+    sasa_mean: float = 5200.0,
+    sasa_std: float = 120.0,
+    pca_pc1_variance: float = 45.3,
+    pca_pc2_variance: float = 18.7,
 ) -> dict:
     return {
         "target": target,
@@ -49,6 +55,10 @@ def _make_md_result(
         "mean_hbonds": 3.2,
         "converged": converged,
         "mmpbsa_dg": mmpbsa_dg,
+        "sasa_mean": sasa_mean,
+        "sasa_std": sasa_std,
+        "pca_pc1_variance": pca_pc1_variance,
+        "pca_pc2_variance": pca_pc2_variance,
     }
 
 
@@ -76,6 +86,14 @@ def _write_csvs(d: Path, *, n: int = 100) -> None:
     pd.DataFrame(
         {"time_ns": time, "n_hbonds": rng.poisson(3, n).astype(float)}
     ).to_csv(d / "hbonds.csv", index=False)
+
+    pd.DataFrame(
+        {"time_ns": time, "sasa_A2": rng.normal(5200, 120, n)}
+    ).to_csv(d / "sasa.csv", index=False)
+
+    pd.DataFrame(
+        {"mode": np.arange(1, 11), "eigenvalue": np.sort(rng.exponential(1.0, 10))[::-1]}
+    ).to_csv(d / "eigenvalues.csv", index=False)
 
 
 def _make_target_dir(
@@ -310,6 +328,66 @@ class TestRenderSummaryTable:
         assert (out / "summary_table.png").exists()
 
 
+# ── plot_sasa ──────────────────────────────────────────────────────
+
+
+class TestPlotSasa:
+    def test_creates_output_files(self, tmp_path: Path) -> None:
+        base = tmp_path / "md"
+        out = tmp_path / "plots"
+        out.mkdir()
+        _make_target_dir(base, "A", "CDK2")
+        _make_target_dir(base, "B", "ERK2")
+
+        targets = discover_targets(base)
+        plot_sasa(targets, out)
+
+        assert (out / "panel_H_sasa.png").exists()
+        assert (out / "panel_H_sasa.svg").exists()
+
+    def test_handles_missing_csv(self, tmp_path: Path) -> None:
+        base = tmp_path / "md"
+        out = tmp_path / "plots"
+        out.mkdir()
+        d = _make_target_dir(base, "A", "CDK2")
+        (d / "sasa.csv").unlink()
+
+        targets = discover_targets(base)
+        plot_sasa(targets, out)
+
+        assert (out / "panel_H_sasa.png").exists()
+
+
+# ── plot_pca_variance ─────────────────────────────────────────────
+
+
+class TestPlotPcaVariance:
+    def test_creates_output_files(self, tmp_path: Path) -> None:
+        base = tmp_path / "md"
+        out = tmp_path / "plots"
+        out.mkdir()
+        _make_target_dir(base, "A", "CDK2")
+        _make_target_dir(base, "B", "ERK2")
+
+        targets = discover_targets(base)
+        plot_pca_variance(targets, out)
+
+        assert (out / "panel_I_pca.png").exists()
+        assert (out / "panel_I_pca.svg").exists()
+
+    def test_handles_missing_csv(self, tmp_path: Path) -> None:
+        base = tmp_path / "md"
+        out = tmp_path / "plots"
+        out.mkdir()
+        d = _make_target_dir(base, "A", "CDK2")
+        (d / "eigenvalues.csv").unlink()
+
+        targets = discover_targets(base)
+        plot_pca_variance(targets, out)
+
+        assert (out / "panel_I_pca.png").exists()
+
+
 # ── render_binding_pose ────────────────────────────────────────────
 
 
@@ -472,4 +550,6 @@ class TestCLI:
         assert (out / "panel_BC_rmsd.png").exists()
         assert (out / "panel_D_rmsf.png").exists()
         assert (out / "panel_FG_rg_hbonds.png").exists()
+        assert (out / "panel_H_sasa.png").exists()
+        assert (out / "panel_I_pca.png").exists()
         assert (out / "summary_table.png").exists()
