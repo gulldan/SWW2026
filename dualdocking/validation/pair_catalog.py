@@ -1,7 +1,9 @@
-"""HTML catalog parser for the 50-pair target catalog.
+"""Pair metadata parsers for validation audits.
 
-Extracts structured :class:`PairRecord` objects from
-``target_pairs_catalog.html``.
+Extracts structured :class:`PairRecord` objects from:
+
+- ``target_pairs_catalog.html`` (legacy HTML catalog)
+- ``configs/pairs.yaml`` (current runtime pair source)
 """
 
 from __future__ import annotations
@@ -271,6 +273,13 @@ class _CatalogParser(HTMLParser):
         if len(self._cells) < 6:
             return
 
+        # New v4 catalog layout (12 columns, no explicit DOI column).
+        if self._is_v4_row():
+            rec = self._finalize_v4_row()
+            if rec is not None:
+                self.pairs.append(rec)
+            return
+
         rec = PairRecord(category=self.current_category)
 
         # Cell 0: pair number
@@ -314,6 +323,83 @@ class _CatalogParser(HTMLParser):
         rec.drug_status = self._cell_data.get("drug_status", "")
 
         self.pairs.append(rec)
+
+    def _is_v4_row(self) -> bool:
+        """Detect the current table layout used by ``target_pairs_catalog.html``."""
+        if len(self._cells) < 10:
+            return False
+        if not re.fullmatch(r"\d+", self._cells[0].strip()):
+            return False
+        pdb_cell = self._cells[3] if len(self._cells) > 3 else ""
+        return bool(re.search(r"\b[0-9][A-Za-z0-9]{3}\b", pdb_cell))
+
+    def _finalize_v4_row(self) -> PairRecord | None:
+        """Parse a row from the v4 catalog layout."""
+        try:
+            pair_number = int(self._cells[0].strip())
+        except ValueError:
+            return None
+
+        pair_text = self._cells[1].strip() if len(self._cells) > 1 else ""
+        pair_match = re.match(r"^(.+?)\s*/\s*(.+)$", pair_text)
+        target_a = pair_match.group(1).strip() if pair_match else pair_text
+        target_b = pair_match.group(2).strip() if pair_match else ""
+
+        category_raw = self._cells[2].strip() if len(self._cells) > 2 else ""
+        category = re.sub(r"([a-z])([A-Z])", r"\1 / \2", category_raw)
+
+        pdb_cell = self._cells[3] if len(self._cells) > 3 else ""
+        pdb_ids = [m.upper() for m in re.findall(r"\b[0-9][A-Za-z0-9]{3}\b", pdb_cell)]
+        pdb_a = pdb_ids[0] if len(pdb_ids) >= 1 else ""
+        pdb_b = pdb_ids[1] if len(pdb_ids) >= 2 else ""
+
+        pdb_lines = [line.strip() for line in pdb_cell.split("\n") if line.strip()]
+        pdb_a_desc = ""
+        pdb_b_desc = ""
+        if len(pdb_lines) >= 1:
+            m = re.search(r"\(([^)]+)\)", pdb_lines[0])
+            pdb_a_desc = m.group(1).strip() if m else ""
+        if len(pdb_lines) >= 2:
+            m = re.search(r"\(([^)]+)\)", pdb_lines[1])
+            pdb_b_desc = m.group(1).strip() if m else ""
+
+        similarity_pct = self._cells[4].strip() if len(self._cells) > 4 else ""
+        drug_status = self._cells[7].strip() if len(self._cells) > 7 else ""
+        selectivity_ratio = self._cells[9].strip() if len(self._cells) > 9 else ""
+        rationale = self._cells[5].strip() if len(self._cells) > 5 else ""
+
+        # Optional DOI column (added in refreshed v4); fallback to PDB-B URL.
+        doi = ""
+        if len(self._cells) > 12:
+            doi_cell = self._cells[12]
+            # Match first DOI token or DOI URL.
+            m_url = re.search(r"https?://doi\.org/(\S+)", doi_cell, flags=re.IGNORECASE)
+            m_raw = re.search(r"\b10\.\d{4,9}/\S+", doi_cell, flags=re.IGNORECASE)
+            if m_url:
+                doi = m_url.group(1).strip().rstrip(").,;")
+            elif m_raw:
+                doi = m_raw.group(0).strip().rstrip(").,;")
+        if not doi and pdb_b:
+            doi = f"https://www.rcsb.org/structure/{pdb_b}"
+
+        return PairRecord(
+            pair_number=pair_number,
+            category=category or self.current_category,
+            target_family=pair_text,
+            target_a=target_a,
+            target_b=target_b,
+            pdb_a=pdb_a,
+            pdb_b=pdb_b,
+            pdb_a_desc=pdb_a_desc,
+            pdb_b_desc=pdb_b_desc,
+            doi=doi,
+            similarity_level="",
+            similarity_pct=similarity_pct,
+            selectivity_ratio=selectivity_ratio,
+            selectivity_ref="",
+            rationale=rationale,
+            drug_status=drug_status,
+        )
 
     @staticmethod
     def _parse_pair_cell(text: str, rec: PairRecord, pdb_ids: list[str]) -> None:
@@ -363,3 +449,72 @@ def parse_catalog(html_path: str | Path) -> list[PairRecord]:
     parser.feed(html_text)
     logger.info("Parsed {} pairs from {}", len(parser.pairs), html_path.name)
     return parser.pairs
+
+
+def _parse_similarity(similarity: str) -> tuple[str, str]:
+    """Split similarity field into ``(level, claim_text)``.
+
+    Accepts values like ``"Very High (~80% kinase domain)"`` and returns
+    ``("Very High", "~80% kinase domain")``.
+    """
+    text = similarity.strip()
+    if not text:
+        return "", ""
+
+    m = re.match(r"^(Very High|High|Mod-High|Moderate|Low|Very Low|None)\s*\((.+)\)\s*$", text)
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+    return "", text
+
+
+def parse_pairs_yaml(config_path: str | Path = "configs/pairs.yaml") -> list[PairRecord]:
+    """Parse runtime pair config (``pairs.yaml``) into :class:`PairRecord`.
+
+    This keeps the verification pipeline compatible with code paths that still
+    consume ``PairRecord`` from the legacy HTML catalog parser.
+    """
+    from dualdocking.config import load_pairs
+
+    path = Path(config_path)
+    data = load_pairs(path)
+    pairs_cfg = data.get("pairs", {})
+
+    records: list[PairRecord] = []
+    for idx, (pair_id, pair_cfg) in enumerate(pairs_cfg.items(), start=1):
+        target_a_cfg = pair_cfg.get("target_a", {})
+        target_b_cfg = pair_cfg.get("target_b", {})
+
+        target_a = str(target_a_cfg.get("id", "")).strip()
+        target_b = str(target_b_cfg.get("id", "")).strip()
+        pdb_a = str(target_a_cfg.get("pdb_id", "")).strip().upper()
+        pdb_b = str(target_b_cfg.get("pdb_id", "")).strip().upper()
+
+        sim_level, sim_claim = _parse_similarity(str(pair_cfg.get("similarity", "")))
+        doi = str(pair_cfg.get("doi", "")).strip()
+        if not doi and pdb_b:
+            # pairs.yaml does not include DOI fields; keep legacy DOI checker usable.
+            doi = f"https://www.rcsb.org/structure/{pdb_b}"
+
+        records.append(
+            PairRecord(
+                pair_number=idx,
+                category=str(pair_cfg.get("set", "")).strip(),
+                target_family=pair_id.replace("_", " / "),
+                target_a=target_a,
+                target_b=target_b,
+                pdb_a=pdb_a,
+                pdb_b=pdb_b,
+                pdb_a_desc=str(target_a_cfg.get("name", "")).strip(),
+                pdb_b_desc=str(target_b_cfg.get("name", "")).strip(),
+                doi=doi,
+                similarity_level=sim_level,
+                similarity_pct=sim_claim,
+                selectivity_ratio=str(pair_cfg.get("selectivity_ratio", "")).strip(),
+                selectivity_ref=str(pair_cfg.get("selectivity_ref", "")).strip(),
+                rationale=str(pair_cfg.get("description", "")).strip(),
+                drug_status=str(pair_cfg.get("ground_truth_drug", "")).strip(),
+            )
+        )
+
+    logger.info("Parsed {} pairs from {}", len(records), path.name)
+    return records

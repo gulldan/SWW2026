@@ -37,6 +37,7 @@ from dualdocking.validation.nw_align import (  # noqa: F401
 from dualdocking.validation.pair_catalog import (  # noqa: F401
     PairRecord,
     parse_catalog,
+    parse_pairs_yaml,
 )
 
 # ---------------------------------------------------------------------------
@@ -151,11 +152,62 @@ class DoiReport:
 
 _UNIPROT_JSON_URL = "https://rest.uniprot.org/uniprotkb/{uniprot_id}.json"
 
-# Manual UniProt corrections for pairs with wrong PDB auto-resolution
-_UNIPROT_OVERRIDES: dict[int, dict[str, str]] = {
-    2: {"uniprot_a": "P11802"},  # CDK4 (not CyclinD1 P24385); PDB 2W96 = CDK4+CyclinD3
-    9: {"uniprot_b": "P37231"},  # PPARgamma (not RXRalpha P19793); PDB 1FM9 = PPARg+RXRa heterodimer
-}
+# Manual UniProt corrections for known problematic PDB auto-resolutions.
+# Matched by pair identity/PDB rather than catalog number so reordering does
+# not silently apply incorrect overrides.
+_GREEK_TO_ASCII = str.maketrans({
+    "α": "a",
+    "β": "b",
+    "γ": "g",
+    "δ": "d",
+    "Α": "A",
+    "Β": "B",
+    "Γ": "G",
+    "Δ": "D",
+})
+
+
+def _norm_target_symbol(value: str) -> str:
+    text = value.translate(_GREEK_TO_ASCII)
+    return re.sub(r"[^A-Za-z0-9]+", "", text).upper()
+
+
+def _derive_uniprot_overrides(pair: PairRecord) -> dict[str, str]:
+    """Return UniProt overrides for known multi-chain PDB pitfalls."""
+    overrides: dict[str, str] = {}
+    ta = _norm_target_symbol(pair.target_a)
+    tb = _norm_target_symbol(pair.target_b)
+    pdb_a = pair.pdb_a.upper()
+    pdb_b = pair.pdb_b.upper()
+
+    # CDK4/CDK6: PDB 2W96 may resolve Cyclin D chains; force CDK4 accession.
+    if {ta, tb} == {"CDK4", "CDK6"} or pdb_a == "2W96" or pdb_b == "2W96":
+        if ta == "CDK4":
+            overrides["uniprot_a"] = "P11802"
+        elif tb == "CDK4":
+            overrides["uniprot_b"] = "P11802"
+        else:
+            overrides["uniprot_a"] = "P11802"
+
+    # PPARa/PPARg: PDB 1FM9 is a heterodimer and may resolve RXRalpha.
+    if {ta, tb} == {"PPARA", "PPARG"} or pdb_a == "1FM9" or pdb_b == "1FM9":
+        if ta == "PPARG":
+            overrides["uniprot_a"] = "P37231"
+        elif tb == "PPARG":
+            overrides["uniprot_b"] = "P37231"
+        else:
+            overrides["uniprot_b"] = "P37231"
+
+    # ADRB1/ADRB2: GPCR structures may include fusion/helper proteins as first entities.
+    if {ta, tb} == {"ADRB1", "ADRB2"}:
+        if ta == "ADRB1":
+            overrides["uniprot_a"] = "P08588"
+            overrides["uniprot_b"] = "P07550"
+        else:
+            overrides["uniprot_a"] = "P07550"
+            overrides["uniprot_b"] = "P08588"
+
+    return overrides
 
 
 def fetch_uniprot_domains(uniprot_id: str) -> list[dict[str, Any]]:
@@ -534,6 +586,7 @@ def verify_pair(  # noqa: PLR0913
     result: dict[str, Any] = asdict(pair)
     verification: dict[str, Any] = {}
     resolved: dict[str, str] = {}
+    user_provided_uniprot_pair = bool(uniprot_a and uniprot_b)
 
     # --- Auto-resolve UniProt IDs from PDB if needed ---
     if (do_sequence or do_chembl) and not uniprot_a and pair.pdb_a:
@@ -557,7 +610,7 @@ def verify_pair(  # noqa: PLR0913
             logger.warning("Failed to resolve UniProt for PDB {}: {}", pair.pdb_b, exc)
 
     # --- Apply manual UniProt overrides for known bad auto-resolutions ---
-    overrides = _UNIPROT_OVERRIDES.get(pair.pair_number, {})
+    overrides = _derive_uniprot_overrides(pair) if (do_sequence or do_chembl) else {}
     if overrides:
         if "uniprot_a" in overrides:
             old_a = uniprot_a
@@ -599,7 +652,7 @@ def verify_pair(  # noqa: PLR0913
         verification["pdb_a"] = asdict(verify_pdb(pair.pdb_a))
         verification["pdb_b"] = asdict(verify_pdb(pair.pdb_b))
 
-    if (do_sequence or (uniprot_a and uniprot_b)) and uniprot_a and uniprot_b:
+    if (do_sequence or user_provided_uniprot_pair) and uniprot_a and uniprot_b:
         # Full-length NW identity (always without domain slicing)
         seq_report = verify_sequence_identity(
             uniprot_a,

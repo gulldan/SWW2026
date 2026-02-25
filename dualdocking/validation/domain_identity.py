@@ -47,6 +47,85 @@ _DOMAIN_RANGE_OVERRIDES: dict[str, tuple[str, int, int]] = {
     "P0DTC1": ("PLpro (nsp3 catalytic)", 1634, 1898),  # SARS-CoV-2 pp1a
 }
 
+_GREEK_TO_ASCII = str.maketrans({
+    "α": "a",
+    "β": "b",
+    "γ": "g",
+    "δ": "d",
+    "Α": "A",
+    "Β": "B",
+    "Γ": "G",
+    "Δ": "D",
+})
+
+
+def _norm_target_symbol(value: str) -> str:
+    text = value.translate(_GREEK_TO_ASCII)
+    return re.sub(r"[^A-Za-z0-9]+", "", text).upper()
+
+
+# Pair-level overrides for domain ranges used in literature-backed comparisons.
+# These rows can be tagged as "overall/active-site/GPCR" in free-text catalog
+# descriptions, but the relevant comparison domain is explicit.
+_PAIR_DOMAIN_OVERRIDES: dict[frozenset[str], dict[str, Any]] = {
+    # JAK active-site comparisons are done in the JH1 kinase domains
+    # (e.g., JAK3 Cys909 in the catalytic site; PMID:25552479, PMID:27473820).
+    frozenset({"JAK1", "JAK3"}): {
+        "domain_type": "kinase",
+        "JAK1": ("875-1153", "Protein kinase 2/JH1"),
+        "JAK3": ("822-1111", "Protein kinase 2/JH1"),
+    },
+    # CDK4/6 inhibitor selectivity is determined in the ATP-binding catalytic cleft
+    # of the kinase domain (PMID:35264774).
+    frozenset({"CDK4", "CDK6"}): {
+        "domain_type": "kinase",
+        "CDK4": ("6-295", "Protein kinase"),
+        "CDK6": ("13-300", "Protein kinase"),
+    },
+    # Beta-adrenergic orthosteric ligand pocket lies in the TM bundle/loops
+    # of GPCR structures (PMID:18594507).
+    frozenset({"ADRB1", "ADRB2"}): {
+        "domain_type": "GPCR",
+        "ADRB1": ("58-377", "7TM bundle"),
+        "ADRB2": ("30-326", "7TM bundle"),
+    },
+    # Carbonic anhydrase inhibitor pharmacology is defined by the Zn active site
+    # in the alpha-carbonic anhydrase core fold (PMID:14984209).
+    frozenset({"CA1", "CA2"}): {
+        "domain_type": "catalytic",
+        "CA1": ("4-261", "Alpha-carbonic anhydrase"),
+        "CA2": ("3-259", "Alpha-carbonic anhydrase"),
+    },
+    # Class I HDAC selectivity is governed by the catalytic deacetylase fold/loops
+    # around the Zn site (PMID:15477595).
+    frozenset({"HDAC2", "HDAC8"}): {
+        "domain_type": "HDAC",
+        "HDAC2": ("9-322", "Histone deacetylase"),
+        "HDAC8": ("14-324", "Histone deacetylase"),
+    },
+    # mIDH1/2 inhibitors bind an allosteric dimer-interface pocket in the mature
+    # catalytic chains (PMID:32071674).
+    frozenset({"IDH1", "IDH2"}): {
+        "domain_type": "overall",
+        "IDH1": ("2-414", "Mature chain"),
+        "IDH2": ("40-452", "Mature chain"),
+    },
+    # AChE/BChE selectivity arises from differences in the catalytic gorge while
+    # retaining homologous cholinesterase architecture (PMID:9398183).
+    frozenset({"ACHE", "BCHE"}): {
+        "domain_type": "overall",
+        "ACHE": ("32-614", "Mature cholinesterase chain"),
+        "BCHE": ("29-602", "Mature cholinesterase chain"),
+    },
+    # MAO-A/B share ~70% sequence identity across mature enzyme chains with
+    # subtype-specific cavity determinants (PMID:2003865; PMCID:PMC6350766).
+    frozenset({"MAOA", "MAOB"}): {
+        "domain_type": "overall",
+        "MAOA": ("1-527", "Mature chain"),
+        "MAOB": ("2-520", "Mature chain"),
+    },
+}
+
 # Map catalog domain keywords -> UniProt Domain description patterns
 _DOMAIN_KEYWORDS: dict[str, list[str]] = {
     "kinase": ["Protein kinase", "PI3K/PI4K"],
@@ -114,6 +193,8 @@ def _parse_catalog_domain_type(similarity_pct: str) -> str:  # noqa: PLR0911
     if "catalytic core" in text and "sirtuin" in text:
         return "sirtuin"
     if "cat domain" in text or "catalytic domain" in text or "catalytic mechanism" in text:
+        return "catalytic"
+    if "catalytic" in text and ("zn" in text or "zinc" in text or "pocket" in text):
         return "catalytic"
     if "catalytic core" in text:
         return "sirtuin"
@@ -225,6 +306,19 @@ def select_domains_for_pair(
         Empty range strings mean "use full-length".
     """
     domain_type = _parse_catalog_domain_type(pair.similarity_pct)
+
+    # Pair-level manual overrides take precedence for ambiguous catalog labels.
+    ta = _norm_target_symbol(pair.target_a)
+    tb = _norm_target_symbol(pair.target_b)
+    pair_override = _PAIR_DOMAIN_OVERRIDES.get(frozenset({ta, tb}))
+    if pair_override is not None:
+        range_name_a = pair_override.get(ta)
+        range_name_b = pair_override.get(tb)
+        if isinstance(range_name_a, tuple) and isinstance(range_name_b, tuple):
+            range_a, name_a = range_name_a
+            range_b, name_b = range_name_b
+            forced_type = str(pair_override.get("domain_type", "")).strip()
+            return range_a, range_b, name_a, name_b, forced_type or domain_type
 
     # No domain alignment for these categories
     if domain_type in ("none", "overall", "active-site", "GPCR"):

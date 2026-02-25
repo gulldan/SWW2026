@@ -440,7 +440,7 @@ or via Docker image.
 
 **Setup (14 commands):**
 pdb2gmx (`-ff amber14sb`) → editconf → solvate → grompp ions → genion (`stdin: SOL`) →
-grompp EM → mdrun EM → make_ndx (`stdin: Protein | r LIG / q`) →
+grompp EM → mdrun EM → make_ndx (`stdin: q`; script adds `Protein_LIG` and `Water_and_ions`) →
 grompp NVT → mdrun NVT → grompp NPT → mdrun NPT → grompp prod → mdrun prod
 
 **Trajectory preprocessing (3 commands):**
@@ -508,7 +508,7 @@ If an NVIDIA GPU is found, all `mdrun` calls receive:
 | `max_rmsd` | float64 | Max ligand RMSD over stability window (Å) |
 | `stable` | bool | `mean_rmsd < 3.0` Å |
 | `mean_hbonds` | float64 | Mean protein-ligand H-bond count |
-| `mean_energy` | float64 | Mean total interaction energy (kJ/mol) |
+| `mean_energy` | float64 | Reserved legacy field; currently `NaN` (energy-group analysis disabled on GPU) |
 | `backbone_rmsd_mean` | float64 | Mean backbone RMSD (Å) |
 | `backbone_rmsd_final` | float64 | Final-frame backbone RMSD (Å) |
 | `rmsf_binding_pocket` | float64 | Mean per-residue backbone RMSF (Å) |
@@ -516,8 +516,8 @@ If an NVIDIA GPU is found, all `mdrun` calls receive:
 | `rg_std` | float64 | Std of radius of gyration (Å) |
 | `converged` | bool | KS test: p > 0.05 AND |mean_diff| < 0.5 Å |
 | `convergence_ks_pvalue` | float64 | 2-sample KS p-value (first vs second half of backbone RMSD) |
-| `coulomb_sr` | float64 | Mean short-range Coulomb interaction energy (kJ/mol) |
-| `lj_sr` | float64 | Mean short-range LJ interaction energy (kJ/mol) |
+| `coulomb_sr` | float64 | Reserved legacy field; currently `NaN` |
+| `lj_sr` | float64 | Reserved legacy field; currently `NaN` |
 | `mmpbsa_dg` | float64 | MM-GBSA binding ΔG (kcal/mol, NaN if not run) |
 | `sasa_mean` | float64 | Mean protein SASA (Å²) |
 | `sasa_std` | float64 | Std of protein SASA (Å²) |

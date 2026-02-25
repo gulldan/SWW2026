@@ -27,11 +27,10 @@ def select_top_molecules(
     seeds: list[int],
     results_dir: Path,
 ) -> pd.DataFrame:
-    """Select top-N molecules by combined Boltz-2 affinity across seeds.
+    """Select top-N molecules by mode-appropriate affinity ranking.
 
     Returns:
-        DataFrame with ``smiles``, ``combined_min``, ``seed`` columns,
-        deduplicated by SMILES and sorted by best ``combined_min``.
+        DataFrame deduplicated by SMILES and sorted by the selected score.
     """
     from dualdocking.data.io_utils import read_df, stem_exists
 
@@ -49,8 +48,26 @@ def select_top_molecules(
 
     all_df = pd.concat(frames, ignore_index=True)
 
-    # Deduplicate by SMILES, keep best combined score
-    score_col = "combined_min" if "combined_min" in all_df.columns else "affinity_a"
+    # Prefer explicit combined score. For legacy outputs without combined_min,
+    # choose a mode-aware fallback to avoid single_b ranking bias.
+    score_col = "combined_min"
+    if score_col not in all_df.columns:
+        if mode == "single_b" and "affinity_b" in all_df.columns:
+            score_col = "affinity_b"
+        elif mode == "single_a" and "affinity_a" in all_df.columns:
+            score_col = "affinity_a"
+        elif {"affinity_a", "affinity_b"}.issubset(all_df.columns):
+            score_col = "__combined_min"
+            all_df[score_col] = all_df[["affinity_a", "affinity_b"]].max(axis=1)
+        elif "affinity_a" in all_df.columns:
+            score_col = "affinity_a"
+        elif "affinity_b" in all_df.columns:
+            score_col = "affinity_b"
+        else:
+            msg = f"No ranking columns found in scored results for {pair}/{mode}"
+            raise ValueError(msg)
+
+    # Deduplicate by SMILES, keep best score according to selected ranking.
     best = all_df.sort_values(score_col).drop_duplicates(subset="smiles", keep="first")
     return best.head(top_n).reset_index(drop=True)
 
@@ -205,7 +222,7 @@ def build_gromacs_commands() -> list[list[str]]:
             "-o",
             str(w / "ions.tpr"),
             "-maxwarn",
-            "0",
+            "1",
         ]
     )
     # 5. genion
@@ -242,7 +259,7 @@ def build_gromacs_commands() -> list[list[str]]:
             "-o",
             str(w / "em.tpr"),
             "-maxwarn",
-            "0",
+            "1",
         ]
     )
     # 7. mdrun EM

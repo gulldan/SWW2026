@@ -52,7 +52,7 @@ a:hover{text-decoration:underline}
 </head>
 <body>
 <h1>Dual-Target Selectivity Study — Expanded Target Pairs (v4)</h1>
-<p class="note">Last updated: 2026-02-25 • This list is meant for methodological benchmarking (selectivity vs dual-target) across diverse protein classes. (v4)<br/>ChEMBL mini-stats under each target show counts of activity records by standard type (IC50, Ki, Kd) and total; newly-added rows currently show <b>n/a</b> placeholders where counts haven’t been pulled yet.</p>
+<p class="note">Last updated: 2026-02-25 • This list is meant for methodological benchmarking (selectivity vs dual-target) across diverse protein classes. (v4)<br/>ChEMBL mini-stats under each target show counts of activity records by standard type (IC50, Ki, Kd) and total; values refreshed from verification cache/API on 2026-02-25.</p>
 <h2>Purpose</h2>
 <p>
 Curated pairs of <b>highly pocket-similar targets</b> from <b>different protein classes</b> (kinases, GPCRs, oxidoreductases, proteases, nuclear receptors, etc.).
@@ -81,7 +81,7 @@ Where I corrected obvious mismatches (e.g., safinamide and rivastigmine), the up
 <th>Pair</th>
 <th>Protein class / Therapeutic area</th>
 <th>PDB A/B (human, ≤2.5Å)</th>
-<th>Pocket similarity (est.)</th>
+<th>Pocket similarity (computed, 5A)</th>
 <th>NW Domain %</th>
 <th>NW Full-seq %</th>
 <th>Drug (year)</th>
@@ -89,125 +89,126 @@ Where I corrected obvious mismatches (e.g., safinamide and rivastigmine), the up
 <th>Selectivity (pref; fold)</th>
 <th>ChEMBL-A</th>
 <th>ChEMBL-B</th>
+<th>DOI (PDB A/B)</th>
 </tr>
 <tr>
 <td class="c">1</td>
 <td class="pair">FGFR1 / FGFR2</td>
 <td><span class="cat pc-kin">Kinase</span><span class="cat ta-onc">Oncology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/5EW8">5EW8</a> (1.63Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/3RI1">3RI1</a> (2.10Å)</span></td>
-<td>~90% kinase domain</td>
-<td>87.6% PK 478-767/481-770 290 aa</td>
+<td>50.0% computed pocket (5A; 24/18 res)</td>
+<td>87.6% Protein kinase 478-767/481-770 290/290 aa</td>
 <td>71.5% 594/831</td>
 <td><span class="drug">Erdafitinib (2019)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>2.1× (assay-dependent)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL3650/">CHEMBL3650</a><span class="sub">9.0K IC<sub>50</sub><br/>1.2K K<sub>i</sub>, 420 K<sub>d</sub><br/><b>10.6K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL3650/">CHEMBL3650</a><span class="sub">9.0K IC<sub>50</sub><br/>1.2K K<sub>i</sub>, 420 K<sub>d</sub><br/><b>11K</b> total</span></td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL4142/">CHEMBL4142</a><span class="sub">4.7K IC<sub>50</sub><br/>5 K<sub>i</sub>, 171 K<sub>d</sub><br/><b>4.8K</b> total</span></td>
-</tr>
+<td>A: <a href="https://doi.org/10.18632/oncotarget.8132">10.18632/oncotarget.8132</a><br/>B: <a href="https://doi.org/10.1074/jbc.M110.213736">10.1074/jbc.M110.213736</a></td></tr>
 <tr>
 <td class="c">2</td>
 <td class="pair">JAK1 / JAK3</td>
 <td><span class="cat pc-kin">Kinase</span><span class="cat ta-imm">Immunology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/6N7B">6N7B</a> (1.81Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/3LXK">3LXK</a> (2.00Å)</span></td>
-<td>84% active-site Cys909 unique</td>
-<td>50.5% JH1 875-1153/822-1111 279/290 aa</td>
+<td>63.6% computed pocket (5A; 22/22 res)</td>
+<td>50.5% Protein kinase 2/JH1 875-1153/822-1111 279/290 aa</td>
 <td>38.0% 461/1214</td>
 <td><span class="drug">Tofacitinib (2012)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>JAK3-pref (112×)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL2835/">CHEMBL2835</a><span class="sub">15.0K IC<sub>50</sub><br/>3.9K K<sub>i</sub>, 580 K<sub>d</sub><br/><b>19.4K</b> total</span></td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL2148/">CHEMBL2148</a><span class="sub">12.0K IC<sub>50</sub><br/>2.4K K<sub>i</sub>, 228 K<sub>d</sub><br/><b>14.6K</b> total</span></td>
-</tr>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL2835/">CHEMBL2835</a><span class="sub">15K IC<sub>50</sub><br/>3.9K K<sub>i</sub>, 580 K<sub>d</sub><br/><b>19K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL2148/">CHEMBL2148</a><span class="sub">12K IC<sub>50</sub><br/>2.4K K<sub>i</sub>, 228 K<sub>d</sub><br/><b>15K</b> total</span></td>
+<td>A: <a href="https://doi.org/10.1016/j.bmcl.2019.04.008">10.1016/j.bmcl.2019.04.008</a><br/>B: <a href="https://doi.org/10.1016/j.jmb.2010.05.020">10.1016/j.jmb.2010.05.020</a></td></tr>
 <tr>
 <td class="c">3</td>
 <td class="pair">EGFR / HER2</td>
 <td><span class="cat pc-kin">Kinase</span><span class="cat ta-onc">Oncology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/1XKK">1XKK</a> (2.40Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/3PP0">3PP0</a> (2.25Å)</span></td>
-<td>~80% kinase domain</td>
-<td>81.3% PK 712-979/720-987 268 aa</td>
+<td>60.6% computed pocket (5A; 28/29 res)</td>
+<td>81.3% Protein kinase 712-979/720-987 268/268 aa</td>
 <td>49.0% 634/1295</td>
 <td><span class="drug">Lapatinib (2007)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>1.2× (assay-dependent)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL203/">CHEMBL203</a><span class="sub">25.8K IC<sub>50</sub><br/>2.1K K<sub>i</sub>, 1.9K K<sub>d</sub><br/><b>29.7K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL203/">CHEMBL203</a><span class="sub">26K IC<sub>50</sub><br/>2.1K K<sub>i</sub>, 1.9K K<sub>d</sub><br/><b>30K</b> total</span></td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL1824/">CHEMBL1824</a><span class="sub">5.2K IC<sub>50</sub><br/>1.5K K<sub>i</sub>, 194 K<sub>d</sub><br/><b>6.9K</b> total</span></td>
-</tr>
+<td>A: <a href="https://doi.org/10.1158/0008-5472.CAN-04-1168">10.1158/0008-5472.CAN-04-1168</a><br/>B: <a href="https://doi.org/10.1074/jbc.M110.206193">10.1074/jbc.M110.206193</a></td></tr>
 <tr>
 <td class="c">4</td>
 <td class="pair">ALK / ROS1</td>
 <td><span class="cat pc-kin">Kinase</span><span class="cat ta-onc">Oncology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/2XP2">2XP2</a> (1.90Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/3ZBF">3ZBF</a> (2.20Å)</span></td>
-<td>77% ATP-site</td>
-<td>48.4% PK 1116-1392/1945-2222 277/278 aa</td>
+<td>75.0% computed pocket (5A; 20/19 res)</td>
+<td>48.4% Protein kinase 1116-1392/1945-2222 277/278 aa</td>
 <td>18.4% 479/2599</td>
 <td><span class="drug">Crizotinib (2011)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>5× (assay-dependent)</td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL4247/">CHEMBL4247</a><span class="sub">4.4K IC<sub>50</sub><br/>946 K<sub>i</sub>, 215 K<sub>d</sub><br/><b>5.5K</b> total</span></td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL5568/">CHEMBL5568</a><span class="sub">422 IC<sub>50</sub><br/>537 K<sub>i</sub>, 137 K<sub>d</sub><br/><b>1.1K</b> total</span></td>
-</tr>
+<td>A: <a href="https://doi.org/10.1021/JM2007613">10.1021/JM2007613</a><br/>B: <a href="https://doi.org/10.1056/NEJMOA1215530">10.1056/NEJMOA1215530</a></td></tr>
 <tr>
 <td class="c">5</td>
 <td class="pair">IDH1 / IDH2</td>
 <td><span class="cat pc-ox">Oxidoreductase</span><span class="cat ta-onc">Oncology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/4UMX">4UMX</a> (1.88Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/5I96">5I96</a> (1.55Å)</span></td>
-<td>72% overall protein</td>
-<td>62.6%† single-domain 414/452 aa</td>
+<td>7.1% computed pocket (5A; 26/17 res)</td>
+<td>68.3% Mature chain 2-414/40-452 413/413 aa</td>
 <td>62.6% 285/455</td>
 <td><span class="drug">Vorasidenib (2024)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>2× (assay-dependent)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL2007625/">CHEMBL2007625</a><span class="sub">13.7K IC<sub>50</sub><br/>158 K<sub>i</sub>, 52 K<sub>d</sub><br/><b>13.9K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL2007625/">CHEMBL2007625</a><span class="sub">14K IC<sub>50</sub><br/>158 K<sub>i</sub>, 52 K<sub>d</sub><br/><b>14K</b> total</span></td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL3991501/">CHEMBL3991501</a><span class="sub">1.8K IC<sub>50</sub><br/>0 K<sub>i</sub>, 2 K<sub>d</sub><br/><b>1.8K</b> total</span></td>
-</tr>
+<td>A: <a href="https://doi.org/10.1074/JBC.M114.608497">10.1074/JBC.M114.608497</a><br/>B: <a href="https://doi.org/10.1158/2159-8290.CD-16-1034">10.1158/2159-8290.CD-16-1034</a></td></tr>
 <tr>
 <td class="c">6</td>
 <td class="pair">CDK4 / CDK6</td>
 <td><span class="cat pc-kin">Kinase</span><span class="cat ta-onc">Oncology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/2W96">2W96</a> (2.30Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/6OQO">6OQO</a> (1.98Å)</span></td>
-<td>~71% overall protein</td>
-<td>71.5% PK 6-295/13-300 290 aa</td>
+<td>n/a (no co-crystal ligand in 2W96)</td>
+<td>71.5% Protein kinase 6-295/13-300 290/288 aa</td>
 <td>64.4% 212/329</td>
 <td><span class="drug">Palbociclib (2015)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>1.5× (assay-dependent)</td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL331/">CHEMBL331</a><span class="sub">1.8K IC<sub>50</sub><br/>117 K<sub>i</sub>, 390 K<sub>d</sub><br/><b>2.3K</b> total</span></td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL2508/">CHEMBL2508</a><span class="sub">1.0K IC<sub>50</sub><br/>4 K<sub>i</sub>, 249 K<sub>d</sub><br/><b>1.3K</b> total</span></td>
-</tr>
+<td>A: <a href="https://doi.org/10.1073/PNAS.0809645106">10.1073/PNAS.0809645106</a><br/>B: <a href="https://doi.org/10.1016/j.bmcl.2019.06.021">10.1016/j.bmcl.2019.06.021</a></td></tr>
 <tr>
 <td class="c">7</td>
 <td class="pair">MAO-A / MAO-B</td>
 <td><span class="cat pc-ox">Oxidoreductase</span><span class="cat ta-neu">Neurology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/2Z5X">2Z5X</a> (2.20Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/2V5Z">2V5Z</a> (1.60Å)</span></td>
-<td>~70% overall seq</td>
-<td>71.5%† single-domain 527/520 aa</td>
+<td>85.4% computed pocket (5A; 47/46 res)</td>
+<td>71.1% Mature chain 1-527/2-520 527/519 aa</td>
 <td>71.5% 378/529</td>
 <td><span class="drug">Safinamide (2017)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>MAO-B-pref (~1,000×)</td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL1951/">CHEMBL1951</a><span class="sub">7.7K IC<sub>50</sub><br/>1.8K K<sub>i</sub>, 0 K<sub>d</sub><br/><b>9.5K</b> total</span></td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL2039/">CHEMBL2039</a><span class="sub">8.7K IC<sub>50</sub><br/>948 K<sub>i</sub>, 9 K<sub>d</sub><br/><b>9.6K</b> total</span></td>
-</tr>
+<td>A: <a href="https://doi.org/10.1073/pnas.0710626105">10.1073/pnas.0710626105</a><br/>B: <a href="https://doi.org/10.1021/jm070677y">10.1021/jm070677y</a></td></tr>
 <tr>
 <td class="c">8</td>
 <td class="pair">AChE / BChE</td>
 <td><span class="cat pc-hyd">Hydrolase</span><span class="cat ta-neu">Neurology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/4EY7">4EY7</a> (2.35Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/4BDS">4BDS</a> (2.10Å)</span></td>
-<td>~65% overall seq</td>
-<td>51.1%† single-domain 614/602 aa</td>
+<td>30.4% computed pocket (5A; 21/16 res)</td>
+<td>52.4% Mature cholinesterase chain 32-614/29-602 583/574 aa</td>
 <td>51.1% 314/615</td>
 <td><span class="drug">Rivastigmine (2000)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>BChE-pref (~70×)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL220/">CHEMBL220</a><span class="sub">9.7K IC<sub>50</sub><br/>1.9K K<sub>i</sub>, 295 K<sub>d</sub><br/><b>12.0K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL220/">CHEMBL220</a><span class="sub">9.7K IC<sub>50</sub><br/>1.9K K<sub>i</sub>, 295 K<sub>d</sub><br/><b>12K</b> total</span></td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL1914/">CHEMBL1914</a><span class="sub">5.4K IC<sub>50</sub><br/>567 K<sub>i</sub>, 4 K<sub>d</sub><br/><b>6.0K</b> total</span></td>
-</tr>
+<td>A: <a href="https://doi.org/10.1021/jm300871x">10.1021/jm300871x</a><br/>B: <a href="https://doi.org/10.1042/BJ20130013">10.1042/BJ20130013</a></td></tr>
 <tr>
 <td class="c">9</td>
 <td class="pair">PPARα / PPARγ</td>
 <td><span class="cat pc-nr">Nuclear receptor</span><span class="cat ta-met">Metabolic</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/2P54">2P54</a> (1.79Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/1FM9">1FM9</a> (2.10Å)</span></td>
-<td>60–70% LBD</td>
+<td>36.4% computed pocket (5A; 29/30 res)</td>
 <td>55.3% NR LBD 239-466/238-503 228/266 aa</td>
 <td>53.9% 275/510</td>
 <td><span class="drug">Saroglitazar (2013)</span></td>
@@ -215,105 +216,105 @@ Where I corrected obvious mismatches (e.g., safinamide and rivastigmine), the up
 <td>PPARα-pref (~4,600×)</td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL239/">CHEMBL239</a><span class="sub">1.3K IC<sub>50</sub><br/>209 K<sub>i</sub>, 39 K<sub>d</sub><br/><b>1.6K</b> total</span></td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL235/">CHEMBL235</a><span class="sub">2.3K IC<sub>50</sub><br/>622 K<sub>i</sub>, 106 K<sub>d</sub><br/><b>3.0K</b> total</span></td>
-</tr>
+<td>A: <a href="https://doi.org/10.1021/jm058056x">10.1021/jm058056x</a><br/>B: <a href="https://doi.org/10.1016/S1097-2765(00)80448-7">10.1016/S1097-2765(00)80448-7</a></td></tr>
 <tr>
 <td class="c">10</td>
 <td class="pair">ERα / ERβ</td>
 <td><span class="cat pc-nr">Nuclear receptor</span><span class="cat ta-end">Endocrine/Oncology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/3ERT">3ERT</a> (1.90Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/1X7B">1X7B</a> (2.30Å)</span></td>
-<td>~56% LBD 2 aa in pocket</td>
-<td>59.7% NR LBD 311-547/264-498 237 aa</td>
+<td>56.5% computed pocket (5A; 22/19 res)</td>
+<td>59.7% NR LBD 311-547/264-498 237/235 aa</td>
 <td>45.5% 275/605</td>
 <td><span class="drug">Tamoxifen (1977)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>~1× (assay-dependent)</td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL206/">CHEMBL206</a><span class="sub">7.6K IC<sub>50</sub><br/>1.7K K<sub>i</sub>, 56 K<sub>d</sub><br/><b>9.4K</b> total</span></td>
 <td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL242/">CHEMBL242</a><span class="sub">3.7K IC<sub>50</sub><br/>1.5K K<sub>i</sub>, 32 K<sub>d</sub><br/><b>5.2K</b> total</span></td>
-</tr>
+<td>A: <a href="https://doi.org/10.1016/S0092-8674(00)81717-1">10.1016/S0092-8674(00)81717-1</a><br/>B: <a href="https://doi.org/10.1021/ja047633o">10.1021/ja047633o</a></td></tr>
 <tr>
 <td class="c">11</td>
 <td class="pair">ADRB1 / ADRB2</td>
 <td><span class="cat pc-gpcr">GPCR</span><span class="cat ta-card">Cardiovascular</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/7BVQ">7BVQ</a> (2.50Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/2RH1">2RH1</a> (2.40Å)</span></td>
-<td>~70–80% orthosteric pocket (β1/β2 highly conserved)</td>
-<td>~67% 7TM (reported); full ~54%</td>
-<td>~54% full-length (reported)</td>
+<td>46.2% computed pocket (5A; 13/13 res)</td>
+<td>56.0% 7TM bundle 58-377/30-326 320/297 aa</td>
+<td>44.5% 220/494</td>
 <td><span class="drug">Metoprolol (1978)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>β1-pref (~30×)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL213/">CHEMBL213</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL210/">CHEMBL210</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-</tr>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL213/">CHEMBL213</a><span class="sub">1.5K IC<sub>50</sub><br/>1.4K K<sub>i</sub>, 154 K<sub>d</sub><br/><b>3.1K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL210/">CHEMBL210</a><span class="sub">1.7K IC<sub>50</sub><br/>1.8K K<sub>i</sub>, 262 K<sub>d</sub><br/><b>3.8K</b> total</span></td>
+<td>A: <a href="https://doi.org/10.1038/s41422-020-00424-2">10.1038/s41422-020-00424-2</a><br/>B: <a href="https://doi.org/10.1126/science.1150577">10.1126/science.1150577</a></td></tr>
 <tr>
 <td class="c">12</td>
 <td class="pair">PDE4B / PDE4D</td>
 <td><span class="cat pc-pde">Phosphodiesterase</span><span class="cat ta-resp">Respiratory/Inflammation</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/1XMU">1XMU</a> (2.30Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/1XOQ">1XOQ</a> (1.83Å)</span></td>
-<td>~80–90% catalytic pocket (PDE4 subfamily)</td>
-<td>~80% catalytic domain (reported)</td>
-<td>~55% full-length (isoform termini diverge)</td>
+<td>100.0% computed pocket (5A; 19/19 res)</td>
+<td>87.6% PDEase 330-659/386-715 330/330 aa</td>
+<td>63.4% 526/829</td>
 <td><span class="drug">Roflumilast (2011)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>PDE4D-pref (~1.2×)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL275/">CHEMBL275</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL288/">CHEMBL288</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-</tr>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL275/">CHEMBL275</a><span class="sub">3.6K IC<sub>50</sub><br/>199 K<sub>i</sub>, 0 K<sub>d</sub><br/><b>3.8K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL288/">CHEMBL288</a><span class="sub">3.6K IC<sub>50</sub><br/>155 K<sub>i</sub>, 9 K<sub>d</sub><br/><b>3.8K</b> total</span></td>
+<td>A: <a href="https://doi.org/10.1016/j.str.2004.10.004">10.1016/j.str.2004.10.004</a><br/>B: <a href="https://doi.org/10.1016/j.str.2004.10.004">10.1016/j.str.2004.10.004</a></td></tr>
 <tr>
 <td class="c">13</td>
 <td class="pair">CA1 / CA2</td>
 <td><span class="cat pc-ca">Carbonic anhydrase</span><span class="cat ta-oph">Ophthalmology/Diuretics</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/1AZM">1AZM</a> (2.00Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/3HS4">3HS4</a> (1.10Å)</span></td>
-<td>Zn active site highly conserved (CA isoforms)</td>
-<td>~60% single-domain enzyme (reported)</td>
-<td>~60% full-length (reported)</td>
+<td>60.0% computed pocket (5A; 15/13 res)</td>
+<td>60.1% Alpha-carbonic anhydrase 4-261/3-259 258/257 aa</td>
+<td>59.9% 157/262</td>
 <td><span class="drug">Acetazolamide (1954)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>CA2-pref (~21×; Ki 250 vs 12 nM)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL261/">CHEMBL261</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL205/">CHEMBL205</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-</tr>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL261/">CHEMBL261</a><span class="sub">475 IC<sub>50</sub><br/>12K K<sub>i</sub>, 606 K<sub>d</sub><br/><b>13K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL205/">CHEMBL205</a><span class="sub">2.3K IC<sub>50</sub><br/>14K K<sub>i</sub>, 945 K<sub>d</sub><br/><b>17K</b> total</span></td>
+<td>A: <a href="https://doi.org/10.1006/jmbi.1994.1655">10.1006/jmbi.1994.1655</a><br/>B: <a href="https://doi.org/10.1107/S1744309109036665">10.1107/S1744309109036665</a></td></tr>
 <tr>
 <td class="c">14</td>
 <td class="pair">Thrombin (F2) / Factor Xa (F10)</td>
 <td><span class="cat pc-prot">Serine protease</span><span class="cat ta-heme">Hemostasis</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/4LXB">4LXB</a> (1.61Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/2W26">2W26</a> (2.08Å)</span></td>
-<td>~60% S1/S4 pocket residues (trypsin-like proteases)</td>
-<td>~40% catalytic domain (reported)</td>
-<td>~40% full-length (reported)</td>
+<td>60.9% computed pocket (5A; 22/21 res)</td>
+<td>65.2% Gla 44-89/41-85 46/45 aa</td>
+<td>29.6% 192/649</td>
 <td><span class="drug">Rivaroxaban (2011)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>FXa-pref (&gt;10,000× vs other serine proteases)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL204/">CHEMBL204</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL244/">CHEMBL244</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-</tr>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL204/">CHEMBL204</a><span class="sub">3.8K IC<sub>50</sub><br/>5.4K K<sub>i</sub>, 65 K<sub>d</sub><br/><b>9.3K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL244/">CHEMBL244</a><span class="sub">3.8K IC<sub>50</sub><br/>4.8K K<sub>i</sub>, 97 K<sub>d</sub><br/><b>8.7K</b> total</span></td>
+<td>A: <a href="https://doi.org/10.1021/jm4005835">10.1021/jm4005835</a><br/>B: <a href="https://doi.org/10.1021/JM050101D">10.1021/JM050101D</a></td></tr>
 <tr>
 <td class="c">15</td>
 <td class="pair">PARP1 / PARP2</td>
 <td><span class="cat pc-tran">Transferase</span><span class="cat ta-onc">Oncology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/7KK4">7KK4</a> (1.96Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/4TVJ">4TVJ</a> (2.10Å)</span></td>
-<td>~85–90% NAD+ site conserved (PARP1/2)</td>
-<td>~69% catalytic domain (reported)</td>
-<td>~45% full-length (reported)</td>
+<td>65.4% computed pocket (5A; 22/23 res)</td>
+<td>32.7% WGR 542-638/104-201 97/98 aa</td>
+<td>24.3% 251/1032</td>
 <td><span class="drug">Olaparib (2014)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>PARP2-pref (~5×; IC50 5 vs 1 nM)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL3105/">CHEMBL3105</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL5366/">CHEMBL5366</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-</tr>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL3105/">CHEMBL3105</a><span class="sub">4.8K IC<sub>50</sub><br/>1.2K K<sub>i</sub>, 226 K<sub>d</sub><br/><b>6.2K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL5366/">CHEMBL5366</a><span class="sub">1.2K IC<sub>50</sub><br/>35 K<sub>i</sub>, 107 K<sub>d</sub><br/><b>1.3K</b> total</span></td>
+<td>A: <a href="https://doi.org/10.1074/jbc.RA120.016573">10.1074/jbc.RA120.016573</a><br/>B: <a href="https://doi.org/10.1021/acs.jmedchem.6b00990">10.1021/acs.jmedchem.6b00990</a></td></tr>
 <tr>
 <td class="c">16</td>
 <td class="pair">HDAC2 / HDAC8</td>
 <td><span class="cat pc-epi">Epigenetic enzyme</span><span class="cat ta-onc">Oncology</span></td>
 <td><span class="pdb"><a href="https://www.rcsb.org/structure/4LXZ">4LXZ</a> (1.85Å)</span><br/><span class="pdb"><a href="https://www.rcsb.org/structure/1T64">1T64</a> (1.90Å)</span></td>
-<td>~55–60% catalytic Zn pocket residues conserved</td>
-<td>~35% overall; active site conserved</td>
-<td>~34% full-length (reported)</td>
+<td>64.7% computed pocket (5A; 17/13 res)</td>
+<td>43.2% Histone deacetylase 9-322/14-324 314/311 aa</td>
+<td>30.9% 153/495</td>
 <td><span class="drug">Vorinostat / SAHA (2006)</span></td>
 <td><span class="fda fda-yes">FDA ✓</span></td>
 <td>HDAC2-pref (~56×; IC50 36 vs 2000 nM)</td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL1937/">CHEMBL1937</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL3192/">CHEMBL3192</a><span class="sub">n/a IC<sub>50</sub><br/>n/a K<sub>i</sub>, n/a K<sub>d</sub><br/><b>n/a</b> total</span></td>
-</tr>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL1937/">CHEMBL1937</a><span class="sub">4.3K IC<sub>50</sub><br/>193 K<sub>i</sub>, 108 K<sub>d</sub><br/><b>4.6K</b> total</span></td>
+<td class="r"><a href="https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL3192/">CHEMBL3192</a><span class="sub">4.8K IC<sub>50</sub><br/>191 K<sub>i</sub>, 48 K<sub>d</sub><br/><b>5.0K</b> total</span></td>
+<td>A: <a href="https://doi.org/10.1074/jbc.M113.490706">10.1074/jbc.M113.490706</a><br/>B: <a href="https://doi.org/10.1016/j.str.2004.04.012">10.1016/j.str.2004.04.012</a></td></tr>
 </table>
 <h2>Quick sanity-checks (what was changed vs the earlier draft)</h2>
 <ul>
@@ -323,7 +324,7 @@ Where I corrected obvious mismatches (e.g., safinamide and rivastigmine), the up
 <li><b>Unified styling</b> (badges, links, consistent wording).</li>
 </ul>
 <p class="note">
-If you want, the next “hardening” step is to compute pocket-identity strictly from the listed PDB co-crystals (e.g., residues within 5 Å of the bound ligand) and replace the “est.” pocket similarity notes with computed values.
+Pocket similarity is now computed from co-crystal PDB structures using residues within 5 A of the bound ligand. Values are sequence-identity percentages of those ligand-contacting pocket residues.
 </p>
 </body>
 </html>

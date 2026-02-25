@@ -179,14 +179,15 @@ Stages and dependencies:
 | Stage | Requires | Produces |
 |-------|----------|----------|
 | `fetch` | Internet | PDB, FASTA, SMILES, FREED++ Docker image, ChEMBL actives, GNINA binary |
-| `calibrate` | fetch outputs | `normalization.yaml`, calibration scores |
+| `prepare` | fetch outputs | Prepared targets and baseline artifacts for downstream stages |
+| `calibrate` | prepare outputs | `normalization.yaml`, calibration scores |
 | `generate` | calibrate outputs | `generated.parquet` per run |
 | `score` | generated molecules | `scored_joined.parquet` per run (configured scorer engine; default `boltz2`) |
 | `analyze` | scored results | `all_results.parquet`, `metrics.json`, `stats.json` |
 | `report` | analysis outputs | Figures, LaTeX report |
 | `audit` | analysis outputs | `claim_audit.json` |
 | `gnina` | scored results, GNINA binary | GNINA score Parquet per run |
-| `md` | scored results, PDB structures | MD trajectories, RMSD/RMSF/Rg/energy CSVs, convergence assessment |
+| `md` | scored results, PDB structures | MD trajectories, RMSD/RMSF/Rg/SASA/PCA CSVs, convergence assessment |
 
 ### Backend Selection
 
@@ -295,12 +296,13 @@ uv run python cli/s5_analyze/summarize.py
 | `s5_analyze/threshold_sensitivity.py` | SCI-06 | Robustness at T = -1, 0, +1 (Parquet output) |
 | `s5_analyze/proxy_correlation.py` | SCI-07 | Spearman rho (docking vs Boltz-2) (Parquet output) |
 | `s7_audit/claim_audit.py` | SCI-10 | Claim traceability (8 checks) |
-| `s7_audit/verify_pair.py` | — | Target pair catalog verification (PDB, DOI, sequence, domain identity, ChEMBL) |
+| `s7_audit/verify_pair.py` | — | Target pair verification (PDB, DOI/URL, sequence, domain identity, ChEMBL) |
 
 ## Target Pair Catalog Verification
 
-Parses `target_pairs_catalog.html` and verifies extracted metadata against
-external APIs (RCSB, doi.org, UniProt, ChEMBL).  Includes both full-length
+Parses `configs/pairs.yaml` by default (with legacy `target_pairs_catalog.html`
+support via `--catalog`) and verifies pair metadata against external APIs
+(RCSB, doi.org, UniProt, ChEMBL). Includes both full-length
 and **domain-specific** Needleman-Wunsch sequence identity.
 
 ### Why domain-specific identity?
@@ -321,7 +323,7 @@ have manual UniProt overrides.
 ### Quick start
 
 ```bash
-# Parse + verify DOI for a single pair (by number)
+# Parse + verify DOI/URL for a single pair (by number)
 uv run python cli/s7_audit/verify_pair.py --pair 1 --verify-doi
 
 # By pair name
@@ -336,7 +338,7 @@ uv run python cli/s7_audit/verify_pair.py --pair 1 \
   --uniprot-a P00533 --uniprot-b P04626 \
   --domain-a 712-979 --domain-b 720-987
 
-# Verify all 50 pairs with all checks, save JSON
+# Verify all configured pairs with all checks, save JSON
 uv run python cli/s7_audit/verify_pair.py --all --full \
   --output-json report/data/verify_all.json
 
@@ -348,10 +350,11 @@ python3 scripts/update_catalog_verification.py
 
 | Option | Description |
 |--------|-------------|
-| `--pair N` or `--pair "NAME"` | Pair number (1-50) or target names (e.g. `"EGFR/HER2"`) |
-| `--all` | Verify all 50 pairs |
+| `--pair N` or `--pair "NAME"` | Pair number or target names (e.g. `"EGFR/HER2"` or `"EGFR_HER2"`) |
+| `--all` | Verify all pairs from the selected source |
 | `--full` | Enable all checks (PDB + DOI + sequence + ChEMBL) |
-| `--catalog PATH` | Path to HTML catalog (default: `target_pairs_catalog.html`) |
+| `--pairs-config PATH` | Path to `pairs.yaml` (default: `configs/pairs.yaml`) |
+| `--catalog PATH` | Legacy HTML catalog path (if set, overrides `--pairs-config`) |
 | `--verify-pdb / --no-verify-pdb` | Check PDB metadata against RCSB (resolution, organism, ligands) |
 | `--verify-doi / --no-verify-doi` | Check DOI resolves via doi.org |
 | `--verify-sequence / --no-verify-sequence` | Compute full-length + domain NW identity (auto-resolves UniProt) |
@@ -366,7 +369,7 @@ python3 scripts/update_catalog_verification.py
 ### What it checks
 
 - **PDB metadata**: resolution, organism (Homo sapiens), gene names, bound ligands via RCSB API
-- **DOI resolution**: HTTP HEAD to doi.org, reports status code and redirect
+- **DOI/URL resolution**: HTTP HEAD to doi.org or URL endpoint, reports status code and redirect
 - **Full-length sequence identity**: Needleman-Wunsch alignment (BLOSUM62, affine gaps) on UniProt canonical sequences
 - **Domain-specific identity**: Auto-discovers domain boundaries from UniProt features (kinase, LBD, SET, BD1, BH3, JmjC, sirtuin, catalytic, HDAC, PDE domains), computes NW identity on domain subsequences, compares with catalog literature claims
 - **ChEMBL bioactivity**: IC50/Ki/Kd counts per target
@@ -387,9 +390,9 @@ All public symbols are re-exported from `pair_verify` for backward compatibility
 ### Programmatic use
 
 ```python
-from dualdocking.validation.pair_verify import parse_catalog, verify_pair, nw_align
+from dualdocking.validation.pair_verify import parse_pairs_yaml, verify_pair, nw_align
 
-pairs = parse_catalog("target_pairs_catalog.html")  # -> list[PairRecord]
+pairs = parse_pairs_yaml("configs/pairs.yaml")  # -> list[PairRecord]
 result = verify_pair(pairs[0], do_pdb=True, do_doi=True, do_sequence=True)
 
 # Full-length identity
@@ -407,7 +410,7 @@ print(f"{aln.identity_pct}% identity, {aln.matches}/{aln.aligned_length}")
 
 # Direct submodule imports also work
 from dualdocking.validation.nw_align import nw_align, AlignmentResult
-from dualdocking.validation.pair_catalog import PairRecord, parse_catalog
+from dualdocking.validation.pair_catalog import PairRecord, parse_catalog, parse_pairs_yaml
 from dualdocking.validation.domain_identity import select_domains_for_pair
 ```
 
@@ -514,6 +517,7 @@ docker run --rm -it --gpus all \
 # Inside container — verify tools work:
 gmx --version
 antechamber --help
+parmchk2 --help
 obabel --version
 python -c "from dualdocking.validation.md_config import MDConfig; print('OK')"
 

@@ -133,8 +133,10 @@ class TestRun:
 
 class TestDetectGpu:
     def test_with_gpu(self) -> None:
-        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
-             patch("dualdocking.validation.md_config.subprocess.run") as mock_run:
+        with (
+            patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
+            patch("dualdocking.validation.md_config.subprocess.run") as mock_run,
+        ):
             mock_run.return_value = MagicMock(returncode=0, stdout="NVIDIA RTX 4090\n")
             flags = _detect_gpu_flags()
             assert "-nb" in flags
@@ -147,8 +149,10 @@ class TestDetectGpu:
             assert flags == []
 
     def test_nvidia_smi_fails(self) -> None:
-        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
-             patch("dualdocking.validation.md_config.subprocess.run") as mock_run:
+        with (
+            patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
+            patch("dualdocking.validation.md_config.subprocess.run") as mock_run,
+        ):
             mock_run.return_value = MagicMock(returncode=1, stdout="")
             flags = _detect_gpu_flags()
             assert flags == []
@@ -239,12 +243,8 @@ class TestBuildGromacsCommands:
 
     def test_maxwarn_values(self) -> None:
         commands = build_gromacs_commands()
-        # ions grompp (3) and EM grompp (5) use -maxwarn 0
-        for i in [3, 5]:
-            idx = commands[i].index("-maxwarn")
-            assert commands[i][idx + 1] == "0", f"Command {i} should use -maxwarn 0"
-        # NVT (8), NPT (10), prod (12) grompp use -maxwarn 1
-        for i in [8, 10, 12]:
+        # All grompp calls in the command builder use -maxwarn 1.
+        for i in [3, 5, 8, 10, 12]:
             idx = commands[i].index("-maxwarn")
             assert commands[i][idx + 1] == "1", f"Command {i} should use -maxwarn 1"
 
@@ -458,9 +458,7 @@ class TestPatchTopology:
         topol = tmp_path / "topol.top"
         lig_itp = tmp_path / "LIG_GMX.itp"
 
-        topol.write_text(
-            "[ system ]\nProtein\n[ molecules ]\nProtein          1\n"
-        )
+        topol.write_text("[ system ]\nProtein\n[ molecules ]\nProtein          1\n")
         lig_itp.write_text("; ligand itp\n")
 
         _patch_topology(topol, lig_itp)
@@ -520,14 +518,7 @@ class TestPatchTopology:
 class TestParseXvg:
     def test_basic_parse(self, tmp_path: Path) -> None:
         xvg = tmp_path / "test.xvg"
-        xvg.write_text(
-            "# comment\n"
-            "@ title\n"
-            "@ xaxis\n"
-            "0.0 1.5\n"
-            "1.0 2.3\n"
-            "2.0 0.8\n"
-        )
+        xvg.write_text("# comment\n@ title\n@ xaxis\n0.0 1.5\n1.0 2.3\n2.0 0.8\n")
         df = _parse_xvg(xvg, columns=["time", "value"])
         assert len(df) == 3
         assert list(df.columns) == ["time", "value"]
@@ -536,12 +527,7 @@ class TestParseXvg:
 
     def test_skips_comments_and_at_lines(self, tmp_path: Path) -> None:
         xvg = tmp_path / "test.xvg"
-        xvg.write_text(
-            "# GROMACS output\n"
-            "@ s0 legend\n"
-            "@ s1 legend\n"
-            "1.0 2.0\n"
-        )
+        xvg.write_text("# GROMACS output\n@ s0 legend\n@ s1 legend\n1.0 2.0\n")
         df = _parse_xvg(xvg, columns=["a", "b"])
         assert len(df) == 1
 
@@ -582,13 +568,25 @@ class TestMDResult:
 
     def test_creation_with_new_fields(self) -> None:
         r = MDResult(
-            pair="CDK2_ERK2", mode="double", mol_id=0,
-            target="CDK2", target_label="A", smiles="CCO",
-            mean_rmsd=1.5, max_rmsd=2.8, stable=True,
-            mean_hbonds=3.2, mean_energy=-150.5,
-            backbone_rmsd_mean=1.2, rg_mean=14.5, rg_std=0.3,
-            converged=True, convergence_ks_pvalue=0.82,
-            coulomb_sr=-50.0, lj_sr=-100.0, mmpbsa_dg=-8.5,
+            pair="CDK2_ERK2",
+            mode="double",
+            mol_id=0,
+            target="CDK2",
+            target_label="A",
+            smiles="CCO",
+            mean_rmsd=1.5,
+            max_rmsd=2.8,
+            stable=True,
+            mean_hbonds=3.2,
+            mean_energy=-150.5,
+            backbone_rmsd_mean=1.2,
+            rg_mean=14.5,
+            rg_std=0.3,
+            converged=True,
+            convergence_ks_pvalue=0.82,
+            coulomb_sr=-50.0,
+            lj_sr=-100.0,
+            mmpbsa_dg=-8.5,
         )
         assert r.backbone_rmsd_mean == 1.2
         assert r.rg_mean == 14.5
@@ -597,12 +595,21 @@ class TestMDResult:
 
     def test_creation_with_sasa_pca_fields(self) -> None:
         r = MDResult(
-            pair="CDK2_ERK2", mode="double", mol_id=0,
-            target="CDK2", target_label="A", smiles="CCO",
-            mean_rmsd=1.5, max_rmsd=2.8, stable=True,
-            mean_hbonds=3.2, mean_energy=-150.5,
-            sasa_mean=5200.0, sasa_std=120.0,
-            pca_pc1_variance=45.3, pca_pc2_variance=18.7,
+            pair="CDK2_ERK2",
+            mode="double",
+            mol_id=0,
+            target="CDK2",
+            target_label="A",
+            smiles="CCO",
+            mean_rmsd=1.5,
+            max_rmsd=2.8,
+            stable=True,
+            mean_hbonds=3.2,
+            mean_energy=-150.5,
+            sasa_mean=5200.0,
+            sasa_std=120.0,
+            pca_pc1_variance=45.3,
+            pca_pc2_variance=18.7,
         )
         assert r.sasa_mean == 5200.0
         assert r.sasa_std == 120.0
@@ -611,10 +618,17 @@ class TestMDResult:
 
     def test_frozen(self) -> None:
         r = MDResult(
-            pair="CDK2_ERK2", mode="double", mol_id=0,
-            target="CDK2", target_label="A", smiles="CCO",
-            mean_rmsd=1.5, max_rmsd=2.8, stable=True,
-            mean_hbonds=3.2, mean_energy=-150.5,
+            pair="CDK2_ERK2",
+            mode="double",
+            mol_id=0,
+            target="CDK2",
+            target_label="A",
+            smiles="CCO",
+            mean_rmsd=1.5,
+            max_rmsd=2.8,
+            stable=True,
+            mean_hbonds=3.2,
+            mean_energy=-150.5,
         )
         with pytest.raises(AttributeError):
             r.stable = False  # type: ignore[misc]
@@ -627,9 +641,16 @@ class TestWriteSummary:
     def test_writes_new_parquet(self, tmp_path: Path) -> None:
         results = [
             MDResult(
-                pair="P", mode="m", mol_id=0, target="T",
-                target_label="A", smiles="C", mean_rmsd=1.0,
-                max_rmsd=2.0, stable=True, mean_hbonds=1.0,
+                pair="P",
+                mode="m",
+                mol_id=0,
+                target="T",
+                target_label="A",
+                smiles="C",
+                mean_rmsd=1.0,
+                max_rmsd=2.0,
+                stable=True,
+                mean_hbonds=1.0,
                 mean_energy=-100.0,
             ),
         ]
@@ -643,11 +664,21 @@ class TestWriteSummary:
     def test_new_columns_present(self, tmp_path: Path) -> None:
         results = [
             MDResult(
-                pair="P", mode="m", mol_id=0, target="T",
-                target_label="A", smiles="C", mean_rmsd=1.0,
-                max_rmsd=2.0, stable=True, mean_hbonds=1.0,
-                mean_energy=-100.0, backbone_rmsd_mean=0.8,
-                rg_mean=15.0, converged=True, mmpbsa_dg=-5.0,
+                pair="P",
+                mode="m",
+                mol_id=0,
+                target="T",
+                target_label="A",
+                smiles="C",
+                mean_rmsd=1.0,
+                max_rmsd=2.0,
+                stable=True,
+                mean_hbonds=1.0,
+                mean_energy=-100.0,
+                backbone_rmsd_mean=0.8,
+                rg_mean=15.0,
+                converged=True,
+                mmpbsa_dg=-5.0,
             ),
         ]
         path = tmp_path / "summary.parquet"
@@ -664,17 +695,31 @@ class TestWriteSummary:
     def test_appends_and_deduplicates(self, tmp_path: Path) -> None:
         path = tmp_path / "summary.parquet"
         r1 = MDResult(
-            pair="P", mode="m", mol_id=0, target="T",
-            target_label="A", smiles="C", mean_rmsd=1.0,
-            max_rmsd=2.0, stable=True, mean_hbonds=1.0,
+            pair="P",
+            mode="m",
+            mol_id=0,
+            target="T",
+            target_label="A",
+            smiles="C",
+            mean_rmsd=1.0,
+            max_rmsd=2.0,
+            stable=True,
+            mean_hbonds=1.0,
             mean_energy=-100.0,
         )
         write_summary([r1], path)
 
         r2 = MDResult(
-            pair="P", mode="m", mol_id=0, target="T",
-            target_label="A", smiles="C", mean_rmsd=0.5,
-            max_rmsd=1.0, stable=True, mean_hbonds=2.0,
+            pair="P",
+            mode="m",
+            mol_id=0,
+            target="T",
+            target_label="A",
+            smiles="C",
+            mean_rmsd=0.5,
+            max_rmsd=1.0,
+            stable=True,
+            mean_hbonds=2.0,
             mean_energy=-200.0,
         )
         write_summary([r2], path)
@@ -697,17 +742,57 @@ class TestSelectTopMolecules:
         assert df.empty
 
     def test_selects_top_n(self, tmp_path: Path) -> None:
-        data = pd.DataFrame({
-            "smiles": ["A", "B", "C", "D"],
-            "combined_min": [0.5, -1.0, 0.2, -0.5],
-        })
+        data = pd.DataFrame(
+            {
+                "smiles": ["A", "B", "C", "D"],
+                "combined_min": [0.5, -1.0, 0.2, -0.5],
+            }
+        )
 
-        with patch("dualdocking.data.io_utils.stem_exists", return_value=True), \
-             patch("dualdocking.data.io_utils.read_df", return_value=data):
+        with (
+            patch("dualdocking.data.io_utils.stem_exists", return_value=True),
+            patch("dualdocking.data.io_utils.read_df", return_value=data),
+        ):
             result = select_top_molecules("P", "m", 2, [42], tmp_path)
 
         assert len(result) == 2
         assert result["smiles"].iloc[0] == "B"  # -1.0 is best
+
+    def test_fallback_single_b_uses_affinity_b(self, tmp_path: Path) -> None:
+        data = pd.DataFrame(
+            {
+                "smiles": ["A", "B"],
+                "affinity_a": [-9.0, -1.0],
+                "affinity_b": [2.0, -8.0],
+            },
+        )
+
+        with (
+            patch("dualdocking.data.io_utils.stem_exists", return_value=True),
+            patch("dualdocking.data.io_utils.read_df", return_value=data),
+        ):
+            result = select_top_molecules("P", "single_b", 1, [42], tmp_path)
+
+        assert len(result) == 1
+        assert result["smiles"].iloc[0] == "B"
+
+    def test_fallback_double_uses_worst_case_when_combined_missing(self, tmp_path: Path) -> None:
+        data = pd.DataFrame(
+            {
+                "smiles": ["A", "B"],
+                "affinity_a": [-5.0, -3.0],
+                "affinity_b": [-1.0, -3.0],
+            },
+        )
+
+        with (
+            patch("dualdocking.data.io_utils.stem_exists", return_value=True),
+            patch("dualdocking.data.io_utils.read_df", return_value=data),
+        ):
+            result = select_top_molecules("P", "double", 1, [42], tmp_path)
+
+        assert len(result) == 1
+        assert result["smiles"].iloc[0] == "B"
 
 
 # ── _make_index ──────────────────────────────────────────────────────
@@ -721,10 +806,7 @@ class TestMakeIndex:
         def _mock_make_ndx(*_args: object, **_kwargs: object) -> MagicMock:
             ndx_path = tmp_path / "index.ndx"
             ndx_path.write_text(
-                "[ Protein ]\n1 2 3\n"
-                "[ LIG ]\n4 5\n"
-                "[ SOL ]\n6 7\n"
-                "[ NA ]\n8\n",
+                "[ Protein ]\n1 2 3\n[ LIG ]\n4 5\n[ SOL ]\n6 7\n[ NA ]\n8\n",
             )
             return MagicMock(returncode=0)
 
@@ -811,31 +893,43 @@ class TestAnalyzeTrajectory:
         cfg = MDConfig(pair_id="X", simulation_time_ns=50.0)
 
         # Mock _run and _parse_xvg to return valid data
-        mock_df = pd.DataFrame({
-            "time_ns": [0.0, 25.0, 50.0],
-            "rmsd_nm": [0.1, 0.15, 0.12],
-        })
-        rmsf_df = pd.DataFrame({
-            "residue": [1.0, 2.0, 3.0],
-            "rmsf_nm": [0.05, 0.08, 0.06],
-        })
-        rg_df = pd.DataFrame({
-            "time_ps": [0.0, 1000.0, 2000.0],
-            "rg_nm": [1.4, 1.5, 1.45],
-        })
-        hbond_df = pd.DataFrame({
-            "time_ns": [0.0, 25.0, 50.0],
-            "n_hbonds": [3.0, 4.0, 3.0],
-        })
+        mock_df = pd.DataFrame(
+            {
+                "time_ns": [0.0, 25.0, 50.0],
+                "rmsd_nm": [0.1, 0.15, 0.12],
+            }
+        )
+        rmsf_df = pd.DataFrame(
+            {
+                "residue": [1.0, 2.0, 3.0],
+                "rmsf_nm": [0.05, 0.08, 0.06],
+            }
+        )
+        rg_df = pd.DataFrame(
+            {
+                "time_ps": [0.0, 1000.0, 2000.0],
+                "rg_nm": [1.4, 1.5, 1.45],
+            }
+        )
+        hbond_df = pd.DataFrame(
+            {
+                "time_ns": [0.0, 25.0, 50.0],
+                "n_hbonds": [3.0, 4.0, 3.0],
+            }
+        )
 
-        sasa_df = pd.DataFrame({
-            "time_ns": [0.0, 25.0, 50.0],
-            "sasa_nm2": [50.0, 51.0, 49.0],
-        })
-        eigenval_df = pd.DataFrame({
-            "mode": [1.0, 2.0, 3.0],
-            "eigenvalue": [5.0, 3.0, 2.0],
-        })
+        sasa_df = pd.DataFrame(
+            {
+                "time_ns": [0.0, 25.0, 50.0],
+                "sasa_nm2": [50.0, 51.0, 49.0],
+            }
+        )
+        eigenval_df = pd.DataFrame(
+            {
+                "mode": [1.0, 2.0, 3.0],
+                "eigenvalue": [5.0, 3.0, 2.0],
+            }
+        )
 
         # 7 parse calls: bb rmsd, lig rmsd, rmsf, rg, hbond, sasa, eigenval
         parse_returns = [mock_df, mock_df, rmsf_df, rg_df, hbond_df, sasa_df, eigenval_df]
@@ -846,9 +940,11 @@ class TestAnalyzeTrajectory:
             call_idx["i"] += 1
             return parse_returns[idx]
 
-        with patch("dualdocking.validation.md_analysis._run") as mock_run, \
-             patch("dualdocking.validation.md_analysis._parse_xvg", side_effect=mock_parse_xvg), \
-             patch("dualdocking.validation.md_analysis._assess_convergence", return_value=(True, 0.85)):
+        with (
+            patch("dualdocking.validation.md_analysis._run") as mock_run,
+            patch("dualdocking.validation.md_analysis._parse_xvg", side_effect=mock_parse_xvg),
+            patch("dualdocking.validation.md_analysis._assess_convergence", return_value=(True, 0.85)),
+        ):
             mock_run.return_value = MagicMock(returncode=0)
             result = _analyze_trajectory(work_dir, ndx, xtc_fit, out_dir, cfg)
 
@@ -937,17 +1033,17 @@ class TestParameterizeLigand:
         acpype_dir = tmp_path / "LIG.acpype"
         acpype_dir.mkdir()
         (acpype_dir / "LIG_GMX.itp").write_text("; test itp\n")
-        (acpype_dir / "LIG_GMX.gro").write_text(
-            "LIG\n 1\n    1LIG     C1    1   0.0   0.0   0.0\n   5.0   5.0   5.0\n"
-        )
+        (acpype_dir / "LIG_GMX.gro").write_text("LIG\n 1\n    1LIG     C1    1   0.0   0.0   0.0\n   5.0   5.0   5.0\n")
 
-        with patch("dualdocking.validation.md_setup._run") as mock_run, \
-             patch("rdkit.Chem.MolFromSmiles", mock_chem.MolFromSmiles), \
-             patch("rdkit.Chem.AddHs", mock_chem.AddHs), \
-             patch("rdkit.Chem.MolToMolFile"), \
-             patch("rdkit.Chem.AllChem.EmbedMolecule", mock_allchem.EmbedMolecule), \
-             patch("rdkit.Chem.AllChem.ETKDGv3", mock_allchem.ETKDGv3), \
-             patch("rdkit.Chem.AllChem.MMFFOptimizeMolecule", mock_allchem.MMFFOptimizeMolecule):
+        with (
+            patch("dualdocking.validation.md_setup._run") as mock_run,
+            patch("rdkit.Chem.MolFromSmiles", mock_chem.MolFromSmiles),
+            patch("rdkit.Chem.AddHs", mock_chem.AddHs),
+            patch("rdkit.Chem.MolToMolFile"),
+            patch("rdkit.Chem.AllChem.EmbedMolecule", mock_allchem.EmbedMolecule),
+            patch("rdkit.Chem.AllChem.ETKDGv3", mock_allchem.ETKDGv3),
+            patch("rdkit.Chem.AllChem.MMFFOptimizeMolecule", mock_allchem.MMFFOptimizeMolecule),
+        ):
             mock_run.return_value = MagicMock(returncode=0)
             _parameterize_ligand("CCO", tmp_path, cmd_timeout=60)
 
@@ -971,25 +1067,22 @@ class TestParameterizeLigand:
         acpype_dir = tmp_path / "LIG.acpype"
         acpype_dir.mkdir()
         (acpype_dir / "LIG_GMX.itp").write_text("; test itp\n")
-        (acpype_dir / "LIG_GMX.gro").write_text(
-            "LIG\n 1\n    1LIG     C1    1   0.0   0.0   0.0\n   5.0   5.0   5.0\n"
-        )
+        (acpype_dir / "LIG_GMX.gro").write_text("LIG\n 1\n    1LIG     C1    1   0.0   0.0   0.0\n   5.0   5.0   5.0\n")
 
-        with patch("dualdocking.validation.md_setup._run") as mock_run, \
-             patch("rdkit.Chem.MolFromSmiles", mock_chem.MolFromSmiles), \
-             patch("rdkit.Chem.AddHs", mock_chem.AddHs), \
-             patch("rdkit.Chem.MolToMolFile"), \
-             patch("rdkit.Chem.AllChem.EmbedMolecule", mock_allchem.EmbedMolecule), \
-             patch("rdkit.Chem.AllChem.ETKDGv3", mock_allchem.ETKDGv3), \
-             patch("rdkit.Chem.AllChem.MMFFOptimizeMolecule", mock_allchem.MMFFOptimizeMolecule):
+        with (
+            patch("dualdocking.validation.md_setup._run") as mock_run,
+            patch("rdkit.Chem.MolFromSmiles", mock_chem.MolFromSmiles),
+            patch("rdkit.Chem.AddHs", mock_chem.AddHs),
+            patch("rdkit.Chem.MolToMolFile"),
+            patch("rdkit.Chem.AllChem.EmbedMolecule", mock_allchem.EmbedMolecule),
+            patch("rdkit.Chem.AllChem.ETKDGv3", mock_allchem.ETKDGv3),
+            patch("rdkit.Chem.AllChem.MMFFOptimizeMolecule", mock_allchem.MMFFOptimizeMolecule),
+        ):
             mock_run.return_value = MagicMock(returncode=0)
             _parameterize_ligand("CCO", tmp_path, cmd_timeout=60)
 
         # Check genrestr was called
-        genrestr_calls = [
-            c for c in mock_run.call_args_list
-            if len(c[0]) > 0 and "genrestr" in c[0][0]
-        ]
+        genrestr_calls = [c for c in mock_run.call_args_list if len(c[0]) > 0 and "genrestr" in c[0][0]]
         assert len(genrestr_calls) == 1
         assert genrestr_calls[0][1]["input_text"] == "0\n"
 
@@ -1009,10 +1102,12 @@ class TestParameterizeLigand:
         mock_allchem = MagicMock()
         mock_allchem.EmbedMolecule.return_value = -1  # failure
 
-        with patch("rdkit.Chem.MolFromSmiles", mock_chem.MolFromSmiles), \
-             patch("rdkit.Chem.AddHs", mock_chem.AddHs), \
-             patch("rdkit.Chem.AllChem.EmbedMolecule", mock_allchem.EmbedMolecule), \
-             patch("rdkit.Chem.AllChem.ETKDGv3", MagicMock()):
+        with (
+            patch("rdkit.Chem.MolFromSmiles", mock_chem.MolFromSmiles),
+            patch("rdkit.Chem.AddHs", mock_chem.AddHs),
+            patch("rdkit.Chem.AllChem.EmbedMolecule", mock_allchem.EmbedMolecule),
+            patch("rdkit.Chem.AllChem.ETKDGv3", MagicMock()),
+        ):
             with pytest.raises(RuntimeError, match="3D embedding failed"):
                 _parameterize_ligand("CCO", tmp_path, cmd_timeout=60)
 
@@ -1027,15 +1122,17 @@ class TestSetupSystem:
 
         cfg = MDConfig(pair_id="X", gpu_auto=False)
 
-        with patch("dualdocking.validation.md_setup._run") as mock_run, \
-             patch("dualdocking.validation.md_setup._merge_gro"), \
-             patch("dualdocking.validation.md_setup._patch_topology"), \
-             patch("dualdocking.validation.md_setup._write_ions_mdp"), \
-             patch("dualdocking.validation.md_setup._write_em_mdp"), \
-             patch("dualdocking.validation.md_setup._write_nvt_mdp"), \
-             patch("dualdocking.validation.md_setup._write_npt_mdp"), \
-             patch("dualdocking.validation.md_setup._write_prod_mdp"), \
-             patch("dualdocking.validation.md_setup._make_index") as mock_ndx:
+        with (
+            patch("dualdocking.validation.md_setup._run") as mock_run,
+            patch("dualdocking.validation.md_setup._merge_gro"),
+            patch("dualdocking.validation.md_setup._patch_topology"),
+            patch("dualdocking.validation.md_setup._write_ions_mdp"),
+            patch("dualdocking.validation.md_setup._write_em_mdp"),
+            patch("dualdocking.validation.md_setup._write_nvt_mdp"),
+            patch("dualdocking.validation.md_setup._write_npt_mdp"),
+            patch("dualdocking.validation.md_setup._write_prod_mdp"),
+            patch("dualdocking.validation.md_setup._make_index") as mock_ndx,
+        ):
             mock_run.return_value = MagicMock(returncode=0)
             mock_ndx.return_value = tmp_path / "index.ndx"
 
@@ -1049,10 +1146,7 @@ class TestSetupSystem:
             _setup_system(protein_pdb, acpype_dir, tmp_path, cfg)
 
         # Find the genion call
-        genion_calls = [
-            c for c in mock_run.call_args_list
-            if len(c[0]) > 0 and "genion" in c[0][0]
-        ]
+        genion_calls = [c for c in mock_run.call_args_list if len(c[0]) > 0 and "genion" in c[0][0]]
         assert len(genion_calls) == 1
         assert genion_calls[0][1]["input_text"] == "SOL\n"
 
@@ -1062,15 +1156,17 @@ class TestSetupSystem:
 
         cfg = MDConfig(pair_id="X", gpu_auto=False)
 
-        with patch("dualdocking.validation.md_setup._run") as mock_run, \
-             patch("dualdocking.validation.md_setup._merge_gro"), \
-             patch("dualdocking.validation.md_setup._patch_topology"), \
-             patch("dualdocking.validation.md_setup._write_ions_mdp"), \
-             patch("dualdocking.validation.md_setup._write_em_mdp"), \
-             patch("dualdocking.validation.md_setup._write_nvt_mdp"), \
-             patch("dualdocking.validation.md_setup._write_npt_mdp"), \
-             patch("dualdocking.validation.md_setup._write_prod_mdp"), \
-             patch("dualdocking.validation.md_setup._make_index") as mock_ndx:
+        with (
+            patch("dualdocking.validation.md_setup._run") as mock_run,
+            patch("dualdocking.validation.md_setup._merge_gro"),
+            patch("dualdocking.validation.md_setup._patch_topology"),
+            patch("dualdocking.validation.md_setup._write_ions_mdp"),
+            patch("dualdocking.validation.md_setup._write_em_mdp"),
+            patch("dualdocking.validation.md_setup._write_nvt_mdp"),
+            patch("dualdocking.validation.md_setup._write_npt_mdp"),
+            patch("dualdocking.validation.md_setup._write_prod_mdp"),
+            patch("dualdocking.validation.md_setup._make_index") as mock_ndx,
+        ):
             mock_run.return_value = MagicMock(returncode=0)
             mock_ndx.return_value = tmp_path / "index.ndx"
 
@@ -1084,10 +1180,7 @@ class TestSetupSystem:
             _setup_system(protein_pdb, acpype_dir, tmp_path, cfg)
 
         # Find the pdb2gmx call
-        pdb2gmx_calls = [
-            c for c in mock_run.call_args_list
-            if len(c[0]) > 0 and "pdb2gmx" in c[0][0]
-        ]
+        pdb2gmx_calls = [c for c in mock_run.call_args_list if len(c[0]) > 0 and "pdb2gmx" in c[0][0]]
         assert len(pdb2gmx_calls) == 1
         cmd = pdb2gmx_calls[0][0][0]
         assert "amber14sb" in cmd
@@ -1120,5 +1213,20 @@ class TestCLI:
 
         runner = CliRunner()
         with patch("shutil.which", return_value=None):
+            result = runner.invoke(main, ["--pair", "CDK2_ERK2"])
+        assert result.exit_code != 0
+
+    def test_missing_parmchk2_exits(self) -> None:
+        from click.testing import CliRunner
+
+        from cli.s9_md.run_md import main
+
+        def _which(tool: str) -> str | None:
+            if tool == "parmchk2":
+                return None
+            return f"/usr/bin/{tool}"
+
+        runner = CliRunner()
+        with patch("shutil.which", side_effect=_which):
             result = runner.invoke(main, ["--pair", "CDK2_ERK2"])
         assert result.exit_code != 0

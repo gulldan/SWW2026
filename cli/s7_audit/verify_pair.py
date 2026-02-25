@@ -1,10 +1,10 @@
-"""Verify target pair(s) from the HTML catalog against external APIs.
+"""Verify target pair(s) from pairs config (or legacy HTML catalog) against APIs.
 
 Thin CLI wrapper around :mod:`dualdocking.validation.pair_verify`.
 
 Examples::
 
-    uv run python cli/s7_audit/verify_pair.py --pair 1 --catalog target_pairs_catalog.html
+    uv run python cli/s7_audit/verify_pair.py --pair 1 --pairs-config configs/pairs.yaml
     uv run python cli/s7_audit/verify_pair.py --pair "EGFR/HER2" --verify-doi
     uv run python cli/s7_audit/verify_pair.py --all --verify-doi --output-json report/data/verify_all.json
 """
@@ -22,9 +22,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 @click.command()
-@click.option("--pair", default="", help="Pair number (int) or name (e.g. 'EGFR/HER2').")
-@click.option("--all", "all_pairs", is_flag=True, help="Verify all 50 pairs.")
-@click.option("--catalog", default="target_pairs_catalog.html", help="Path to HTML catalog.")
+@click.option("--pair", default="", help="Pair number (int) or name (e.g. 'EGFR/HER2' or 'EGFR_HER2').")
+@click.option("--all", "all_pairs", is_flag=True, help="Verify all pairs from selected source.")
+@click.option("--pairs-config", default="configs/pairs.yaml", help="Path to pairs.yaml (default source).")
+@click.option("--catalog", default="", help="Legacy HTML catalog path. If set, overrides --pairs-config.")
 @click.option("--uniprot-a", default="", help="UniProt ID for target A (sequence identity).")
 @click.option("--uniprot-b", default="", help="UniProt ID for target B (sequence identity).")
 @click.option("--domain-a", default="", help="Domain range for target A (e.g. '671-998').")
@@ -42,6 +43,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 def main(  # noqa: PLR0913
     pair: str,
     all_pairs: bool,
+    pairs_config: str,
     catalog: str,
     uniprot_a: str,
     uniprot_b: str,
@@ -58,8 +60,8 @@ def main(  # noqa: PLR0913
     cache_dir: str,
     no_cache: bool,
 ) -> None:
-    """Parse & verify target pair(s) from the HTML catalog."""
-    from dualdocking.validation.pair_verify import parse_catalog, set_cache_dir, verify_pair
+    """Parse & verify target pair(s) from pairs.yaml or legacy HTML catalog."""
+    from dualdocking.validation.pair_verify import parse_catalog, parse_pairs_yaml, set_cache_dir, verify_pair
 
     # --full enables all checks
     if full_check:
@@ -75,12 +77,31 @@ def main(  # noqa: PLR0913
         cache_path = PROJECT_ROOT / cache_dir if not Path(cache_dir).is_absolute() else Path(cache_dir)
         set_cache_dir(cache_path)
 
-    catalog_path = PROJECT_ROOT / catalog if not Path(catalog).is_absolute() else Path(catalog)
-    if not catalog_path.exists():
-        logger.error("Catalog not found: {}", catalog_path)
-        sys.exit(1)
-
-    pairs = parse_catalog(catalog_path)
+    pairs: list = []
+    if catalog:
+        catalog_path = PROJECT_ROOT / catalog if not Path(catalog).is_absolute() else Path(catalog)
+        if not catalog_path.exists():
+            logger.error("Catalog not found: {}", catalog_path)
+            sys.exit(1)
+        pairs = parse_catalog(catalog_path)
+        logger.info("Loaded {} pairs from legacy catalog {}", len(pairs), catalog_path)
+    else:
+        pairs_cfg_path = PROJECT_ROOT / pairs_config if not Path(pairs_config).is_absolute() else Path(pairs_config)
+        if pairs_cfg_path.exists():
+            pairs = parse_pairs_yaml(pairs_cfg_path)
+            logger.info("Loaded {} pairs from {}", len(pairs), pairs_cfg_path)
+        else:
+            fallback_catalog = PROJECT_ROOT / "target_pairs_catalog.html"
+            if fallback_catalog.exists():
+                logger.warning(
+                    "pairs config not found at {}. Falling back to legacy catalog {}.",
+                    pairs_cfg_path,
+                    fallback_catalog,
+                )
+                pairs = parse_catalog(fallback_catalog)
+            else:
+                logger.error("Pairs source not found: {} (and no fallback catalog)", pairs_cfg_path)
+                sys.exit(1)
 
     if not pair and not all_pairs:
         logger.error("Specify --pair <number|name> or --all")
@@ -98,11 +119,14 @@ def main(  # noqa: PLR0913
             sys.exit(1)
     else:
         # Match by name (case-insensitive, flexible separator)
-        query = pair.lower().replace("/", "").replace(" ", "").replace("_", "")
+        query = pair.lower().replace("/", "").replace(" ", "").replace("_", "").replace("-", "")
         for p in pairs:
-            key = f"{p.target_a}{p.target_b}".lower().replace("/", "").replace(" ", "").replace("_", "")
-            key_rev = f"{p.target_b}{p.target_a}".lower().replace("/", "").replace(" ", "").replace("_", "")
-            if query in (key, key_rev):
+            key = f"{p.target_a}{p.target_b}".lower().replace("/", "").replace(" ", "").replace("_", "").replace("-", "")
+            key_rev = (
+                f"{p.target_b}{p.target_a}".lower().replace("/", "").replace(" ", "").replace("_", "").replace("-", "")
+            )
+            family = p.target_family.lower().replace("/", "").replace(" ", "").replace("_", "").replace("-", "")
+            if query in (key, key_rev, family):
                 selected.append(p)
                 break
         if not selected:

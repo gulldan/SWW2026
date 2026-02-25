@@ -45,7 +45,7 @@ def main(  # noqa: PLR0913
 
     Selects the top-N molecules per mode from scored results, runs GROMACS
     MD for each molecule against both targets, and writes per-frame RMSD,
-    hydrogen bond, and interaction energy data.
+    hydrogen bond, and structural stability outputs.
     """
     if docker:
         from dualdocking.validation.md_docker import build_md_image, run_md_in_docker
@@ -76,7 +76,7 @@ def main(  # noqa: PLR0913
         sys.exit(result.returncode)
 
     # Check prerequisites (only when running locally)
-    for tool in ("gmx", "antechamber", "acpype", "obabel"):
+    for tool in ("gmx", "antechamber", "parmchk2", "acpype", "obabel"):
         if not shutil.which(tool):
             logger.error("{} not found in PATH. Install prerequisites first.", tool)
             sys.exit(1)

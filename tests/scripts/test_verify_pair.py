@@ -16,6 +16,7 @@ from dualdocking.validation.pair_verify import (
     fetch_uniprot_domains,
     nw_align,
     parse_catalog,
+    parse_pairs_yaml,
     resolve_chembl_from_uniprot,
     resolve_uniprot_from_pdb,
     select_domains_for_pair,
@@ -226,6 +227,7 @@ class TestCLI:
         assert result.exit_code == 0
         assert "--pair" in result.output
         assert "--catalog" in result.output
+        assert "--pairs-config" in result.output
 
     def test_parse_pair1(self, tmp_path):
         from click.testing import CliRunner
@@ -266,6 +268,124 @@ class TestCLI:
         assert "--full" in result.output
         assert "--verify-sequence" in result.output
         assert "--verify-chembl" in result.output
+
+
+class TestPairsYamlParsing:
+    def test_parse_pairs_yaml(self, tmp_path):
+        cfg = tmp_path / "pairs.yaml"
+        cfg.write_text(
+            """
+pairs:
+  EGFR_HER2:
+    set: core
+    similarity: "Very High (~80% kinase domain ID)"
+    selectivity_ratio: "Lapatinib: 1.2x"
+    ground_truth_drug: "Lapatinib"
+    description: "EGFR/HER2 dual inhibition"
+    target_a:
+      id: EGFR
+      organism: "Homo sapiens"
+      name: "Epidermal growth factor receptor"
+      pdb_id: 1XKK
+    target_b:
+      id: HER2
+      organism: "Homo sapiens"
+      name: "Receptor tyrosine kinase erbB-2"
+      pdb_id: 3PP0
+""".strip()
+        )
+        pairs = parse_pairs_yaml(cfg)
+
+        assert len(pairs) == 1
+        pair = pairs[0]
+        assert pair.pair_number == 1
+        assert pair.target_a == "EGFR"
+        assert pair.target_b == "HER2"
+        assert pair.similarity_level == "Very High"
+        assert pair.similarity_pct == "~80% kinase domain ID"
+        assert pair.doi == "https://www.rcsb.org/structure/3PP0"
+
+
+class TestUniprotOverridesByIdentity:
+    def test_no_number_based_override_for_unrelated_pair(self, monkeypatch):
+        monkeypatch.setattr("dualdocking.validation.pair_verify._CACHE_DIR", None)
+        monkeypatch.setattr(
+            "dualdocking.validation.pair_verify.resolve_uniprot_from_pdb",
+            lambda pdb_id: {"6N7B": ["P23458"], "3LXK": ["P52333"]}.get(pdb_id, []),
+        )
+        monkeypatch.setattr(
+            "dualdocking.validation.pair_verify._fetch_uniprot_fasta",
+            lambda uid: "ACDEFGHIKLMNPQRSTVWY",
+        )
+        monkeypatch.setattr(
+            "dualdocking.validation.pair_verify.fetch_uniprot_domains",
+            lambda uid: [],
+        )
+
+        pair = PairRecord(
+            pair_number=2,  # Old number-only override would incorrectly force CDK4 here
+            target_a="JAK1",
+            target_b="JAK3",
+            pdb_a="6N7B",
+            pdb_b="3LXK",
+            similarity_pct="84% active-site residue identity",
+        )
+        result = verify_pair(pair, do_sequence=True)
+        assert result["resolved_ids"]["uniprot_a"] == "P23458"
+        assert result["resolved_ids"]["uniprot_b"] == "P52333"
+
+    def test_override_applies_by_identity_not_number(self, monkeypatch):
+        monkeypatch.setattr("dualdocking.validation.pair_verify._CACHE_DIR", None)
+        monkeypatch.setattr(
+            "dualdocking.validation.pair_verify.resolve_uniprot_from_pdb",
+            lambda pdb_id: {"2W96": ["P24385"], "6OQO": ["Q00534"]}.get(pdb_id, []),
+        )
+        monkeypatch.setattr(
+            "dualdocking.validation.pair_verify._fetch_uniprot_fasta",
+            lambda uid: "ACDEFGHIKLMNPQRSTVWY",
+        )
+        monkeypatch.setattr(
+            "dualdocking.validation.pair_verify.fetch_uniprot_domains",
+            lambda uid: [],
+        )
+
+        pair = PairRecord(
+            pair_number=99,
+            target_a="CDK4",
+            target_b="CDK6",
+            pdb_a="2W96",
+            pdb_b="6OQO",
+            similarity_pct="~71% overall protein ID",
+        )
+        result = verify_pair(pair, do_sequence=True)
+        assert result["resolved_ids"]["uniprot_a"] == "P11802"
+
+    def test_adrb_override_applies(self, monkeypatch):
+        monkeypatch.setattr("dualdocking.validation.pair_verify._CACHE_DIR", None)
+        monkeypatch.setattr(
+            "dualdocking.validation.pair_verify.resolve_uniprot_from_pdb",
+            lambda pdb_id: {"7BVQ": ["D9IEF7"], "2RH1": ["P00720"]}.get(pdb_id, []),
+        )
+        monkeypatch.setattr(
+            "dualdocking.validation.pair_verify._fetch_uniprot_fasta",
+            lambda uid: "ACDEFGHIKLMNPQRSTVWY",
+        )
+        monkeypatch.setattr(
+            "dualdocking.validation.pair_verify.fetch_uniprot_domains",
+            lambda uid: [],
+        )
+
+        pair = PairRecord(
+            pair_number=11,
+            target_a="ADRB1",
+            target_b="ADRB2",
+            pdb_a="7BVQ",
+            pdb_b="2RH1",
+            similarity_pct="~70–80% orthosteric pocket",
+        )
+        result = verify_pair(pair, do_sequence=True)
+        assert result["resolved_ids"]["uniprot_a"] == "P08588"
+        assert result["resolved_ids"]["uniprot_b"] == "P07550"
 
 
 # ---------------------------------------------------------------------------
@@ -694,13 +814,109 @@ class TestSelectDomainsForPair:
 
     def test_active_site_returns_empty(self):
         pair = PairRecord(
-            pair_number=33, target_a="JAK1", target_b="JAK3",
+            pair_number=33, target_a="BRAF", target_b="RAF1",
             similarity_pct="84% active-site residue identity",
         )
-        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "P23458", "P52333")
+        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "P15056", "P04049")
         assert ra == ""
         assert rb == ""
         assert dtype == "active-site"
+
+    def test_jak_pair_override_returns_jh1(self):
+        pair = PairRecord(
+            pair_number=34, target_a="JAK1", target_b="JAK3",
+            similarity_pct="84% active-site residue identity; unique JAK3 Cys909",
+        )
+        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "P23458", "P52333")
+        assert ra == "875-1153"
+        assert rb == "822-1111"
+        assert na == "Protein kinase 2/JH1"
+        assert nb == "Protein kinase 2/JH1"
+        assert dtype == "kinase"
+
+    def test_cdk_pair_override_returns_kinase_domain(self):
+        pair = PairRecord(
+            pair_number=35, target_a="CDK4", target_b="CDK6",
+            similarity_pct="~71% overall protein ID",
+        )
+        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "P11802", "Q00534")
+        assert ra == "6-295"
+        assert rb == "13-300"
+        assert na == "Protein kinase"
+        assert nb == "Protein kinase"
+        assert dtype == "kinase"
+
+    def test_adrb_pair_override_returns_7tm(self):
+        pair = PairRecord(
+            pair_number=36, target_a="ADRB1", target_b="ADRB2",
+            similarity_pct="~70-80% orthosteric pocket (beta1/beta2 highly conserved)",
+        )
+        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "P08588", "P07550")
+        assert ra == "58-377"
+        assert rb == "30-326"
+        assert na == "7TM bundle"
+        assert nb == "7TM bundle"
+        assert dtype == "GPCR"
+
+    def test_ca_pair_override_returns_alpha_ca_domain(self):
+        pair = PairRecord(
+            pair_number=37, target_a="CA1", target_b="CA2",
+            similarity_pct="Zn active site highly conserved (CA isoforms)",
+        )
+        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "P00915", "P00918")
+        assert ra == "4-261"
+        assert rb == "3-259"
+        assert na == "Alpha-carbonic anhydrase"
+        assert nb == "Alpha-carbonic anhydrase"
+        assert dtype == "catalytic"
+
+    def test_hdac_pair_override_returns_hdac_domain(self):
+        pair = PairRecord(
+            pair_number=38, target_a="HDAC2", target_b="HDAC8",
+            similarity_pct="~55-60% catalytic Zn pocket residues conserved",
+        )
+        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "Q92769", "Q9BY41")
+        assert ra == "9-322"
+        assert rb == "14-324"
+        assert na == "Histone deacetylase"
+        assert nb == "Histone deacetylase"
+        assert dtype == "HDAC"
+
+    def test_idh_pair_override_returns_mature_chain_ranges(self):
+        pair = PairRecord(
+            pair_number=39, target_a="IDH1", target_b="IDH2",
+            similarity_pct="72% overall protein",
+        )
+        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "O75874", "P48735")
+        assert ra == "2-414"
+        assert rb == "40-452"
+        assert na == "Mature chain"
+        assert nb == "Mature chain"
+        assert dtype == "overall"
+
+    def test_ache_bche_override_returns_mature_chain_ranges(self):
+        pair = PairRecord(
+            pair_number=40, target_a="AChE", target_b="BChE",
+            similarity_pct="~65% overall seq",
+        )
+        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "P22303", "P06276")
+        assert ra == "32-614"
+        assert rb == "29-602"
+        assert na == "Mature cholinesterase chain"
+        assert nb == "Mature cholinesterase chain"
+        assert dtype == "overall"
+
+    def test_mao_pair_override_returns_mature_chain_ranges(self):
+        pair = PairRecord(
+            pair_number=41, target_a="MAO-A", target_b="MAO-B",
+            similarity_pct="~70% overall seq",
+        )
+        ra, rb, na, nb, dtype = select_domains_for_pair(pair, "P21397", "P27338")
+        assert ra == "1-527"
+        assert rb == "2-520"
+        assert na == "Mature chain"
+        assert nb == "Mature chain"
+        assert dtype == "overall"
 
     def test_polyprotein_domain_override(self, monkeypatch):
         monkeypatch.setattr("dualdocking.validation.pair_verify._CACHE_DIR", None)
