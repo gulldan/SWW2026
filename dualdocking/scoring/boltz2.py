@@ -501,7 +501,7 @@ def _nim_predict_affinity(sequence: str, smiles: str) -> float:
 
 
 def _parse_nim_affinity(result: dict[str, Any], smiles: str) -> float:
-    return _helpers.parse_nim_affinity(result, smiles, log=logger)
+    return _helpers.parse_nim_affinity(result, smiles)
 
 
 async def _nim_predict_batch_async(

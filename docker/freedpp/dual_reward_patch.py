@@ -42,12 +42,12 @@ def _write_reward_metadata(*, path: Path | None = None) -> None:
         path: Explicit output path.  When ``None`` (default / production),
               uses the ``REWARD_METADATA_PATH`` environment variable.
     """
-    _state._write_reward_metadata(path=path)
+    _state._write_reward_metadata(path=path)  # noqa: SLF001
 
 
 def _apply_dual_patch() -> None:
     """Monkey-patch DockingVina for dual-target reward calculation."""
-    _hooks._apply_dual_patch()
+    _hooks._apply_dual_patch()  # noqa: SLF001
 
 
 def __getattr__(name: str) -> object:

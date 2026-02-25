@@ -19,12 +19,15 @@ Usage::
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import click
 from loguru import logger
 
 from dualdocking.pipeline import PipelineConfig, PipelineRunner, StageTask, checks, stages
+from dualdocking.pipeline.core import detect_gpu_count
+from dualdocking.pipeline.executor import TaskExecutor
 
 
 @click.command()
@@ -34,6 +37,8 @@ from dualdocking.pipeline import PipelineConfig, PipelineRunner, StageTask, chec
 @click.option("--seeds", default=None, help="Comma-separated seed list")
 @click.option("--molecules", default=None, type=click.Path(exists=True), help="Molecule file for scoring")
 @click.option("--latex-mode", type=click.Choice(["off", "draft", "full"]), default="off")
+@click.option("--parallel", default=0, type=int, help="Parallel tasks for GPU stages. 0 = auto-detect (# GPUs).")
+@click.option("--resume", is_flag=True, default=False, help="Skip stage tasks when expected outputs already exist.")
 @click.option("--dry-run", is_flag=True, help="Show what would be run without executing")
 @click.option("--skip-preflight/--no-skip-preflight", default=False, help="Skip input checks")
 def main(
@@ -43,6 +48,8 @@ def main(
     seeds: str | None,
     molecules: str | None,
     latex_mode: str,
+    parallel: int,
+    resume: bool,
     dry_run: bool,
     skip_preflight: bool,
 ) -> None:
@@ -62,6 +69,10 @@ def main(
             scoring stage.
         latex_mode: LaTeX compilation mode (``"off"``, ``"draft"``, or
             ``"full"``).
+        parallel: Number of concurrent task workers for task-based stages.
+            ``0`` auto-detects from visible GPUs.
+        resume: Skip per-task stage execution when expected outputs already
+            exist.
         dry_run: If ``True``, log what would be run without executing.
         skip_preflight: If ``True``, skip prerequisite input checks before
             each stage.
@@ -105,6 +116,8 @@ def main(
         logger.info("  Pair filter: {}", pair or "all")
         logger.info("  Seed filter: {}", seeds or "all")
         logger.info("  Total tasks (for generate/score): {}", len(tasks))
+        logger.info("  Parallel workers: {}", _resolve_parallel(parallel))
+        logger.info("  Resume mode: {}", resume)
         return
 
     # Create runner
@@ -133,9 +146,20 @@ def main(
         elif stage == "calibrate":
             runner.run_stage_calibrate()
         elif stage == "generate":
-            _run_generate_stage(runner, tasks)
+            _run_generate_stage(
+                runner,
+                tasks,
+                parallel=_resolve_parallel(parallel),
+                resume=resume,
+            )
         elif stage == "score":
-            _run_score_stage(runner, tasks, molecules)
+            _run_score_stage(
+                runner,
+                tasks,
+                molecules,
+                parallel=_resolve_parallel(parallel),
+                resume=resume,
+            )
         elif stage == "analyze":
             runner.run_stage_analyze()
         elif stage == "report":
@@ -143,7 +167,12 @@ def main(
         elif stage == "audit":
             runner.run_stage_audit()
         elif stage == "gnina":
-            _run_gnina_stage(runner, tasks)
+            _run_gnina_stage(
+                runner,
+                tasks,
+                parallel=_resolve_parallel(parallel),
+                resume=resume,
+            )
         elif stage == "md":
             _run_md_stage(runner, tasks)
 
@@ -152,23 +181,97 @@ def main(
     logger.info("All selected stages completed successfully")
 
 
-def _run_generate_stage(runner: PipelineRunner, tasks: list[StageTask]) -> None:
+def _resolve_parallel(parallel: int) -> int:
+    """Resolve worker count from CLI value."""
+    return detect_gpu_count() if parallel <= 0 else max(1, parallel)
+
+
+def _task_has_stem_output(task: StageTask, project_root: Path, stem_name: str) -> bool:
+    """Return whether a task run directory has a stem output (parquet/csv)."""
+    from dualdocking.data.io_utils import stem_exists
+
+    run_dir = task.run_dir(project_root)
+    return stem_exists(run_dir / stem_name)
+
+
+def _run_task_stage(
+    runner: PipelineRunner,
+    tasks: list[StageTask],
+    *,
+    stage_label: str,
+    log_path: Path,
+    parallel: int,
+    build_cmd_fn: Callable[[StageTask], list[str]],
+) -> None:
+    """Run per-task stage commands sequentially or with GPU-aware parallelism."""
+    if not tasks:
+        logger.info("No tasks to run for stage '{}'", stage_label)
+        return
+
+    if parallel <= 1:
+        for task in tasks:
+            runner.run_cmd(build_cmd_fn(task), log_path, gpu_id=0)
+        return
+
+    n_gpus = detect_gpu_count()
+    executor = TaskExecutor(n_gpus=n_gpus, max_workers=parallel)
+
+    def _task_fn(task: StageTask, gpu_id: int | None) -> None:
+        runner.run_cmd(build_cmd_fn(task), log_path, gpu_id=gpu_id)
+
+    n_completed, n_failed = executor.execute(tasks, _task_fn)
+    logger.info(
+        "Stage '{}' task summary: {} completed, {} failed ({} total)",
+        stage_label,
+        n_completed,
+        n_failed,
+        len(tasks),
+    )
+    if n_failed > 0:
+        msg = f"Stage '{stage_label}' failed for {n_failed} task(s)"
+        raise RuntimeError(msg)
+
+
+def _run_generate_stage(
+    runner: PipelineRunner,
+    tasks: list[StageTask],
+    *,
+    parallel: int,
+    resume: bool,
+) -> None:
     """Run generate stage for all tasks.
 
     Args:
         runner: Pipeline runner instance.
         tasks: List of tasks to execute.
+        parallel: Number of concurrent workers.
+        resume: Skip task if ``generated`` already exists.
     """
     log_path = runner.get_log_path("generate")
-    for task in tasks:
-        cmd = stages.build_generate_command(task)
-        runner.run_cmd(cmd, log_path)
+    run_tasks = tasks
+    if resume:
+        run_tasks = [task for task in tasks if not _task_has_stem_output(task, runner.config.project_root, "generated")]
+        skipped = len(tasks) - len(run_tasks)
+        if skipped > 0:
+            logger.info("[RESUME] generate: skipped {} task(s) with existing outputs", skipped)
+
+    _run_task_stage(
+        runner,
+        run_tasks,
+        stage_label="generate",
+        log_path=log_path,
+        parallel=parallel,
+        build_cmd_fn=stages.build_generate_command,
+    )
 
 
 def _run_score_stage(
     runner: PipelineRunner,
     tasks: list[StageTask],
     molecules: str | None,
+    *,
+    parallel: int,
+    resume: bool,
 ) -> None:
     """Run score stage for all tasks.
 
@@ -176,24 +279,66 @@ def _run_score_stage(
         runner: Pipeline runner instance.
         tasks: List of tasks to execute.
         molecules: Optional path to external molecule file.
+        parallel: Number of concurrent workers.
+        resume: Skip task if ``scored_joined`` already exists.
     """
     log_path = runner.get_log_path("score")
-    for task in tasks:
-        cmd = stages.build_score_command(task, molecules=molecules)
-        runner.run_cmd(cmd, log_path)
+    run_tasks = tasks
+    if resume and molecules is None:
+        run_tasks = [task for task in tasks if not _task_has_stem_output(task, runner.config.project_root, "scored_joined")]
+        skipped = len(tasks) - len(run_tasks)
+        if skipped > 0:
+            logger.info("[RESUME] score: skipped {} task(s) with existing outputs", skipped)
+    elif resume and molecules is not None:
+        logger.warning("--resume is ignored for score stage when --molecules override is set")
+
+    _run_task_stage(
+        runner,
+        run_tasks,
+        stage_label="score",
+        log_path=log_path,
+        parallel=parallel,
+        build_cmd_fn=lambda task: stages.build_score_command(task, molecules=molecules),
+    )
 
 
-def _run_gnina_stage(runner: PipelineRunner, tasks: list[StageTask]) -> None:
+def _run_gnina_stage(
+    runner: PipelineRunner,
+    tasks: list[StageTask],
+    *,
+    parallel: int,
+    resume: bool,
+) -> None:
     """Run GNINA cross-validation for all tasks.
 
     Args:
         runner: Pipeline runner instance.
         tasks: List of tasks to execute.
+        parallel: Number of concurrent workers.
+        resume: Skip task if GNINA outputs already exist for both targets.
     """
     log_path = runner.get_log_path("gnina")
-    for task in tasks:
-        cmd = stages.build_gnina_command(task)
-        runner.run_cmd(cmd, log_path)
+    run_tasks = tasks
+    if resume:
+        from dualdocking.data.io_utils import stem_exists
+
+        def _has_gnina(task: StageTask) -> bool:
+            run_dir = task.run_dir(runner.config.project_root)
+            return stem_exists(run_dir / "gnina_scores_A") and stem_exists(run_dir / "gnina_scores_B")
+
+        run_tasks = [task for task in tasks if not _has_gnina(task)]
+        skipped = len(tasks) - len(run_tasks)
+        if skipped > 0:
+            logger.info("[RESUME] gnina: skipped {} task(s) with existing outputs", skipped)
+
+    _run_task_stage(
+        runner,
+        run_tasks,
+        stage_label="gnina",
+        log_path=log_path,
+        parallel=parallel,
+        build_cmd_fn=stages.build_gnina_command,
+    )
 
 
 def _run_md_stage(runner: PipelineRunner, tasks: list[StageTask]) -> None:

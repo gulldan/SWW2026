@@ -6,7 +6,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import numpy as np
 from loguru import logger
@@ -243,7 +243,7 @@ def parse_nim_affinity(
     result: dict[str, Any],
     smiles: str,
     *,
-    log: _WarnLogger = logger,
+    log: _WarnLogger | None = None,
 ) -> float:
     """Extract averaged NIM affinity from response payload.
 
@@ -255,10 +255,11 @@ def parse_nim_affinity(
     Returns:
         Mean affinity score, or NaN on parse failures.
     """
+    active_log = log if log is not None else cast("_WarnLogger", logger)
     try:
         affinities = result["affinities"]["B"]
         pred_values = affinities["affinity_pred_value"]
         return float(np.mean(pred_values))
     except (KeyError, TypeError, IndexError) as exc:
-        log.error(f"Failed to parse NIM affinity for SMILES {smiles}: {exc}")
+        active_log.error(f"Failed to parse NIM affinity for SMILES {smiles}: {exc}")
         return float("nan")

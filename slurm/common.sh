@@ -25,3 +25,9 @@ mkdir -p "$DD_LOG_DIR"
 
 # ── Container runtime (docker or apptainer) ─────────────────────────
 export DD_CONTAINER_RUNTIME="${DD_CONTAINER_RUNTIME:-docker}"
+
+# ── Boltz-2 NIM lifecycle mode ───────────────────────────────────────
+# auto: follow scorer.backend in configs/experiment.yaml
+# 0: do not manage local NIM containers in sbatch jobs
+# 1: start/stop local NIM containers in score stages
+export DD_USE_NIM="${DD_USE_NIM:-auto}"

@@ -10,9 +10,13 @@
 #SBATCH --output=%x_%j.out
 source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 
-# Detect GPU count from SLURM allocation
-N_GPUS="${SLURM_GPUS_ON_NODE:-$(echo "$CUDA_VISIBLE_DEVICES" | tr ',' '\n' | wc -l)}"
+# Detect GPU count from effective visibility inside allocation
+N_GPUS=$(uv run python - <<'PY'
+from dualdocking.pipeline.core import detect_gpu_count
+print(detect_gpu_count())
+PY
+)
 
 echo "[$(date -u)] START generate (s3)  job=$SLURM_JOB_ID  gpus=$N_GPUS"
-uv run python cli/pipeline/run_stages.py --stages generate --skip-preflight
+uv run python cli/pipeline/run_stages.py --stages generate --skip-preflight --parallel "$N_GPUS" --resume
 echo "[$(date -u)] DONE  generate (s3)  job=$SLURM_JOB_ID"

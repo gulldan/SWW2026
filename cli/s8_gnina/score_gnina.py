@@ -350,8 +350,16 @@ def main(
     targets_dir = PROJECT_ROOT / "output" / "data" / "targets" / pair
     target_a_id = pair_cfg["target_a"]["id"]
     target_b_id = pair_cfg["target_b"]["id"]
-    pdb_a = targets_dir / "A" / f"{pair_cfg['target_a']['pdb']}.pdb"
-    pdb_b = targets_dir / "B" / f"{pair_cfg['target_b']['pdb']}.pdb"
+
+    def _target_pdb_id(target_cfg: dict) -> str:
+        pdb_id = target_cfg.get("pdb_id", target_cfg.get("pdb"))
+        if not pdb_id:
+            logger.error("Target config missing 'pdb_id' field: {}", target_cfg)
+            sys.exit(1)
+        return str(pdb_id)
+
+    pdb_a = targets_dir / "A" / f"{_target_pdb_id(pair_cfg['target_a'])}.pdb"
+    pdb_b = targets_dir / "B" / f"{_target_pdb_id(pair_cfg['target_b'])}.pdb"
 
     for pdb, tid in [(pdb_a, target_a_id), (pdb_b, target_b_id)]:
         if not pdb.exists():
@@ -359,12 +367,28 @@ def main(
             sys.exit(1)
 
     # Resolve binding box from pairs.yaml (if available)
-    def _get_box(target_cfg: dict) -> tuple[tuple[float, ...] | None, tuple[float, ...] | None]:
+    def _to_xyz(values: object) -> tuple[float, float, float] | None:
+        if not isinstance(values, (list, tuple)) or len(values) != 3:
+            return None
+        x_raw, y_raw, z_raw = values
+        if not isinstance(x_raw, (int, float)):
+            return None
+        if not isinstance(y_raw, (int, float)):
+            return None
+        if not isinstance(z_raw, (int, float)):
+            return None
+        try:
+            return (float(x_raw), float(y_raw), float(z_raw))
+        except (TypeError, ValueError):
+            return None
+
+    def _get_box(target_cfg: dict) -> tuple[tuple[float, float, float] | None, tuple[float, float, float] | None]:
         box = target_cfg.get("box", {})
-        if "center" in box and "size" in box:
-            c = box["center"]
-            s = box["size"]
-            return tuple(c), tuple(s)
+        if isinstance(box, dict):
+            center = _to_xyz(box.get("center"))
+            size = _to_xyz(box.get("size"))
+            if center is not None and size is not None:
+                return center, size
         return None, None
 
     center_a, size_a = _get_box(pair_cfg["target_a"])

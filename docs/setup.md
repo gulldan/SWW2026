@@ -400,6 +400,10 @@ module load apptainer/1.3
 
 # Set container runtime if Docker is not available
 export DD_CONTAINER_RUNTIME=apptainer
+
+# Optional: force NIM lifecycle behavior in score jobs
+# DD_USE_NIM=auto (default), 1 (always), 0 (never)
+# export DD_USE_NIM=1
 ```
 
 Edit partition names and resource requests in `slurm/{monolithic,array}/*.sbatch`

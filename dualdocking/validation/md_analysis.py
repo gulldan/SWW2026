@@ -343,7 +343,8 @@ def _analyze_trajectory(
         logger.warning("gmx sasa failed — skipping")
         sasa_df = pd.DataFrame(columns=["time_ns", "sasa_A2"])
     sasa_df[["time_ns", "sasa_A2"] if "sasa_A2" in sasa_df.columns else list(sasa_df.columns)].to_csv(
-        out_dir / "sasa.csv", index=False,
+        out_dir / "sasa.csv",
+        index=False,
     )
 
     # ── PCA (covariance analysis) ─────────────────────────────────

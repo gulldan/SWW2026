@@ -283,10 +283,10 @@ Bypass: `DUALDOCKING_ALLOW_NON_HUMAN=true`.
 ## SLURM Integration
 
 For HPC clusters, `slurm/` provides shell-only integration with **zero changes
-to Python code**. Two strategies:
+to core computation modules**. Two strategies:
 
-- **Monolithic** (`slurm/monolithic/`): single node, N GPUs — wraps
-  `run_full_experiment.py --parallel N`
+- **Monolithic** (`slurm/monolithic/`): single node, N GPUs — runs stage
+  runner with per-task parallelism (`run_stages.py --parallel N`) for s3/s4
 - **Array** (`slurm/array/`): multi-node — each array element runs one
   (pair, mode, seed) task via `generate.py` + `score.py`
 
@@ -294,8 +294,9 @@ to Python code**. Two strategies:
 the same `PipelineConfig.generate_tasks()` as the Python orchestrator. This
 guarantees identical task ordering.
 
-Both strategies submit a 6-stage SLURM dependency chain matching the pipeline
-stages: fetch → calibrate → gen+score → analyze → report + audit.
+Both strategies submit the full SLURM dependency chain:
+fetch → prepare → calibrate → generate → score → analyze → report/audit,
+with optional gnina/md branches after score.
 
 See [`pipeline.md`](pipeline.md#slurm-cluster-execution) for usage.
 

@@ -649,8 +649,8 @@ For HPC clusters with SLURM workload manager. Two strategies are provided in
 
 | Strategy | When to use | Parallelism |
 |----------|-------------|-------------|
-| **Monolithic** (`slurm/monolithic/`) | DGX / multi-GPU workstation | 1 node, N GPUs via `--parallel` |
-| **Array** (`slurm/array/`) | HPC cluster, many nodes | 1 GPU per task, up to 180 array elements |
+| **Monolithic** (`slurm/monolithic/`) | DGX / multi-GPU workstation | 1 node, N GPUs (task parallelism via `run_stages.py --parallel`) |
+| **Array** (`slurm/array/`) | HPC cluster, many nodes | 1 GPU per task; array size from `slurm/task_matrix.py --count` (currently 150) |
 
 ### Quick Start
 
@@ -702,23 +702,30 @@ Enable optional stages with `--with-gnina` and/or `--with-md`:
 slurm/array/submit.sh --with-gnina --with-md
 ```
 
-In the array strategy, GNINA runs as a 180-element array (same task matrix as
-generate), while MD runs as a 12-element array (one per active pair).
+In the array strategy, GNINA runs as a full task array (same matrix as
+generate/score), while MD runs as one task per active pair (`--pair-count`).
 
 ### Task Matrix (Array Strategy)
 
 Each array element maps to a single (pair, mode, seed) combination:
 
 ```bash
-# Total task count (12 active pairs × 3 modes × 5 seeds = 180)
+# Total task count (active pairs × modes × seeds; currently 10 × 3 × 5 = 150)
 uv run python slurm/task_matrix.py --count
+
+# Active pair count (used by MD array stage)
+uv run python slurm/task_matrix.py --pair-count
 
 # Print full mapping
 uv run python slurm/task_matrix.py --list
 
 # Single task lookup (used inside sbatch)
 uv run python slurm/task_matrix.py --index 0 --format env
-# -> export TASK_PAIR=CDK2_ERK2 TASK_MODE=single_a TASK_SEED=42
+# -> export TASK_PAIR=EGFR_HER2 TASK_MODE=single_a TASK_SEED=42
+
+# Pair lookup by index (used by array MD stage)
+uv run python slurm/task_matrix.py --pair-index 0 --format env
+# -> export TASK_PAIR=EGFR_HER2
 ```
 
 `task_matrix.py` uses the same `PipelineConfig.generate_tasks()` as the Python
@@ -739,16 +746,25 @@ makes retry idempotent — completed tasks are skipped at no cost.
 
 ### NIM on Compute Nodes
 
-To use Boltz-2 NIM containers on SLURM compute nodes, set `DD_USE_NIM=1`:
+`DD_USE_NIM` defaults to `auto` in `slurm/common.sh`:
+
+- if `scorer.backend=nim` in `configs/experiment.yaml`, score stages start local
+  NIM container(s) automatically;
+- if backend is not `nim`, NIM lifecycle is skipped.
+
+Force behavior explicitly when needed:
 
 ```bash
+# Always manage local NIM containers in score stages
 DD_USE_NIM=1 slurm/monolithic/submit.sh
 DD_USE_NIM=1 slurm/array/submit.sh
+
+# Never manage local NIM containers (expect external NIM if backend=nim)
+DD_USE_NIM=0 slurm/array/submit.sh
 ```
 
-This sources `slurm/nim/lifecycle.sh`, which starts NIM containers before
-generation and stops them on exit. Requires Docker access on compute nodes
-and `NGC_API_KEY` in environment.
+NIM lifecycle is implemented in `slurm/nim/lifecycle.sh` and runs only in score
+stages (`s4`). Requires Docker access on compute nodes and `NGC_API_KEY`.
 
 ### Shared Filesystem & Caching
 
@@ -766,8 +782,8 @@ All SLURM scripts inherit from `slurm/common.sh`:
 | `EXPERIMENT_RUN_ID` | `slurm_<timestamp>` | Shared run ID across all jobs |
 | `DD_LOG_DIR` | `$DD_ROOT/slurm/logs/$EXPERIMENT_RUN_ID` | Log directory |
 | `DD_CONTAINER_RUNTIME` | `docker` | Container runtime (`docker` or `apptainer`) |
-| `DD_USE_NIM` | `0` | Enable NIM Boltz-2 containers |
-| `DD_LATEX_MODE` | `draft` | LaTeX report mode (`off`, `draft`, `full`) |
+| `DD_USE_NIM` | `auto` | NIM lifecycle mode: `auto`, `0`, or `1` |
+| `DD_LATEX_MODE` | `off` | LaTeX report mode (`off`, `draft`, `full`) |
 
 ### Customization
 

@@ -12,7 +12,7 @@
 #   slurm/array/submit.sh --skip-fetch            # skip fetch + prepare stages
 #   slurm/array/submit.sh --max-concurrent=4      # limit concurrent array tasks
 #   slurm/array/submit.sh --with-gnina            # add GNINA cross-validation
-#   slurm/array/submit.sh --with-md               # add MD validation (12 array tasks, per pair)
+#   slurm/array/submit.sh --with-md               # add MD validation (1 array task per active pair)
 #   slurm/array/submit.sh --with-gnina --with-md  # add both
 #
 # Retry failed tasks:
@@ -40,13 +40,14 @@ done
 TASK_COUNT=$(uv run python slurm/task_matrix.py --count)
 MAX_INDEX=$((TASK_COUNT - 1))
 # Number of active pairs (for MD array)
-N_PAIRS=12
+PAIR_COUNT=$(uv run python slurm/task_matrix.py --pair-count)
 
 echo "=== DualDocking SLURM chain (array) ==="
 echo "  Project root   : $DD_ROOT"
 echo "  Run ID         : $EXPERIMENT_RUN_ID"
 echo "  Log directory  : $DD_LOG_DIR"
 echo "  Total tasks    : $TASK_COUNT"
+echo "  Active pairs   : $PAIR_COUNT"
 echo "  Max concurrent : $MAX_CONCURRENT"
 echo "  GNINA          : $([ "$WITH_GNINA" == 1 ] && echo yes || echo no)"
 echo "  MD             : $([ "$WITH_MD" == 1 ] && echo yes || echo no)"
@@ -114,7 +115,7 @@ fi
 # Optional: MD validation (array job, 1 per pair, depends on score)
 MD_JOB=""
 if [[ "$WITH_MD" == "1" ]]; then
-    MD_MAX=$((N_PAIRS - 1))
+    MD_MAX=$((PAIR_COUNT - 1))
     MD_JOB=$(sbatch --parsable --export=ALL \
         --dependency=afterok:"$SCORE_JOB" \
         --array="0-${MD_MAX}%4" \

@@ -9,7 +9,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --requeue
 #SBATCH --output=%x_%A_%a.out
-# --array is set at submit time by submit.sh (e.g. --array=0-179%8)
+# --array is set at submit time by submit.sh (e.g. --array=0-149%8)
 source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 
 # Resolve (pair, mode, seed) from array index

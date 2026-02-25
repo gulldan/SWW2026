@@ -363,15 +363,14 @@ def plot_pca_variance(targets: dict[str, Path], out_dir: Path) -> None:
         top = df.head(10).copy()
         top["variance_pct"] = top["eigenvalue"] / total * 100
         x = np.arange(len(top))
-        ax.bar(x + i * bar_width, top["variance_pct"], bar_width,
-               color=color, alpha=0.8, label=f"{target_name}")
+        ax.bar(x + i * bar_width, top["variance_pct"], bar_width, color=color, alpha=0.8, label=f"{target_name}")
         has_data = True
 
     if has_data:
         ax.set_xlabel("Principal Component")
         ax.set_ylabel("Variance (%)")
         ax.set_xticks(np.arange(10) + bar_width / 2)
-        ax.set_xticklabels([f"PC{j+1}" for j in range(10)])
+        ax.set_xticklabels([f"PC{j + 1}" for j in range(10)])
         ax.legend(frameon=False)
 
     _add_panel_labels(fig, [ax], ["I"])
@@ -408,9 +407,7 @@ def render_summary_table(targets: dict[str, Path], out_dir: Path) -> None:
                     else "\u2014"
                 ),
                 "PC1 var (%)": (
-                    f"{r['pca_pc1_variance']:.1f}"
-                    if not np.isnan(r.get("pca_pc1_variance", float("nan")))
-                    else "\u2014"
+                    f"{r['pca_pc1_variance']:.1f}" if not np.isnan(r.get("pca_pc1_variance", float("nan"))) else "\u2014"
                 ),
             }
         )

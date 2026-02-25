@@ -480,21 +480,14 @@ def run_freedpp(  # noqa: PLR0913
                     )
 
                 # Collect reward for early stopping
-                metrics = {
-                    m.group("key").lower(): float(m.group("value"))
-                    for m in _METRIC_RE.finditer(stripped)
-                }
+                metrics = {m.group("key").lower(): float(m.group("value")) for m in _METRIC_RE.finditer(stripped)}
                 if "reward" in metrics:
                     reward_history.append(metrics["reward"])
                 elif "score" in metrics:
                     reward_history.append(metrics["score"])
 
                 # Check early stopping convergence
-                if (
-                    es_patience > 0
-                    and len(reward_history) >= es_min_epochs
-                    and len(reward_history) >= es_patience
-                ):
+                if es_patience > 0 and len(reward_history) >= es_min_epochs and len(reward_history) >= es_patience:
                     window = reward_history[-es_patience:]
                     mean_val = sum(window) / len(window)
                     range_val = max(window) - min(window)

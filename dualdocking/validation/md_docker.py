@@ -190,8 +190,8 @@ def run_md_in_docker(  # noqa: PLR0913
     result = subprocess.run(  # noqa: S603
         cmd,
         cwd=str(project_root),
-        stdout=None,
-        stderr=None,
+        capture_output=True,
+        text=True,
         timeout=timeout,
         check=False,
     )
