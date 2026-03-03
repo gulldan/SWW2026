@@ -1,0 +1,162 @@
+\documentclass[journal=jcim,manuscript=article]{achemso}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{xcolor}
+
+\title{ {{ title }} }
+\author{ {{ author }} }
+\affiliation{ {{ affiliation | default('SWW2026 Workshop') }} }
+{% if email %}
+\email{ {{ email }} }
+{% endif %}
+
+\abbreviations{RL, FREED++, UniDock, GNINA, QED, SA, PAINS, ADMET, FDR, AUROC, BEDROC}
+\keywords{ {{ keyword_text | default('dual-target docking, molecular generation, FREED++, Boltz-2, reproducibility') }} }
+
+{% macro fmt(val, nd=3) -%}
+{%- if val is number -%}
+{{ ('%.' ~ nd ~ 'f') % val }}
+{%- else -%}
+-
+{%- endif -%}
+{%- endmacro %}
+
+{% macro pval(val) -%}
+{%- if val is number -%}
+{%- if val < 0.0001 -%}
+<1e-4
+{%- else -%}
+{{ '%.4f' % val }}
+{%- endif -%}
+{%- else -%}
+-
+{%- endif -%}
+{%- endmacro %}
+
+\begin{document}
+
+\begin{abstract}
+{% if abstract_text %}
+{{ abstract_text }}
+{% else %}
+This manuscript reports a reproducible comparison of single-target and dual-target molecular generation
+under a common docking-driven evaluation protocol.
+{% endif %}
+\end{abstract}
+
+{% for section in sections %}
+\section{ {{ section.title }} }
+{% if section.content %}
+{{ section.content }}
+{% else %}
+This section is intentionally left as a placeholder.
+{% endif %}
+{% endfor %}
+
+\section{Quantitative Results}
+{% if metric_rows %}
+\subsection{Primary Metrics Across Pairs and Modes}
+\begin{longtable}{p{0.18\linewidth} p{0.10\linewidth} p{0.15\linewidth} p{0.15\linewidth} p{0.15\linewidth} p{0.15\linewidth}}
+\toprule
+Pair & Mode & HR\_A (mean $\pm$ SEM) & HR\_B (mean $\pm$ SEM) & HR\_both (mean $\pm$ SEM) & Balance (mean $\pm$ SEM) \\
+\midrule
+\endhead
+{% for row in metric_rows %}
+{{ row.pair_id.replace('_', '\\_') }} &
+{{ row.mode.replace('_', '\\_') }} &
+{{ fmt(row.hr_a_mean) }} $\pm$ {{ fmt(row.hr_a_sem) }} &
+{{ fmt(row.hr_b_mean) }} $\pm$ {{ fmt(row.hr_b_sem) }} &
+{{ fmt(row.hr_both_mean) }} $\pm$ {{ fmt(row.hr_both_sem) }} &
+{{ fmt(row.balance_mean) }} $\pm$ {{ fmt(row.balance_sem) }} \\
+{% endfor %}
+\bottomrule
+\end{longtable}
+{% else %}
+No metric table available. Run \texttt{cli/s5\_analyze/compute\_metrics.py} first.
+{% endif %}
+
+{% if objective_columns is defined and objective_columns %}
+\subsection{Objective Sensitivity Analysis}
+\begin{longtable}{p{0.22\linewidth} p{0.12\linewidth}{% for _ in objective_columns %} p{0.15\linewidth}{% endfor %}}
+\toprule
+Pair & Mode{% for col in objective_columns %} & {{ col.replace('_', '\\_') }}{% endfor %} \\
+\midrule
+\endhead
+{% for row in metric_rows %}
+{{ row.pair_id.replace('_', '\\_') }} &
+{{ row.mode.replace('_', '\\_') }}{% for col in objective_columns %} &
+{% if row.get(col ~ '_mean') is number %}{{ fmt(row[col ~ '_mean']) }} $\pm$ {{ fmt(row.get(col ~ '_sem', 0)) }}{% else %}-{% endif %}{% endfor %} \\
+{% endfor %}
+\bottomrule
+\end{longtable}
+{% endif %}
+
+{% if stats_rows %}
+\subsection{Hypothesis Tests (FDR-adjusted)}
+\begin{longtable}{p{0.17\linewidth} p{0.09\linewidth} p{0.19\linewidth} p{0.10\linewidth} p{0.10\linewidth} p{0.10\linewidth} p{0.10\linewidth}}
+\toprule
+Pair & Test & Comparison & Metric & $\Delta$ & p\_adj & Significant \\
+\midrule
+\endhead
+{% for row in stats_rows %}
+{{ row.pair_id.replace('_', '\\_') }} &
+{{ row.test_id }} &
+{{ (row.comparison or '').replace('_', '\\_') }} &
+{{ row.metric or '-' }} &
+{{ fmt(row.observed_diff) }} &
+{{ pval(row.p_value_adjusted) }} &
+{% if row.significant %}\textcolor{green!50!black}{yes}{% else %}no{% endif %} \\
+{% endfor %}
+\bottomrule
+\end{longtable}
+{% else %}
+No statistical table available. Run \texttt{cli/s5\_analyze/compute\_metrics.py} first.
+{% endif %}
+
+\section{Figures}
+{% if figures %}
+{% for fig in figures[:6] %}
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.88\linewidth]{ {{- fig -}} }
+\caption{Auto-generated figure: \texttt{ {{- fig -}} }}
+\end{figure}
+{% endfor %}
+{% else %}
+No figures available. Run \texttt{cli/s6\_report/plot\_results.py} and \texttt{cli/s6\_report/render\_molecules.py}.
+{% endif %}
+
+\section{Reproducibility and Artifact Traceability}
+\subsection{Software Snapshot}
+\begin{itemize}
+\item Master config version: \texttt{ {{ master_config.get('version', 'unknown') }} }
+{% set sw = master_config.get('software', {}) %}
+\item Docker image digest: \texttt{ {{ sw.get('docker_image_digest', 'unknown') }} }
+\item Boltz version: \texttt{ {{ sw.get('boltz_version', 'unknown') }} }
+\item Docking program/version: \texttt{ {{ sw.get('docking_program', 'unknown') }} } / \texttt{ {{ sw.get('docking_version', 'unknown') }} }
+\end{itemize}
+
+\subsection{Data Snapshot}
+{% set ds = master_config.get('data_sources', {}) %}
+\begin{itemize}
+\item Calibration set: \texttt{ {{ ds.get('calibration_set', {}).get('path', 'unknown') }} }
+\item Baseline set: \texttt{ {{ ds.get('baseline_set', {}).get('path', 'unknown') }} }
+\end{itemize}
+
+\appendix
+\section{Machine Summary Excerpt}
+{% if summary_excerpt %}
+\begin{verbatim}
+{{ summary_excerpt }}
+\end{verbatim}
+{% else %}
+No summary excerpt available. Run \texttt{cli/s5\_analyze/summarize.py}.
+{% endif %}
+
+\bibliography{references}
+
+\end{document}

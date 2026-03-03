@@ -1,0 +1,61 @@
+version: "2.5"
+experiment:
+  name: "Dual-Target Drug Discovery"
+  date: "2026-02-03"
+  # Pre-registered: single_a, single_b, double. Exploratory: linear_equal, biased_a, selective_a.
+  modes: [single_a, single_b, double, linear_equal, biased_a, selective_a]
+  seeds: [42, 137, 256, 512, 1024]
+
+data_sources:
+  calibration_set:
+    path: "output/data/calibration/zinc_druglike_calibration_1000_v2024.smi"
+    sha256: "ee4f11d1f9d56aeeadaf8a23a47dc40787225c745c880b42396a87096662a19b"
+  baseline_set:
+    path: "output/data/baseline/zinc_druglike_baseline_1000_seed42.smi"
+    sha256: "647b619f6807972a4645e5820b4aa542e9ba6de9616c092143ce1c07f62bad10"
+
+configs:
+  experiment_yaml:
+    path: "configs/experiment.yaml"
+    sha256: "7da5b90cc2d5899b93eda5ff85245158febdf72172bed24372386a32bef58f9e"
+  pairs_yaml:
+    path: "configs/pairs.yaml"
+    sha256: "5a161ac88ae12561a019c39fdfb4e7be24fc6c46cf40fed7b38a883b3d313383"
+  metrics_yaml:
+    path: "configs/metrics.yaml"
+    sha256: "44be62c090b971b5ee2b5b1af7fb363824db370170a8db3d26f63a6718b0ccc0"
+  normalization_yaml:
+    path: "configs/normalization.yaml"
+    sha256: "3b69477db24b3b3244663980a3e4503e7da77923b3e2bf55fb1846fd35910b8b"
+
+# SCI-02: Pair freeze — locked before experiment runs.
+# All active pairs are Homo sapiens only (ENG-10 organism gate).
+# COX1_COX2 blocked (non-human PDB: Ovis aries / Mus musculus).
+pairs_freeze:
+  freeze_date: "2026-02-07"
+  human_only: true
+  organism_gate: "dualdocking/config.py: load_pairs()"
+  core:
+    - CDK2_ERK2    # 1HCL / 4QTA, Homo / Homo
+    - AChE_BChE    # 4EY7 / 4BDS, Homo / Homo
+    - BACE1_GSK3B  # 6EQM / 5KPK, Homo / Homo
+    - AChE_BACE1   # 4EY7 / 6EQM, Homo / Homo
+    - GSK3B_CDK5   # 5KPK / 1UNL, Homo / Homo
+  auxiliary:
+    - EGFR_HER2    # 1M17 / 3PP0, Homo / Homo
+    - BACE1_CDK5   # 6EQM / 1UNL, Homo / Homo
+    - AChE_MAOB    # 4EY7 / 2V5Z, Homo / Homo (cofactor: FAD)
+  blocked:
+    - COX1_COX2    # 1EQG / 3LN1, Ovis aries / Mus musculus
+
+primary_metric:
+  source: "Boltz-2 affinity_pred_value"
+  unit: "log10(IC50 microM)"
+  direction: "lower_is_better"
+  hit_threshold: 0.0
+
+software:
+  docker_image_digest: "sha256:84621724917265ea8f72445ced88af441730b45342b4613f4355ed5663c71d4a"
+  boltz_version: "2.2.1"
+  docking_program: "unidock_gpu"
+  docking_version: "Uni-Dock v1.1.3"

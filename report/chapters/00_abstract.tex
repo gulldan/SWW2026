@@ -1,0 +1,25 @@
+Multi-target drug design aims to discover single molecules that simultaneously
+modulate two or more disease-relevant proteins, yet current reinforcement-learning
+(RL) generators optimize binding to one target at a time.  We ask whether
+RL generation with a joint dual-target reward produces molecules with higher
+dual hit-rates than single-target baselines evaluated post-hoc on both targets.
+
+We extend the fragment-based RL generator FREED++ with a worst-case
+scalarization reward, $R = -\max(z_A, z_B)$, over UniDock GPU docking
+scores and evaluate generated molecules with Boltz-2 affinity
+predictions---an orthogonal, learned surrogate that is never used as a
+training signal.  Six reward configurations spanning the selectivity--polypharmacology
+spectrum are tested across five pre-registered core target pairs (including
+AD-relevant BACE1/GSK3$\beta$, AChE/BACE1, and kinase controls), each with
+five independent seeds and 1000 molecules per run.
+
+% >>> PLACEHOLDER: replace after pipeline completion <<<
+% On N/5 core pairs, \texttt{double} mode achieves a statistically significant
+% improvement in dual hit-rate (BH-adjusted $p < 0.05$, Cliff's $\delta \geq 0.33$).
+% Per-target hit-rates show no large degradation (Cliff's $\delta > -0.47$).
+% >>> END PLACEHOLDER <<<
+
+All comparisons enforce fairness through matched molecular budgets, fixed seeds,
+shared hit-threshold definitions, and pre-registered success criteria
+with hierarchical bootstrap inference and FDR correction.
+Code, configurations, and the statistical analysis plan are publicly available.

@@ -1,0 +1,74 @@
+% ===========================================================================
+%  Chapter 1: Introduction
+%  Dual-Target RL Molecular Generation — Workshop Report
+% ===========================================================================
+
+Polypharmacology---the deliberate modulation of multiple biological
+targets by a single molecule---has emerged as a promising strategy for
+complex multifactorial diseases~\citep{bolognesi2013polypharmacology,
+anighoro2014polypharmacology}.
+In Alzheimer's disease alone, the simultaneous inhibition of
+cholinesterases (AChE, BChE), $\beta$-secretase (BACE1), and kinases
+involved in tau phosphorylation (GSK3$\beta$, CDK5) has been pursued
+both computationally and
+clinically~\citep{stern2022multitarget, weinreb2012cholinesterase}.
+Approved dual-target agents such as lapatinib (EGFR/HER2) and
+ladostigil (AChE/MAO-B) demonstrate that single molecules \emph{can}
+engage structurally distinct binding sites, but their discovery has
+relied on serendipity or labor-intensive medicinal chemistry campaigns.
+
+Reinforcement learning (RL) offers a principled framework for
+goal-directed molecular generation: an agent constructs molecules
+step by step and receives a scalar reward derived from a computational
+scoring function~\citep{telepov2023freedpp, loeffler2024reinvent4}.
+To date, RL-based generators have been applied almost exclusively
+in single-target mode, optimizing docking score or predicted affinity
+toward one protein at a time.
+Multi-objective extensions typically optimize \emph{property}
+trade-offs (QED, SA, logP) rather than binding affinity to two
+specific protein targets
+simultaneously~\citep{fromer2023moo, wang2024scarlp}.
+
+This study addresses three gaps identified in our systematic
+literature survey (Section~\ref{sec:rw:moo}):
+\begin{enumerate}
+\item \textbf{Systematic weight-space exploration.}
+  No prior work scans the continuous weight space from selective
+  ($w_A{=}1, w_B{=}{-1}$) through single-target ($w_A{=}1, w_B{=}0$)
+  to dual-target ($w_A{=}1, w_B{=}1$) using structure-based docking
+  as the RL reward for two protein targets.
+  We implement six reward configurations---\texttt{single\_a},
+  \texttt{single\_b}, \texttt{double}, \texttt{linear\_equal},
+  \texttt{biased\_a}, and \texttt{selective\_a}---within the same
+  generator architecture (FREED++).
+\item \textbf{Orthogonal evaluation.}
+  Most generative studies evaluate molecules with the same scorer
+  used as the RL reward, creating a circular evaluation.
+  We decouple training (UniDock docking scores $d_A, d_B$) from
+  evaluation (Boltz-2 affinity predictions $a_A, a_B$), using two
+  fundamentally different methods---physics-based empirical scoring
+  versus a transformer-based learned surrogate---to mitigate
+  scorer-specific artifacts.
+\item \textbf{Selectivity--polypharmacology spectrum.}
+  The literature treats target selectivity and multi-target design
+  as separate research fields.  We show that these are points on a
+  single parametric scale controlled by the reward weight vector,
+  enabling direct comparison within a unified experimental framework.
+\end{enumerate}
+
+The primary hypothesis is that dual-target RL generation
+(\texttt{double} mode, $R = -\max(d_A, d_B)$) increases the
+probability of obtaining simultaneous hits on both targets relative
+to single-target baselines (\texttt{single\_a}, \texttt{single\_b}),
+as measured by Boltz-2 affinity evaluated independently of the RL
+reward.
+
+The experiment is organized as a fully reproducible eight-stage
+pipeline: data acquisition, target preparation, calibration,
+generation, Boltz-2 scoring, aggregation and statistical
+testing, report generation, and claim audit.
+All comparisons enforce fairness through matched molecular budgets,
+fixed seed sets, shared hit-threshold definitions, and uniform
+post-processing rules.
+Success criteria, pair assignments, and the statistical analysis
+plan are pre-registered before any generation runs.

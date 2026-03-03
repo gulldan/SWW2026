@@ -1,0 +1,1137 @@
+[
+  {
+    "pair_number": 1,
+    "category": "I. Oncology — Kinase",
+    "target_family": "RTK (ErbB)",
+    "target_a": "EGFR",
+    "target_b": "HER2",
+    "pdb_a": "1XKK",
+    "pdb_b": "3PP0",
+    "pdb_a_desc": "EGFR+lapatinib, 2.40Å",
+    "pdb_b_desc": "HER2+SYR127063, 2.25Å",
+    "doi": "10.1158/0008-5472.CAN-04-1168",
+    "similarity_level": "Very High",
+    "similarity_pct": "~80% kinase domain ID; RMSD 1.1Å (247 Cα)\n\nNW domain: 81.3% Protein kinase (712-979 / 720-987, 268 aa) | NW full-seq: 49.0% (634/1295)\n\nUniProt: P00533 / P04626\n\nChEMBL-A: CHEMBL203 — 25.8K IC50, 2.1K Ki, 1.9K Kd (29.7K total)\n\nChEMBL-B: CHEMBL1824 — 5.2K IC50, 1.5K Ki, 194 Kd (6.9K total)",
+    "selectivity_ratio": "Lapatinib: 10.8/9.3 nM (1.2×, near-equipotent) PMC3099692",
+    "selectivity_ref": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3099692/",
+    "rationale": "Lapatinib (FDA 2007) — dual EGFR/HER2 TKI for HER2+ breast cancer. Validates dual ErbB blockade.",
+    "drug_status": "Lapatinib (FDA 2007)",
+    "resolved_ids": {
+      "uniprot_a": "P00533",
+      "uniprot_b": "P04626",
+      "chembl_a": "CHEMBL203",
+      "chembl_b": "CHEMBL1824"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "1XKK",
+        "resolution": 2.4,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "EGFR",
+          "ERBB1"
+        ],
+        "ligands": [
+          "PO4",
+          "FMM"
+        ],
+        "title": "EGFR kinase domain complexed with a quinazoline inhibitor- GW572016",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "3PP0",
+        "resolution": 2.25,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "ERBB2",
+          "HER2",
+          "MLN19",
+          "NEU",
+          "NGL"
+        ],
+        "ligands": [
+          "03Q"
+        ],
+        "title": "Crystal Structure of the Kinase domain of Human HER2 (erbB2).",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 49.0,
+          "aligned_length": 1295,
+          "matches": 634,
+          "gaps": 125,
+          "seq_a_len": 1210,
+          "seq_b_len": 1255
+        },
+        "catalog_claim": "~80% kinase domain ID; RMSD 1.1Å (247 Cα)\n\nNW domain: 81.3% Protein kinase (712-979 / 720-987, 268 aa) | NW full-seq: 49.0% (634/1295)\n\nUniProt: P00533 / P04626\n\nChEMBL-A: CHEMBL203 — 25.8K IC50, 2.1K Ki, 1.9K Kd (29.7K total)\n\nChEMBL-B: CHEMBL1824 — 5.2K IC50, 1.5K Ki, 194 Kd (6.9K total)",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": {
+          "identity_pct": 81.3,
+          "aligned_length": 268,
+          "matches": 218,
+          "gaps": 0,
+          "seq_a_len": 268,
+          "seq_b_len": 268
+        },
+        "domain_a": "Protein kinase (712-979)",
+        "domain_b": "Protein kinase (720-987)",
+        "range_a": "712-979",
+        "range_b": "720-987",
+        "domain_type": "kinase",
+        "catalog_claim_pct": "~80%",
+        "match_quality": "match",
+        "notes": [
+          "Sliced P00533 to 712-979 (268 res)",
+          "Sliced P04626 to 720-987 (268 res)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL203",
+        "total_activities": 29737,
+        "ic50_count": 25758,
+        "ki_count": 2090,
+        "kd_count": 1889,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL1824",
+        "total_activities": 6874,
+        "ic50_count": 5207,
+        "ki_count": 1473,
+        "kd_count": 194,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.1158/0008-5472.CAN-04-1168",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "https://aacrjournals.org/cancerres/article/64/18/6652/511710/A-Unique-Structure-for-Epidermal-Growth-Factor",
+        "notes": []
+      }
+    }
+  },
+  {
+    "pair_number": 2,
+    "category": "I. Oncology — Kinase",
+    "target_family": "CMGC (CDK)",
+    "target_a": "CDK4",
+    "target_b": "CDK6",
+    "pdb_a": "2W96",
+    "pdb_b": "6OQO",
+    "pdb_a_desc": "CDK4+cycD, 2.30Å",
+    "pdb_b_desc": "CDK6+Cpd24, 1.98Å",
+    "doi": "10.1038/nrclinonc.2016.26",
+    "similarity_level": "High",
+    "similarity_pct": "~71% overall protein ID; ATP-site highly conserved\n\nNW domain: 71.5% Protein kinase (6-295 / 13-300, 290 aa) | NW full-seq: 64.4% (212/329)\n\nUniProt: P11802 / Q00534\n\nChEMBL-A: CHEMBL331 — 1.8K IC50, 117 Ki, 390 Kd (2.3K total)\n\nChEMBL-B: CHEMBL2508 — 1.0K IC50, 4 Ki, 249 Kd (1.3K total)\n\nNote: PDB 2W96 = CDK4+CyclinD3 complex; auto-resolution → CyclinD1 (P24385). Correct: CDK4 = P11802",
+    "selectivity_ratio": "Palbociclib: 11/16 nM (1:1.5) PMC6248306",
+    "selectivity_ref": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6248306/",
+    "rationale": "Palbociclib (FDA 2015) — CDK4/6 dual inhibitor for HR+/HER2- breast cancer. Also ribociclib, abemaciclib.",
+    "drug_status": "Palbociclib (FDA 2015)",
+    "resolved_ids": {
+      "uniprot_a": "P11802",
+      "uniprot_b": "Q00534",
+      "chembl_a": "CHEMBL331",
+      "chembl_b": "CHEMBL2508"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "2W96",
+        "resolution": 2.3,
+        "organism": "Homo sapiens",
+        "gene_names": [],
+        "ligands": [
+          "GOL"
+        ],
+        "title": "Crystal Structure of CDK4 in complex with a D-type cyclin",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "6OQO",
+        "resolution": 1.977,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "CDK6",
+          "CDKN6"
+        ],
+        "ligands": [
+          "N1J"
+        ],
+        "title": "CDK6 in complex with Cpd24 N-(5-(6-ethyl-2,6-diazaspiro[3.3]heptan-2-yl)pyridin-2-yl)-5-fluoro-4-(4-methyl-5,6,7,8-tetrahydro-4H-pyrazolo[1,5-a]azepin-3-yl)pyrimidin-2-amine",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 64.4,
+          "aligned_length": 329,
+          "matches": 212,
+          "gaps": 29,
+          "seq_a_len": 303,
+          "seq_b_len": 326
+        },
+        "catalog_claim": "~71% overall protein ID; ATP-site highly conserved\n\nNW domain: 71.5% Protein kinase (6-295 / 13-300, 290 aa) | NW full-seq: 64.4% (212/329)\n\nUniProt: P11802 / Q00534\n\nChEMBL-A: CHEMBL331 — 1.8K IC50, 117 Ki, 390 Kd (2.3K total)\n\nChEMBL-B: CHEMBL2508 — 1.0K IC50, 4 Ki, 249 Kd (1.3K total)\n\nNote: PDB 2W96 = CDK4+CyclinD3 complex; auto-resolution → CyclinD1 (P24385). Correct: CDK4 = P11802",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": {
+          "identity_pct": 71.5,
+          "aligned_length": 291,
+          "matches": 208,
+          "gaps": 4,
+          "seq_a_len": 290,
+          "seq_b_len": 288
+        },
+        "domain_a": "Protein kinase (6-295)",
+        "domain_b": "Protein kinase (13-300)",
+        "range_a": "6-295",
+        "range_b": "13-300",
+        "domain_type": "kinase",
+        "catalog_claim_pct": "~71%",
+        "match_quality": "match",
+        "notes": [
+          "Sliced P11802 to 6-295 (290 res)",
+          "Sliced Q00534 to 13-300 (288 res)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL331",
+        "total_activities": 2279,
+        "ic50_count": 1772,
+        "ki_count": 117,
+        "kd_count": 390,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL2508",
+        "total_activities": 1299,
+        "ic50_count": 1046,
+        "ki_count": 4,
+        "kd_count": 249,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.1038/nrclinonc.2016.26",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "https://www.nature.com/articles/nrclinonc.2016.26",
+        "notes": []
+      }
+    }
+  },
+  {
+    "pair_number": 3,
+    "category": "I. Oncology — Kinase",
+    "target_family": "RTK (ALK/ROS1)",
+    "target_a": "ALK",
+    "target_b": "ROS1",
+    "pdb_a": "2XP2",
+    "pdb_b": "3ZBF",
+    "pdb_a_desc": "ALK+crizotinib, 1.90Å",
+    "pdb_b_desc": "ROS1+crizotinib, 2.20Å",
+    "doi": "10.1073/pnas.1420785112",
+    "similarity_level": "High",
+    "similarity_pct": "49% kinase domain / 77% ATP-site ID\n\nNW domain: 48.4% Protein kinase (1116-1392 / 1945-2222, 277/278 aa) | NW full-seq: 18.4% (479/2599)\n\nUniProt: Q9UM73 / P08922\n\nChEMBL-A: CHEMBL4247 — 4.4K IC50, 946 Ki, 215 Kd (5.5K total)\n\nChEMBL-B: CHEMBL5568 — 422 IC50, 537 Ki, 137 Kd (1.1K total)",
+    "selectivity_ratio": "Crizotinib: 20/4 nM (5× ALK/ROS1) PNAS 2015",
+    "selectivity_ref": "https://www.pnas.org/doi/10.1073/pnas.1515281112",
+    "rationale": "Crizotinib (FDA 2011) — ALK/ROS1 dual TKI for NSCLC. Lorlatinib also covers both.",
+    "drug_status": "Crizotinib (FDA 2011)",
+    "resolved_ids": {
+      "uniprot_a": "Q9UM73",
+      "uniprot_b": "P08922",
+      "chembl_a": "CHEMBL4247",
+      "chembl_b": "CHEMBL5568"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "2XP2",
+        "resolution": 1.9,
+        "organism": "Homo sapiens",
+        "gene_names": [],
+        "ligands": [
+          "VGH"
+        ],
+        "title": "Structure of the Human Anaplastic Lymphoma Kinase in Complex with Crizotinib (PF-02341066)",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "3ZBF",
+        "resolution": 2.2,
+        "organism": "Homo sapiens",
+        "gene_names": [],
+        "ligands": [
+          "VGH"
+        ],
+        "title": "Structure of Human ROS1 Kinase Domain in Complex with Crizotinib",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 18.4,
+          "aligned_length": 2599,
+          "matches": 479,
+          "gaps": 1231,
+          "seq_a_len": 1620,
+          "seq_b_len": 2347
+        },
+        "catalog_claim": "49% kinase domain / 77% ATP-site ID\n\nNW domain: 48.4% Protein kinase (1116-1392 / 1945-2222, 277/278 aa) | NW full-seq: 18.4% (479/2599)\n\nUniProt: Q9UM73 / P08922\n\nChEMBL-A: CHEMBL4247 — 4.4K IC50, 946 Ki, 215 Kd (5.5K total)\n\nChEMBL-B: CHEMBL5568 — 422 IC50, 537 Ki, 137 Kd (1.1K total)",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": {
+          "identity_pct": 48.4,
+          "aligned_length": 285,
+          "matches": 138,
+          "gaps": 15,
+          "seq_a_len": 277,
+          "seq_b_len": 278
+        },
+        "domain_a": "Protein kinase (1116-1392)",
+        "domain_b": "Protein kinase (1945-2222)",
+        "range_a": "1116-1392",
+        "range_b": "1945-2222",
+        "domain_type": "kinase",
+        "catalog_claim_pct": "49%",
+        "match_quality": "match",
+        "notes": [
+          "Sliced Q9UM73 to 1116-1392 (277 res)",
+          "Sliced P08922 to 1945-2222 (278 res)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL4247",
+        "total_activities": 5518,
+        "ic50_count": 4357,
+        "ki_count": 946,
+        "kd_count": 215,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL5568",
+        "total_activities": 1096,
+        "ic50_count": 422,
+        "ki_count": 537,
+        "kd_count": 137,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.1073/pnas.1420785112",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "https://pnas.org/doi/full/10.1073/pnas.1420785112",
+        "notes": []
+      }
+    }
+  },
+  {
+    "pair_number": 4,
+    "category": "I. Oncology — Kinase",
+    "target_family": "RTK (FGFR)",
+    "target_a": "FGFR1",
+    "target_b": "FGFR2",
+    "pdb_a": "5EW8",
+    "pdb_b": "3RI1",
+    "pdb_a_desc": "FGFR1+erdafitinib, 1.63Å",
+    "pdb_b_desc": "FGFR2+ARQ069, 2.10Å",
+    "doi": "10.1158/1535-7163.MCT-16-0589",
+    "similarity_level": "Very High",
+    "similarity_pct": "~90% kinase domain ID (highest in set)\n\nNW domain: 87.6% Protein kinase (478-767 / 481-770, 290 aa) | NW full-seq: 71.5% (594/831)\n\nUniProt: P11362 / P21802\n\nChEMBL-A: CHEMBL3650 — 9.0K IC50, 1.2K Ki, 420 Kd (10.6K total)\n\nChEMBL-B: CHEMBL4142 — 4.7K IC50, 5 Ki, 171 Kd (4.8K total)",
+    "selectivity_ratio": "Erdafitinib: 1.2/2.5 nM (1:2.1) PMC6627960",
+    "selectivity_ref": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6627960/",
+    "rationale": "Erdafitinib (FDA 2019) — pan-FGFR inhibitor for urothelial carcinoma with FGFR alterations.",
+    "drug_status": "Erdafitinib (FDA 2019)",
+    "resolved_ids": {
+      "uniprot_a": "P11362",
+      "uniprot_b": "P21802",
+      "chembl_a": "CHEMBL3650",
+      "chembl_b": "CHEMBL4142"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "5EW8",
+        "resolution": 1.63,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "FGFR1",
+          "BFGFR",
+          "CEK",
+          "FGFBR",
+          "FLG",
+          "FLT2",
+          "HBGFR"
+        ],
+        "ligands": [
+          "SO4",
+          "5SF"
+        ],
+        "title": "FIBROBLAST GROWTH FACTOR RECEPTOR 1 IN COMPLEX WITH JNJ-4275693",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "3RI1",
+        "resolution": 2.1,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "FGFR2",
+          "BEK",
+          "KGFR",
+          "KSAM"
+        ],
+        "ligands": [
+          "3RH",
+          "SO4"
+        ],
+        "title": "Crystal structure of the catalytic domain of FGFR2 kinase in complex with ARQ 069",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 71.5,
+          "aligned_length": 831,
+          "matches": 594,
+          "gaps": 19,
+          "seq_a_len": 822,
+          "seq_b_len": 821
+        },
+        "catalog_claim": "~90% kinase domain ID (highest in set)\n\nNW domain: 87.6% Protein kinase (478-767 / 481-770, 290 aa) | NW full-seq: 71.5% (594/831)\n\nUniProt: P11362 / P21802\n\nChEMBL-A: CHEMBL3650 — 9.0K IC50, 1.2K Ki, 420 Kd (10.6K total)\n\nChEMBL-B: CHEMBL4142 — 4.7K IC50, 5 Ki, 171 Kd (4.8K total)",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": {
+          "identity_pct": 87.6,
+          "aligned_length": 290,
+          "matches": 254,
+          "gaps": 0,
+          "seq_a_len": 290,
+          "seq_b_len": 290
+        },
+        "domain_a": "Protein kinase (478-767)",
+        "domain_b": "Protein kinase (481-770)",
+        "range_a": "478-767",
+        "range_b": "481-770",
+        "domain_type": "kinase",
+        "catalog_claim_pct": "~90%",
+        "match_quality": "match",
+        "notes": [
+          "Sliced P11362 to 478-767 (290 res)",
+          "Sliced P21802 to 481-770 (290 res)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL3650",
+        "total_activities": 10640,
+        "ic50_count": 8987,
+        "ki_count": 1233,
+        "kd_count": 420,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL4142",
+        "total_activities": 4830,
+        "ic50_count": 4654,
+        "ki_count": 5,
+        "kd_count": 171,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.1158/1535-7163.MCT-16-0589",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "https://aacrjournals.org/mct/article/16/6/1010/92241/Discovery-and-Pharmacological-Characterization-of",
+        "notes": []
+      }
+    }
+  },
+  {
+    "pair_number": 5,
+    "category": "II. Oncology — Non-Kinase",
+    "target_family": "Dehydrogenase (IDH)",
+    "target_a": "IDH1(R132H)",
+    "target_b": "IDH2(R140Q)",
+    "pdb_a": "4UMX",
+    "pdb_b": "5I96",
+    "pdb_a_desc": "IDH1-R132H+cpd1, 1.88Å",
+    "pdb_b_desc": "IDH2-R140Q+enasidenib, 1.55Å",
+    "doi": "10.1021/acsmedchemlett.9b00509",
+    "similarity_level": "High",
+    "similarity_pct": "72% overall protein ID; conserved allosteric dimer-interface pocket\n\nNW full-seq: 62.6% (285/455), 414/452 aa\n\nUniProt: O75874 / P48735\n\nChEMBL-A: CHEMBL2007625 — 13.7K IC50, 158 Ki, 52 Kd (13.9K total)\n\nChEMBL-B: CHEMBL3991501 — 1.8K IC50, 0 Ki, 2 Kd (1.8K total)",
+    "selectivity_ratio": "Vorasidenib: 0.6–6 / 7–12 nM (~2× IDH1 pref.) NEJM 2023",
+    "selectivity_ref": "https://www.nejm.org/doi/full/10.1056/NEJMoa2304194",
+    "rationale": "Vorasidenib (FDA 2024) — dual IDH1/2 inhibitor for low-grade glioma (INDIGO trial, NCT04164901). BBB-penetrant.",
+    "drug_status": "Vorasidenib (FDA 2024)",
+    "resolved_ids": {
+      "uniprot_a": "O75874",
+      "uniprot_b": "P48735",
+      "chembl_a": "CHEMBL2007625",
+      "chembl_b": "CHEMBL3991501"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "4UMX",
+        "resolution": 1.88,
+        "organism": "Homo sapiens",
+        "gene_names": [],
+        "ligands": [
+          "VVS",
+          "NAP",
+          "GOL"
+        ],
+        "title": "IDH1 R132H in complex with cpd 1",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "5I96",
+        "resolution": 1.55,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "IDH2"
+        ],
+        "ligands": [
+          "CA",
+          "GOL",
+          "NDP",
+          "NA",
+          "ACT",
+          "69Q"
+        ],
+        "title": "Crystal Structure of Human Mitochondrial Isocitrate Dehydrogenase (IDH2) R140Q Mutant Homodimer in Complex with AG-221 (Enasidenib) Inhibitor.",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 62.6,
+          "aligned_length": 455,
+          "matches": 285,
+          "gaps": 44,
+          "seq_a_len": 414,
+          "seq_b_len": 452
+        },
+        "catalog_claim": "72% overall protein ID; conserved allosteric dimer-interface pocket\n\nNW full-seq: 62.6% (285/455), 414/452 aa\n\nUniProt: O75874 / P48735\n\nChEMBL-A: CHEMBL2007625 — 13.7K IC50, 158 Ki, 52 Kd (13.9K total)\n\nChEMBL-B: CHEMBL3991501 — 1.8K IC50, 0 Ki, 2 Kd (1.8K total)",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": null,
+        "domain_a": "",
+        "domain_b": "",
+        "range_a": "",
+        "range_b": "",
+        "domain_type": "overall",
+        "catalog_claim_pct": "",
+        "match_quality": "n/a",
+        "notes": [
+          "Domain alignment not applicable (type=overall)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL2007625",
+        "total_activities": 13883,
+        "ic50_count": 13673,
+        "ki_count": 158,
+        "kd_count": 52,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL3991501",
+        "total_activities": 1822,
+        "ic50_count": 1820,
+        "ki_count": 0,
+        "kd_count": 2,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.1021/acsmedchemlett.9b00509",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "https://pubs.acs.org/doi/10.1021/acsmedchemlett.9b00509",
+        "notes": []
+      }
+    }
+  },
+  {
+    "pair_number": 6,
+    "category": "III. Neurodegenerative",
+    "target_family": "Cholinesterase",
+    "target_a": "AChE",
+    "target_b": "BChE",
+    "pdb_a": "4EY7",
+    "pdb_b": "4BDS",
+    "pdb_a_desc": "AChE+donepezil, 2.35Å",
+    "pdb_b_desc": "BChE+tacrine, 2.10Å",
+    "doi": "10.1016/j.ejmech.2024.116810",
+    "similarity_level": "High",
+    "similarity_pct": "~65% overall seq ID; conserved gorge & catalytic triad; BChE gorge ~200Å³ larger\n\nNW full-seq: 51.1% (314/615), 614/602 aa\n\nUniProt: P22303 / P06276\n\nChEMBL-A: CHEMBL220 — 9.7K IC50, 1.9K Ki, 295 Kd (12.0K total)\n\nChEMBL-B: CHEMBL1914 — 5.4K IC50, 567 Ki, 4 Kd (6.0K total)",
+    "selectivity_ratio": "Rivastigmine: ~8× BChE pref. PMC8071298",
+    "selectivity_ref": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8071298/",
+    "rationale": "Rivastigmine (FDA 2000) — dual AChE/BChE inhibitor for AD. BChE compensates as disease progresses.",
+    "drug_status": "Rivastigmine (FDA 2000)",
+    "resolved_ids": {
+      "uniprot_a": "P22303",
+      "uniprot_b": "P06276",
+      "chembl_a": "CHEMBL220",
+      "chembl_b": "CHEMBL1914"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "4EY7",
+        "resolution": 2.3509,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "ACHE"
+        ],
+        "ligands": [
+          "E20",
+          "EDO",
+          "NAG",
+          "NO3"
+        ],
+        "title": "Crystal Structure of Recombinant Human Acetylcholinesterase in Complex with Donepezil",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "4BDS",
+        "resolution": 2.1,
+        "organism": "Homo sapiens",
+        "gene_names": [],
+        "ligands": [
+          "NAG",
+          "FUC",
+          "THA",
+          "GOL",
+          "SO4",
+          "CL",
+          "FPK",
+          "UNX"
+        ],
+        "title": "Human butyrylcholinesterase in complex with tacrine",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 51.1,
+          "aligned_length": 615,
+          "matches": 314,
+          "gaps": 14,
+          "seq_a_len": 614,
+          "seq_b_len": 602
+        },
+        "catalog_claim": "~65% overall seq ID; conserved gorge & catalytic triad; BChE gorge ~200Å³ larger\n\nNW full-seq: 51.1% (314/615), 614/602 aa\n\nUniProt: P22303 / P06276\n\nChEMBL-A: CHEMBL220 — 9.7K IC50, 1.9K Ki, 295 Kd (12.0K total)\n\nChEMBL-B: CHEMBL1914 — 5.4K IC50, 567 Ki, 4 Kd (6.0K total)",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": null,
+        "domain_a": "",
+        "domain_b": "",
+        "range_a": "",
+        "range_b": "",
+        "domain_type": "overall",
+        "catalog_claim_pct": "",
+        "match_quality": "n/a",
+        "notes": [
+          "Domain alignment not applicable (type=overall)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL220",
+        "total_activities": 11966,
+        "ic50_count": 9731,
+        "ki_count": 1940,
+        "kd_count": 295,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL1914",
+        "total_activities": 5957,
+        "ic50_count": 5386,
+        "ki_count": 567,
+        "kd_count": 4,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.1016/j.ejmech.2024.116810",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "https://linkinghub.elsevier.com/retrieve/pii/S0223523424006913",
+        "notes": []
+      }
+    }
+  },
+  {
+    "pair_number": 7,
+    "category": "III. Neurodegenerative",
+    "target_family": "MAO isozymes",
+    "target_a": "MAO-A",
+    "target_b": "MAO-B",
+    "pdb_a": "2Z5X",
+    "pdb_b": "2V5Z",
+    "pdb_a_desc": "MAO-A+harmine, 2.20Å",
+    "pdb_b_desc": "MAO-B+safinamide, 1.60Å",
+    "doi": "10.3390/molecules28124814",
+    "similarity_level": "High",
+    "similarity_pct": "~70% overall seq ID; 10/16 substrate-cavity residues conserved (~63%)\n\nNW full-seq: 71.5% (378/529), 527/520 aa\n\nUniProt: P21397 / P27338\n\nChEMBL-A: CHEMBL1951 — 7.7K IC50, 1.8K Ki, 0 Kd (9.5K total)\n\nChEMBL-B: CHEMBL2039 — 8.7K IC50, 948 Ki, 9 Kd (9.6K total)",
+    "selectivity_ratio": "Tranylcypromine: ~2.4× MAO-B pref. PMC2710584",
+    "selectivity_ref": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2710584/",
+    "rationale": "Safinamide (FDA 2017) — selective MAO-B inhibitor for Parkinson's. Also phenelzine (non-selective, approved).",
+    "drug_status": "Safinamide (FDA 2017)",
+    "resolved_ids": {
+      "uniprot_a": "P21397",
+      "uniprot_b": "P27338",
+      "chembl_a": "CHEMBL1951",
+      "chembl_b": "CHEMBL2039"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "2Z5X",
+        "resolution": 2.2,
+        "organism": "Homo sapiens",
+        "gene_names": [],
+        "ligands": [
+          "FAD",
+          "HRM",
+          "DCX",
+          "GOL"
+        ],
+        "title": "Crystal Structure of Human Monoamine Oxidase A with Harmine",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "2V5Z",
+        "resolution": 1.6,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "MAOB"
+        ],
+        "ligands": [
+          "FAD",
+          "SAG"
+        ],
+        "title": "Structure of human MAO B in complex with the selective inhibitor safinamide",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 71.5,
+          "aligned_length": 529,
+          "matches": 378,
+          "gaps": 11,
+          "seq_a_len": 527,
+          "seq_b_len": 520
+        },
+        "catalog_claim": "~70% overall seq ID; 10/16 substrate-cavity residues conserved (~63%)\n\nNW full-seq: 71.5% (378/529), 527/520 aa\n\nUniProt: P21397 / P27338\n\nChEMBL-A: CHEMBL1951 — 7.7K IC50, 1.8K Ki, 0 Kd (9.5K total)\n\nChEMBL-B: CHEMBL2039 — 8.7K IC50, 948 Ki, 9 Kd (9.6K total)",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": null,
+        "domain_a": "",
+        "domain_b": "",
+        "range_a": "",
+        "range_b": "",
+        "domain_type": "overall",
+        "catalog_claim_pct": "",
+        "match_quality": "n/a",
+        "notes": [
+          "Domain alignment not applicable (type=overall)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL1951",
+        "total_activities": 9504,
+        "ic50_count": 7679,
+        "ki_count": 1825,
+        "kd_count": 0,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL2039",
+        "total_activities": 9613,
+        "ic50_count": 8656,
+        "ki_count": 948,
+        "kd_count": 9,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.3390/molecules28124814",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "https://www.mdpi.com/1420-3049/28/12/4814",
+        "notes": []
+      }
+    }
+  },
+  {
+    "pair_number": 8,
+    "category": "IV. Inflammation / Autoimmune",
+    "target_family": "JAK (Non-RTK)",
+    "target_a": "JAK1",
+    "target_b": "JAK3",
+    "pdb_a": "6N7B",
+    "pdb_b": "3LXK",
+    "pdb_a_desc": "JAK1+cmpd38, 1.81Å",
+    "pdb_b_desc": "JAK3+tofacitinib, 2.00Å",
+    "doi": "10.1056/NEJMoa1109071",
+    "similarity_level": "Very High",
+    "similarity_pct": "84% active-site residue ID; unique JAK3 Cys909\n\nNW full-seq: 38.0% (461/1214), 1154/1124 aa\n\nUniProt: P23458 / P52333\n\nChEMBL-A: CHEMBL2835 — 15.0K IC50, 3.9K Ki, 580 Kd (19.4K total)\n\nChEMBL-B: CHEMBL2148 — 12.0K IC50, 2.4K Ki, 228 Kd (14.6K total)",
+    "selectivity_ratio": "Tofacitinib: 112/1 nM (~112× JAK3 pref.) ACS Omega 2019",
+    "selectivity_ref": "https://pubs.acs.org/doi/10.1021/acsomega.9b02800",
+    "rationale": "Tofacitinib (FDA 2012) — JAK1/3 inhibitor for RA. Highest selectivity ratio in this set (112×).",
+    "drug_status": "Tofacitinib (FDA 2012)",
+    "resolved_ids": {
+      "uniprot_a": "P23458",
+      "uniprot_b": "P52333",
+      "chembl_a": "CHEMBL2835",
+      "chembl_b": "CHEMBL2148"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "6N7B",
+        "resolution": 1.81,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "JAK1",
+          "JAK1A",
+          "JAK1B"
+        ],
+        "ligands": [
+          "KEY",
+          "GOL"
+        ],
+        "title": "Structure of the human JAK1 kinase domain with compound 38",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "3LXK",
+        "resolution": 2.0,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "JAK3"
+        ],
+        "ligands": [
+          "MI1"
+        ],
+        "title": "Structural and Thermodynamic Characterization of the TYK2 and JAK3 Kinase Domains in Complex with CP-690550 and CMP-6",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 38.0,
+          "aligned_length": 1214,
+          "matches": 461,
+          "gaps": 150,
+          "seq_a_len": 1154,
+          "seq_b_len": 1124
+        },
+        "catalog_claim": "84% active-site residue ID; unique JAK3 Cys909\n\nNW full-seq: 38.0% (461/1214), 1154/1124 aa\n\nUniProt: P23458 / P52333\n\nChEMBL-A: CHEMBL2835 — 15.0K IC50, 3.9K Ki, 580 Kd (19.4K total)\n\nChEMBL-B: CHEMBL2148 — 12.0K IC50, 2.4K Ki, 228 Kd (14.6K total)",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": null,
+        "domain_a": "",
+        "domain_b": "",
+        "range_a": "",
+        "range_b": "",
+        "domain_type": "active-site",
+        "catalog_claim_pct": "",
+        "match_quality": "n/a",
+        "notes": [
+          "Domain alignment not applicable (type=active-site)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL2835",
+        "total_activities": 19442,
+        "ic50_count": 14973,
+        "ki_count": 3889,
+        "kd_count": 580,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL2148",
+        "total_activities": 14637,
+        "ic50_count": 12009,
+        "ki_count": 2400,
+        "kd_count": 228,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.1056/NEJMoa1109071",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "http://www.nejm.org/doi/abs/10.1056/NEJMoa1109071",
+        "notes": []
+      }
+    }
+  },
+  {
+    "pair_number": 9,
+    "category": "V. Metabolic / Endocrine",
+    "target_family": "Nuclear receptor (PPAR)",
+    "target_a": "PPARα",
+    "target_b": "PPARγ",
+    "pdb_a": "2P54",
+    "pdb_b": "1FM9",
+    "pdb_a_desc": "PPARα+GW735, 1.79Å",
+    "pdb_b_desc": "PPARγ+GI262570, 2.10Å",
+    "doi": "10.1016/j.coph.2006.06.009",
+    "similarity_level": "High",
+    "similarity_pct": "60–70% LBD ID; single Tyr/His difference drives selectivity\n\nNW domain: 55.3% NR LBD (239-466 / 238-503, 228/266 aa) | NW full-seq: 53.9% (275/510)\n\nUniProt: Q07869 / P37231\n\nChEMBL-A: CHEMBL239 — 1.3K IC50, 209 Ki, 39 Kd (1.6K total)\n\nChEMBL-B: CHEMBL235 — 2.3K IC50, 622 Ki, 106 Kd (3.0K total)\n\nNote: PDB 1FM9 = PPARγ+RXRα heterodimer; auto-resolution → RXRα (P19793). Correct: PPARγ = P37231",
+    "selectivity_ratio": "Saroglitazar: EC50 0.65 pM / 3 nM (~4,600× PPARα) Jain 2015",
+    "selectivity_ref": "https://doi.org/10.1002/prp2.136",
+    "rationale": "Saroglitazar (India 2013) — PPARα/γ dual agonist for diabetic dyslipidemia. Highest selectivity ratio in set (4,600×).",
+    "drug_status": "Saroglitazar (India 2013)",
+    "resolved_ids": {
+      "uniprot_a": "Q07869",
+      "uniprot_b": "P37231",
+      "chembl_a": "CHEMBL239",
+      "chembl_b": "CHEMBL235"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "2P54",
+        "resolution": 1.79,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "PPARA",
+          "NR1C1",
+          "PPAR",
+          "NCOA1"
+        ],
+        "ligands": [
+          "735"
+        ],
+        "title": "a crystal structure of PPAR alpha bound with SRC1 peptide and GW735",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "1FM9",
+        "resolution": 2.1,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "NCOA1"
+        ],
+        "ligands": [
+          "9CR",
+          "570"
+        ],
+        "title": "THE 2.1 ANGSTROM RESOLUTION CRYSTAL STRUCTURE OF THE HETERODIMER OF THE HUMAN RXRALPHA AND PPARGAMMA LIGAND BINDING DOMAINS RESPECTIVELY BOUND WITH 9-CIS RETINOIC ACID AND GI262570 AND CO-ACTIVATOR PEPTIDES.",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 53.9,
+          "aligned_length": 510,
+          "matches": 275,
+          "gaps": 47,
+          "seq_a_len": 468,
+          "seq_b_len": 505
+        },
+        "catalog_claim": "60–70% LBD ID; single Tyr/His difference drives selectivity\n\nNW domain: 55.3% NR LBD (239-466 / 238-503, 228/266 aa) | NW full-seq: 53.9% (275/510)\n\nUniProt: Q07869 / P37231\n\nChEMBL-A: CHEMBL239 — 1.3K IC50, 209 Ki, 39 Kd (1.6K total)\n\nChEMBL-B: CHEMBL235 — 2.3K IC50, 622 Ki, 106 Kd (3.0K total)\n\nNote: PDB 1FM9 = PPARγ+RXRα heterodimer; auto-resolution → RXRα (P19793). Correct: PPARγ = P37231",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": {
+          "identity_pct": 55.3,
+          "aligned_length": 266,
+          "matches": 147,
+          "gaps": 38,
+          "seq_a_len": 228,
+          "seq_b_len": 266
+        },
+        "domain_a": "NR LBD (239-466)",
+        "domain_b": "NR LBD (238-503)",
+        "range_a": "239-466",
+        "range_b": "238-503",
+        "domain_type": "LBD",
+        "catalog_claim_pct": "60–70%",
+        "match_quality": "close",
+        "notes": [
+          "Sliced Q07869 to 239-466 (228 res)",
+          "Sliced P37231 to 238-503 (266 res)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL239",
+        "total_activities": 1551,
+        "ic50_count": 1303,
+        "ki_count": 209,
+        "kd_count": 39,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL235",
+        "total_activities": 3049,
+        "ic50_count": 2321,
+        "ki_count": 622,
+        "kd_count": 106,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.1016/j.coph.2006.06.009",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "https://linkinghub.elsevier.com/retrieve/pii/S1471489206001603",
+        "notes": []
+      }
+    }
+  },
+  {
+    "pair_number": 10,
+    "category": "V. Metabolic / Endocrine",
+    "target_family": "Nuclear receptor (ER)",
+    "target_a": "ERα",
+    "target_b": "ERβ",
+    "pdb_a": "3ERT",
+    "pdb_b": "1X7B",
+    "pdb_a_desc": "ERα+4-OHT, 1.90Å",
+    "pdb_b_desc": "ERβ+ERB-041, 2.30Å",
+    "doi": "10.1016/j.steroids.2014.06.012",
+    "similarity_level": "Mod-High",
+    "similarity_pct": "Mod- ~56% LBD ID; only 2 aa differ in ligand pocket (Leu/Met → Met/Ile)\n\nNW domain: 59.7% NR LBD (311-547 / 264-498, 237 aa) | NW full-seq: 45.5% (275/605)\n\nUniProt: P03372 / Q92731\n\nChEMBL-A: CHEMBL206 — 7.6K IC50, 1.7K Ki, 56 Kd (9.4K total)\n\nChEMBL-B: CHEMBL242 — 3.7K IC50, 1.5K Ki, 32 Kd (5.2K total)",
+    "selectivity_ratio": "Tamoxifen: ~equipotent; MPP 670× ERα-selective BCR 2001",
+    "selectivity_ref": "https://breast-cancer-research.biomedcentral.com/articles/10.1186/bcr80",
+    "rationale": "Tamoxifen (FDA 1977) / Raloxifene (FDA 1997) — SERMs with tissue-specific ERα/β modulation. ERα proliferative in breast cancer, ERβ anti-proliferative.",
+    "drug_status": "Tamoxifen (FDA 1977) / Raloxifene (FDA 1997)",
+    "resolved_ids": {
+      "uniprot_a": "P03372",
+      "uniprot_b": "Q92731",
+      "chembl_a": "CHEMBL206",
+      "chembl_b": "CHEMBL242"
+    },
+    "verification": {
+      "pdb_a": {
+        "pdb_id": "3ERT",
+        "resolution": 1.9,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "ESTROGEN RECEPTOR ALPHA"
+        ],
+        "ligands": [
+          "OHT"
+        ],
+        "title": "HUMAN ESTROGEN RECEPTOR ALPHA LIGAND-BINDING DOMAIN IN COMPLEX WITH 4-HYDROXYTAMOXIFEN",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "pdb_b": {
+        "pdb_id": "1X7B",
+        "resolution": 2.3,
+        "organism": "Homo sapiens",
+        "gene_names": [
+          "ESR2",
+          "NR3A2",
+          "ESTRB",
+          "NCOA1"
+        ],
+        "ligands": [
+          "041"
+        ],
+        "title": "CRYSTAL STRUCTURE OF ESTROGEN RECEPTOR BETA COMPLEXED WITH ERB-041",
+        "method": "X-ray",
+        "match": true,
+        "notes": []
+      },
+      "sequence_identity": {
+        "alignment": {
+          "identity_pct": 45.5,
+          "aligned_length": 605,
+          "matches": 275,
+          "gaps": 85,
+          "seq_a_len": 595,
+          "seq_b_len": 530
+        },
+        "catalog_claim": "Mod- ~56% LBD ID; only 2 aa differ in ligand pocket (Leu/Met → Met/Ile)\n\nNW domain: 59.7% NR LBD (311-547 / 264-498, 237 aa) | NW full-seq: 45.5% (275/605)\n\nUniProt: P03372 / Q92731\n\nChEMBL-A: CHEMBL206 — 7.6K IC50, 1.7K Ki, 56 Kd (9.4K total)\n\nChEMBL-B: CHEMBL242 — 3.7K IC50, 1.5K Ki, 32 Kd (5.2K total)",
+        "match": true,
+        "notes": []
+      },
+      "domain_identity": {
+        "alignment": {
+          "identity_pct": 59.7,
+          "aligned_length": 238,
+          "matches": 142,
+          "gaps": 4,
+          "seq_a_len": 237,
+          "seq_b_len": 235
+        },
+        "domain_a": "NR LBD (311-547)",
+        "domain_b": "NR LBD (264-498)",
+        "range_a": "311-547",
+        "range_b": "264-498",
+        "domain_type": "LBD",
+        "catalog_claim_pct": "~56%",
+        "match_quality": "match",
+        "notes": [
+          "Sliced P03372 to 311-547 (237 res)",
+          "Sliced Q92731 to 264-498 (235 res)"
+        ]
+      },
+      "chembl_a": {
+        "chembl_id": "CHEMBL206",
+        "total_activities": 9389,
+        "ic50_count": 7597,
+        "ki_count": 1736,
+        "kd_count": 56,
+        "notes": []
+      },
+      "chembl_b": {
+        "chembl_id": "CHEMBL242",
+        "total_activities": 5163,
+        "ic50_count": 3653,
+        "ki_count": 1478,
+        "kd_count": 32,
+        "notes": []
+      },
+      "doi": {
+        "doi": "10.1016/j.steroids.2014.06.012",
+        "resolves": true,
+        "status_code": 302,
+        "redirect_url": "https://linkinghub.elsevier.com/retrieve/pii/S0039128X14001512",
+        "notes": []
+      }
+    }
+  }
+]

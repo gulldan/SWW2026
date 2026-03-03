@@ -1,0 +1,352 @@
+# Protein target pairs for the dual-target selectivity experiment.
+# Each pair defines two targets (A and B) with their PDB structures and metadata.
+#
+# Selection: 10 pairs from 5 therapeutic categories (see target_pairs_catalog.html)
+# Criteria: high binding-site similarity (>=53%), approved selective drug, quality PDB structures
+# Similarity range: 53% (ERa/ERb) to 90% (FGFR1/FGFR2)
+# Selectivity range: 1.2x (lapatinib) to ~4600x (saroglitazar)
+
+pairs:
+  # --- I. Oncology Kinase (4 pairs) ---
+
+  EGFR_HER2:
+    description: "Dual EGFR/HER2 inhibition - ~80% kinase domain ID, RMSD 1.1 A. Lapatinib FDA 2007."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "Very High (~80% kinase domain)"
+    selectivity_ratio: "Lapatinib: 10.8/9.3 nM (1.2x, near-equipotent)"
+    ground_truth_drug: "Lapatinib"
+    nw_domain: "81.3% Protein kinase (268 aa)"
+    target_a:
+      id: EGFR
+      name: "Epidermal growth factor receptor"
+      uniprot: P00533
+      pdb_id: 1XKK
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, kinase domain"
+      chembl_id: CHEMBL203
+      chembl_ic50_count: 25758
+      chembl_ki_count: 2090
+      chembl_kd_count: 1889
+      chembl_total: 29737
+    target_b:
+      id: HER2
+      name: "Receptor tyrosine kinase erbB-2"
+      uniprot: P04626
+      pdb_id: 3PP0
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, kinase domain"
+      chembl_id: CHEMBL1824
+      chembl_ic50_count: 5207
+      chembl_ki_count: 1473
+      chembl_kd_count: 194
+      chembl_total: 6874
+
+  CDK4_CDK6:
+    description: "CDK4/6 dual inhibition - ~71% protein ID, ATP-site highly conserved. Palbociclib FDA 2015."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "High (~71% overall protein ID)"
+    selectivity_ratio: "Palbociclib: 11/16 nM (1:1.5)"
+    ground_truth_drug: "Palbociclib"
+    nw_domain: "71.5% Protein kinase (290 aa)"
+    note: "PDB 2W96 = CDK4+CyclinD3 complex; use CDK4 chain (P11802), not CyclinD1 (P24385)"
+    target_a:
+      id: CDK4
+      name: "Cyclin-dependent kinase 4"
+      uniprot: P11802
+      pdb_id: 2W96
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding pocket"
+      chembl_id: CHEMBL331
+      chembl_ic50_count: 1772
+      chembl_ki_count: 117
+      chembl_kd_count: 390
+      chembl_total: 2279
+    target_b:
+      id: CDK6
+      name: "Cyclin-dependent kinase 6"
+      uniprot: Q00534
+      pdb_id: 6OQO  # CDK6+Cpd24, 1.98 A (replaced 5L2I which was 2.75 A)
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding pocket"
+      chembl_id: CHEMBL2508
+      chembl_ic50_count: 1046
+      chembl_ki_count: 4
+      chembl_kd_count: 249
+      chembl_total: 1299
+
+  ALK_ROS1:
+    description: "ALK/ROS1 dual TKI - 77% ATP-site ID, 49% kinase domain. Crizotinib FDA 2011."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "High (77% ATP-site)"
+    selectivity_ratio: "Crizotinib: 20/4 nM (5x ALK/ROS1)"
+    ground_truth_drug: "Crizotinib"
+    nw_domain: "48.4% Protein kinase (277 aa)"
+    target_a:
+      id: ALK
+      name: "ALK receptor tyrosine kinase"
+      uniprot: Q9UM73
+      pdb_id: 2XP2
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, kinase domain"
+      chembl_id: CHEMBL4247
+      chembl_ic50_count: 4357
+      chembl_ki_count: 946
+      chembl_kd_count: 215
+      chembl_total: 5518
+    target_b:
+      id: ROS1
+      name: "Proto-oncogene tyrosine-protein kinase ROS"
+      uniprot: P08922
+      pdb_id: 3ZBF
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, kinase domain"
+      chembl_id: CHEMBL5568
+      chembl_ic50_count: 422
+      chembl_ki_count: 537
+      chembl_kd_count: 137
+      chembl_total: 1096
+
+  FGFR1_FGFR2:
+    description: "FGFR selectivity - ~90% kinase domain ID (highest in set). Erdafitinib FDA 2019."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "Very High (~90% kinase domain)"
+    selectivity_ratio: "Erdafitinib: 1.2/2.5 nM (1:2.1)"
+    ground_truth_drug: "Erdafitinib"
+    nw_domain: "87.6% Protein kinase (290 aa)"
+    target_a:
+      id: FGFR1
+      name: "Fibroblast growth factor receptor 1"
+      uniprot: P11362
+      pdb_id: 5EW8
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, kinase domain"
+      chembl_id: CHEMBL3650
+      chembl_ic50_count: 8987
+      chembl_ki_count: 1233
+      chembl_kd_count: 420
+      chembl_total: 10640
+    target_b:
+      id: FGFR2
+      name: "Fibroblast growth factor receptor 2"
+      uniprot: P21802
+      pdb_id: 3RI1  # FGFR2+ARQ069, 2.1 A (replaced 2PSQ which was apo)
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, kinase domain"
+      chembl_id: CHEMBL4142
+      chembl_ic50_count: 4654
+      chembl_ki_count: 5
+      chembl_kd_count: 171
+      chembl_total: 4830
+
+  # --- II. Oncology Non-Kinase (1 pair) ---
+
+  IDH1_IDH2:
+    description: "Mutant IDH1(R132H) vs IDH2(R140Q) - 72% protein ID, allosteric dimer-interface pocket. Vorasidenib FDA 2024."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "High (72% overall protein ID)"
+    selectivity_ratio: "Vorasidenib: 0.6-6 / 7-12 nM (~2x IDH1 pref.)"
+    ground_truth_drug: "Vorasidenib"
+    nw_full_seq: "62.6% (285/455), 414/452 aa"
+    target_a:
+      id: IDH1
+      name: "Isocitrate dehydrogenase 1 (R132H mutant)"
+      uniprot: O75874
+      pdb_id: 4UMX  # IDH1-R132H+cpd1(VVS), 1.88 A (replaced 6ADG which was 3.0 A)
+      organism: "Homo sapiens"
+      binding_site: "Allosteric dimer-interface pocket"
+      chembl_id: CHEMBL2007625
+      chembl_ic50_count: 13673
+      chembl_ki_count: 158
+      chembl_kd_count: 52
+      chembl_total: 13883
+    target_b:
+      id: IDH2
+      name: "Isocitrate dehydrogenase 2 (R140Q mutant)"
+      uniprot: P48735
+      pdb_id: 5I96
+      organism: "Homo sapiens"
+      binding_site: "Allosteric dimer-interface pocket"
+      chembl_id: CHEMBL3991501
+      chembl_ic50_count: 1820
+      chembl_ki_count: 0
+      chembl_kd_count: 2
+      chembl_total: 1822
+
+  # --- III. Neurodegenerative (2 pairs) ---
+
+  AChE_BChE:
+    description: "Dual cholinesterase inhibition - ~65% seq ID, conserved gorge & catalytic triad. Rivastigmine FDA 2000."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "High (~65% overall seq ID)"
+    selectivity_ratio: "Rivastigmine: ~8x BChE pref."
+    ground_truth_drug: "Rivastigmine"
+    nw_full_seq: "51.1% (314/615), 614/602 aa"
+    target_a:
+      id: AChE
+      name: "Acetylcholinesterase"
+      uniprot: P22303
+      pdb_id: 4EY7
+      organism: "Homo sapiens"
+      binding_site: "Catalytic active site (gorge)"
+      chembl_id: CHEMBL220
+      chembl_ic50_count: 9731
+      chembl_ki_count: 1940
+      chembl_kd_count: 295
+      chembl_total: 11966
+    target_b:
+      id: BChE
+      name: "Butyrylcholinesterase"
+      uniprot: P06276
+      pdb_id: 4BDS
+      organism: "Homo sapiens"
+      binding_site: "Catalytic active site (gorge)"
+      chembl_id: CHEMBL1914
+      chembl_ic50_count: 5386
+      chembl_ki_count: 567
+      chembl_kd_count: 4
+      chembl_total: 5957
+
+  MAOA_MAOB:
+    description: "MAO isozyme selectivity - ~70% seq ID, 10/16 substrate-cavity residues conserved. Safinamide FDA 2017."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "High (~70% overall seq ID)"
+    selectivity_ratio: "Tranylcypromine: ~2.4x MAO-B pref."
+    ground_truth_drug: "Safinamide"
+    nw_full_seq: "71.5% (378/529), 527/520 aa"
+    note: "MAO-A/B contain covalent FAD cofactor - Boltz-2 affinity may be unreliable"
+    target_a:
+      id: MAOA
+      name: "Monoamine oxidase A"
+      uniprot: P21397
+      pdb_id: 2Z5X
+      organism: "Homo sapiens"
+      binding_site: "Substrate pocket (adjacent to FAD cofactor)"
+      chembl_id: CHEMBL1951
+      chembl_ic50_count: 7679
+      chembl_ki_count: 1825
+      chembl_kd_count: 0
+      chembl_total: 9504
+    target_b:
+      id: MAOB
+      name: "Monoamine oxidase B"
+      uniprot: P27338
+      pdb_id: 2V5Z
+      organism: "Homo sapiens"
+      binding_site: "Substrate pocket (adjacent to FAD cofactor)"
+      chembl_id: CHEMBL2039
+      chembl_ic50_count: 8656
+      chembl_ki_count: 948
+      chembl_kd_count: 9
+      chembl_total: 9613
+
+  # --- IV. Inflammation / Autoimmune (1 pair) ---
+
+  JAK1_JAK3:
+    description: "JAK selectivity - 84% active-site residue ID; unique JAK3 Cys909. Tofacitinib FDA 2012."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "Very High (84% active-site)"
+    selectivity_ratio: "Tofacitinib: 112/1 nM (~112x JAK3 pref.)"
+    ground_truth_drug: "Tofacitinib"
+    nw_full_seq: "38.0% (461/1214), 1154/1124 aa"
+    nw_domain: "50.5% Protein kinase 2/JH1 (875-1153 / 822-1111, 279/290 aa)"
+    target_a:
+      id: JAK1
+      name: "Janus kinase 1"
+      uniprot: P23458
+      pdb_id: 6N7B
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, JH1 kinase domain"
+      chembl_id: CHEMBL2835
+      chembl_ic50_count: 14973
+      chembl_ki_count: 3889
+      chembl_kd_count: 580
+      chembl_total: 19442
+    target_b:
+      id: JAK3
+      name: "Janus kinase 3"
+      uniprot: P52333
+      pdb_id: 3LXK
+      organism: "Homo sapiens"
+      binding_site: "ATP-binding site, JH1 kinase domain"
+      chembl_id: CHEMBL2148
+      chembl_ic50_count: 12009
+      chembl_ki_count: 2400
+      chembl_kd_count: 228
+      chembl_total: 14637
+
+  # --- V. Metabolic / Endocrine (2 pairs) ---
+
+  PPARa_PPARg:
+    description: "Dual PPAR alpha/gamma agonism - 60-70% LBD ID, single Tyr/His drives selectivity. Saroglitazar India 2013."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "High (60-70% LBD ID)"
+    selectivity_ratio: "Saroglitazar: EC50 0.65 pM / 3 nM (~4600x PPARa pref.)"
+    ground_truth_drug: "Saroglitazar"
+    nw_domain: "55.3% NR LBD (228/266 aa)"
+    note: "PDB 1FM9 = PPARg+RXRa heterodimer; use PPARg chain (P37231), not RXRa (P19793)"
+    target_a:
+      id: PPARa
+      name: "Peroxisome proliferator-activated receptor alpha"
+      uniprot: Q07869
+      pdb_id: 2P54
+      organism: "Homo sapiens"
+      binding_site: "Ligand-binding domain (LBD)"
+      chembl_id: CHEMBL239
+      chembl_ic50_count: 1303
+      chembl_ki_count: 209
+      chembl_kd_count: 39
+      chembl_total: 1551
+    target_b:
+      id: PPARg
+      name: "Peroxisome proliferator-activated receptor gamma"
+      uniprot: P37231
+      pdb_id: 1FM9
+      organism: "Homo sapiens"
+      binding_site: "Ligand-binding domain (LBD)"
+      chembl_id: CHEMBL235
+      chembl_ic50_count: 2321
+      chembl_ki_count: 622
+      chembl_kd_count: 106
+      chembl_total: 3049
+
+  ERa_ERb:
+    description: "Estrogen receptor selectivity - ~56% LBD ID, only 2 aa differ in ligand pocket. Tamoxifen FDA 1977."
+    boltz2_status: "ok"
+    set: "core"
+    similarity: "Mod-High (~56% LBD ID)"
+    selectivity_ratio: "Tamoxifen: ~equipotent; MPP 670x ERa-selective"
+    ground_truth_drug: "Tamoxifen"
+    nw_domain: "59.7% NR LBD (237 aa)"
+    target_a:
+      id: ERa
+      name: "Estrogen receptor alpha"
+      uniprot: P03372
+      pdb_id: 3ERT
+      organism: "Homo sapiens"
+      binding_site: "Ligand-binding domain (LBD)"
+      chembl_id: CHEMBL206
+      chembl_ic50_count: 7597
+      chembl_ki_count: 1736
+      chembl_kd_count: 56
+      chembl_total: 9389
+    target_b:
+      id: ERb
+      name: "Estrogen receptor beta"
+      uniprot: Q92731
+      pdb_id: 1X7B
+      organism: "Homo sapiens"
+      binding_site: "Ligand-binding domain (LBD)"
+      chembl_id: CHEMBL242
+      chembl_ic50_count: 3653
+      chembl_ki_count: 1478
+      chembl_kd_count: 32
+      chembl_total: 5163

@@ -1,0 +1,206 @@
+[project]
+name = "dualdocking"
+version = "0.1.0"
+description = "Dual-target docking workshop: single vs double target molecular generation with FREED++ and Boltz-2"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "pyarrow>=14.0",
+    "pyyaml>=6.0",
+    "rdkit>=2024.3.1",
+    "meeko>=0.5.1",
+    "requests>=2.31",
+    "datasets>=2.19",
+    "click>=8.1",
+    "jinja2>=3.1",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "scipy",
+    "tqdm>=4.66",
+    "loguru>=0.7",
+    "aiohttp>=3.9",
+    "boltz[cuda]",
+    "reinvent>=4.7",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-xdist>=3.0",
+    "ty",
+    "pre-commit>=3.6",
+]
+
+[project.scripts]
+dd-fetch = "cli.s0_fetch.fetch_all:main"
+dd-prepare = "cli.s1_prepare.prepare_targets:main"
+dd-calibrate = "cli.s2_calibrate.dock_calibration:main"
+dd-generate = "cli.s3_generate.generate:main"
+dd-score = "cli.s4_score.score:main"
+dd-aggregate = "cli.s5_analyze.aggregate:main"
+dd-smoke = "cli.smoke.boltz_smoke:main"
+dd-metrics = "cli.s5_analyze.compute_metrics:main"
+dd-plot = "cli.s6_report.plot_results:main"
+dd-render = "cli.s6_report.render_molecules:main"
+dd-summarize = "cli.s5_analyze.summarize:main"
+dd-gnina = "cli.s8_gnina.score_gnina:main"
+dd-md = "cli.s9_md.run_md:main"
+dd-audit = "cli.s7_audit.claim_audit:main"
+dd-verify-pair = "cli.s7_audit.verify_pair:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dualdocking", "cli", "dualdocking/generation/reinvent4/reinvent_plugins"]
+
+[tool.ruff]
+lint.select = ["ALL"]
+
+lint.ignore = [
+    "TC001", "TC002", "TC003",  # Type checking imports (too noisy for runtime-checked code)
+    "RUF002", "RUF003", "RUF001", "RUF010",  # Unicode and conversion
+    "TRY300", "TRY400", "TRY301",  # Exception handling
+    "BLE001",  # Blind except
+    "PTH118", "PTH112", "PTH107",  # Pathlib
+    "D100",  # Missing docstring in public module
+    "D103",  # Missing docstring in public function (too strict for small helpers)
+    "G004",  # Logging f-string
+    "G201",  # logger.exception vs logger.error (both valid)
+    "ISC001", "COM812",  # Formatting
+    "INP001",  # Implicit namespace package
+    "PLC0415",  # Import not at top level (lazy imports)
+    "ANN401",  # Any type (used for callbacks)
+    "PLW0603",  # Global statement
+    "PLR2004",  # Magic values (too noisy for algorithm code)
+    "TRY003", "EM101", "EM102",  # Exception messages (too strict)
+    "D107",  # Missing docstring in __init__ (often redundant)
+    "FBT001", "FBT002",  # Boolean positional arguments (too restrictive)
+    "TID252",  # Relative imports (valid in packages)
+    "RUF046",  # Cast to int when already int (sometimes for clarity)
+    "B905",  # zip without strict (Python 3.10+ is fine)
+    "UP035",  # typing.ContextManager deprecated (backwards compat)
+    "DTZ005",  # datetime.now() without tz (internal logging only)
+    "RET504",  # naming variables before return improves readability
+]
+
+
+line-length = 130
+
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    ".idea",
+    "__pycahe__",
+    "tests",
+    "test.py",
+]
+
+# Assume Python 3.12.
+target-version = "py312"
+
+[tool.ruff.lint.mccabe]
+# Flag errors (`C901`) whenever the complexity level exceeds 5.
+max-complexity = 50
+
+[tool.ruff.lint.pylint]
+max-branches = 50
+max-statements = 150
+max-args = 10
+max-returns = 12
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# Use single quotes for non-triple-quoted strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v -n 8 -m 'not benchmark'"
+pythonpath = ["."]
+filterwarnings = [
+    # scipy Boost _nct_cdf/_nct_sf: numerical divide-by-zero for extreme
+    # non-centrality parameters (small df + large nc). Cannot fix upstream;
+    # results are correct despite the warning.
+    "ignore:divide by zero encountered in _nct_:RuntimeWarning:scipy",
+]
+markers = [
+    "integration: marks tests as integration tests",
+    "benchmark: marks performance benchmarks (require GPU + optional NIM container)",
+]
+
+[tool.coverage.run]
+source = ["dualdocking"]
+omit = ["tests/*", "*/__pycache__/*"]
+
+[tool.ty]
+# ty type checker config (https://docs.astral.sh/ty/)
+# All other rules remain at ERROR level (default)
+environment = { root = ["."] }
+src = { include = ["dualdocking"], exclude = ["tests/", "cli/", "alembic/"] }
+
+[tool.ty.rules]
+# === External library issues (missing type stubs) ===
+# These cannot be fixed without adding stubs to external packages
+unresolved-import = "warn"           # Optional deps: psutil, mypy_boto3_s3
+unresolved-attribute = "warn"        # Libraries without stubs: fugashi, ass, av
+no-matching-overload = "warn"        # SQLAlchemy UUID overload issues in alembic
+
+# === ty inference limitations with ParamSpec decorators ===
+# ty cannot properly infer types through decorators using ParamSpec
+# See: https://github.com/astral-sh/ty/issues (ParamSpec support)
+too-many-positional-arguments = "warn"  # @timed_db, @timed_llm decorators
+unknown-argument = "warn"            # **kwargs passed through decorators
+missing-argument = "warn"            # Decorator-wrapped fixtures in tests
+not-subscriptable = "warn"           # Return type inference through decorators
+not-iterable = "warn"                # Same inference issue
+
+# === Dynamic **kwargs unpacking ===
+# ty cannot infer types when dict is unpacked as **kwargs
+invalid-argument-type = "warn"       # **media_kwargs, FastAPI middleware
+
+# === Complex union narrowing ===
+# ty doesn't narrow types through all control flow patterns
+invalid-assignment = "warn"          # dict[str, Unknown] subscript access
+unsupported-operator = "warn"        # numpy with Optional types
+
+[tool.uv.sources]
+boltz = { git = "https://github.com/jwohlwend/boltz.git", rev = "cb04aeccdd480fd4db707f0bbafde538397fa2ac" }
+reinvent = { git = "https://github.com/MolecularAI/REINVENT4.git", tag = "v4.7" }

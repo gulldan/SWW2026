@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+wheels/
+.eggs/
+
+# Virtual environments
+.venv/
+.ruff_cache
+.pytest_cache
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+output/cache/
+output/data/targets/*/A/*.pdb
+output/data/targets/*/B/*.pdb
+output/data/*.pdb
+output/results/
+report/experiment_*.log
+report/post_*.log
+report/calibration_full.log
+report/data/*.parquet
+report/figures/*.png
+report/metrics.json
+report/stats.json
+report/summary.txt
+report/proxy_correlation.json
+report/manuscript.tex
+report/manuscript.pdf
+report/manuscript.aux
+report/manuscript.bbl
+report/manuscript.blg
+report/manuscript.log
+report/references.bib
+docker/freedpp/dualdocking-freedpp.tar.zst
+.coverage
+# Secrets / credentials
+.env
+*.key
+output/data/
+docker/boltz2/boltz2_1.5.0.tar
+docker/boltz2/cache/
+output/cache/boltz_nim

@@ -1,0 +1,92 @@
+% ===========================================================================
+%  Chapter 8: Discussion
+%  Dual-Target RL Molecular Generation — Workshop Report
+% ===========================================================================
+
+% >>> PLACEHOLDER: this section is populated after pipeline completion. <<<
+% Subsection structure below defines the narrative arc; each subsection
+% should be expanded with quantitative references to the Results tables.
+
+\subsection{Interpretation of Primary Results}
+
+% >>> PLACEHOLDER: interpret hr_both differences, effect sizes, CI. <<<
+% Relate N/5 success rate to pre-registered criteria (Section 4).
+% Discuss whether the effect is consistent across homo vs hetero pairs.
+% >>> END PLACEHOLDER <<<
+
+\subsection{Comparison with Prior Work}
+
+No prior work has systematically explored the continuous weight space
+from selective ($w_A = 1, w_B = -1$) through single-target
+($w_A = 1, w_B = 0$) to dual-target ($w_A = 1, w_B = 1$) for
+structure-based docking as the RL reward for two protein
+targets~\citep{fromer2023moo, loeffler2024reinvent4}.
+Existing multi-objective RL generators either optimize molecular
+\emph{properties} (QED, SA, logP) rather than binding affinity to
+two specific proteins~\citep{jain2023mogfn, wang2024scarlp},
+or use predictor-based rewards instead of
+docking~\citep{ren2024polygon, zhang2024clm}.
+
+The closest comparisons are:
+\begin{itemize}
+\item \textbf{PMMG}~\citep{pmmg2025}: Pareto MCTS for dual EGFR/HER2
+  docking, but without weight-space exploration or orthogonal evaluation.
+\item \textbf{AIxFuse}~\citep{chen2024aixfuse}: pharmacophore-based
+  dual-target design for GSK3$\beta$/JNK3, but no selectivity spectrum.
+\item \textbf{Isigkeit et al.}~\citep{isigkeit2024clm}: chemical language
+  model fine-tuning for dual ligands with experimental validation, but
+  ligand-based (no structural docking reward).
+\end{itemize}
+
+% >>> PLACEHOLDER: compare quantitative results to PMMG/POLYGON success rates. <<<
+% >>> END PLACEHOLDER <<<
+
+\subsection{Orthogonal Evaluation: UniDock vs.\ Boltz-2}
+
+A key design choice is the decoupling of the training objective (UniDock
+docking scores $d_A, d_B$) from the evaluation metric (Boltz-2 affinity
+$a_A, a_B$)~\citep{passaro2025boltz2}.  Most generative studies evaluate
+molecules with the same scorer used as the RL reward, creating circular
+evaluation~\citep{abdelsayed2025polypharmacology}.
+Our design mitigates this by using two fundamentally different
+methods---physics-based empirical scoring versus a transformer-based
+learned surrogate.
+
+% >>> PLACEHOLDER: report per-target Spearman rho and discuss concordance. <<<
+% If rho ~ 0 for any target, flag hit-rate conclusions for that pair.
+% >>> END PLACEHOLDER <<<
+
+\citet{bret2026boltz2docking} recently showed that Boltz-2 affinity
+predictions may be insensitive to binding-site mutations, reinforcing the
+need for multiple independent evaluation layers.  Where docking and Boltz-2
+agree on the direction of the \texttt{double} advantage, confidence in the
+result is substantially higher.
+
+\subsection{Weight-Space Spectrum}
+
+The six reward modes map the trade-off between target selectivity and
+polypharmacology onto a single parametric axis.  This is, to our knowledge,
+the first demonstration that these two traditionally separate research
+fields correspond to different points on a continuous reward-weight
+scale within the same RL architecture.
+
+% >>> PLACEHOLDER: summarize trends across the 6 modes. <<<
+% Does selective_a mode actually produce A-selective molecules?
+% Does linear_equal differ from worst-case?
+% >>> END PLACEHOLDER <<<
+
+\subsection{Limitations in Context}
+
+The limitations enumerated in Section~\ref{sec:limitations} should be
+weighed against three mitigating factors:
+(1)~all comparisons are \emph{relative} (double vs.\ single under
+identical conditions), so absolute scorer calibration is less critical;
+(2)~pre-registration of pairs, thresholds, and success criteria
+prevents post-hoc cherry-picking;
+(3)~the conjunctive significance criterion (FDR $+$ effect size $+$
+CI exclusion) is deliberately conservative.
+
+The $m = 5$ seed limitation remains the principal statistical weakness.
+Future work should increase the seed count to $\geq 10$ and consider
+wild cluster bootstrap~\citep{cameron2008bootstrap} for improved
+small-cluster inference.

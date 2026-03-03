@@ -1,0 +1,89 @@
+% This chapter is populated by the post-pipeline (generate_latex_report.py).
+% Placeholder subsections below define the structure; each will be filled
+% with auto-generated tables, figures, and statistical summaries.
+
+\subsection{Experimental Completeness}
+
+% >>> PLACEHOLDER: auto-filled by compute_metrics.py <<<
+% Run completion rate, quality-gate pass/fail summary, missing data report.
+% >>> END PLACEHOLDER <<<
+
+\subsection{Primary Endpoint: Dual Hit-Rate}
+
+The primary endpoint is the dual hit-rate difference
+$\Delta\mathrm{hr}_{\mathrm{both}} = \mathrm{hr}_{\mathrm{both}}(\texttt{double})
+- \mathrm{hr}_{\mathrm{both}}(\texttt{single\_x})$
+on each of the five pre-registered core pairs.
+A contrast is declared significant only if all three conditions hold:
+BH-adjusted $p < 0.05$, $|\text{Cliff's } \delta| \geq 0.33$, and the
+bootstrap 95\% CI excludes
+zero~\citep{cameron2008bootstrap, cliff1993dominance, benjamini1995fdr}.
+
+% >>> PLACEHOLDER: primary results table <<<
+% Table: pair | hr_both(double) | hr_both(single_a) | hr_both(single_b) |
+%   delta_a | delta_b | p_adj_a | p_adj_b | CI | verdict
+% >>> END PLACEHOLDER <<<
+
+\subsection{No-Degradation Guard}
+
+For every core pair, per-target hit-rates $\mathrm{hr}_a(\texttt{double})$
+and $\mathrm{hr}_b(\texttt{double})$ are compared against the corresponding
+single-mode baseline.  A pair is flagged if Cliff's $\delta < -0.47$
+(large negative effect).
+
+% >>> PLACEHOLDER: degradation table <<<
+% >>> END PLACEHOLDER <<<
+
+\subsection{Secondary Endpoints}
+
+\paragraph{Score balance.}
+Median $|a_A - a_B|$ per mode; lower values indicate more balanced
+dual-target affinity.
+
+\paragraph{Enrichment@K.}
+For $K \in \{10, 50, 100, 500\}$, enrichment factor of dual hits
+in the top-$K$ molecules ranked by $\max(a_A, a_B)$ ascending.
+
+\paragraph{Pareto hypervolume.}
+Hypervolume dominated by the non-dominated set in $(a_A, a_B)$ space,
+with reference point $r = (2.0, 2.0)$.
+
+% >>> PLACEHOLDER: secondary metrics table <<<
+% >>> END PLACEHOLDER <<<
+
+\subsection{Exploratory Endpoints}
+
+\paragraph{Reward weight-space spectrum.}
+Comparison of all six modes (including exploratory \texttt{linear\_equal},
+\texttt{biased\_a}, \texttt{selective\_a}) on dual hit-rate and per-target
+hit-rates, reported descriptively.
+
+\paragraph{Docking--Boltz-2 concordance.}
+Per-target Spearman $\rho(d_X, a_X)$ as a sanity check for surrogate agreement.
+
+\paragraph{Chemical diversity.}
+Internal diversity (Tanimoto), scaffold diversity, and uniqueness
+across modes.
+
+% >>> PLACEHOLDER: exploratory figures <<<
+% >>> END PLACEHOLDER <<<
+
+\subsection{Sensitivity Analyses}
+
+\paragraph{Threshold sensitivity.}
+Primary analysis repeated at $T \in \{-1.0, 0.0, +1.0\}$
+(100\,nM, 1\,$\mu$M, 10\,$\mu$M).
+
+\paragraph{Equal docking calls.}
+Single modes with doubled RL epochs (400) to equalize
+training-time docking budget.
+
+\paragraph{Alternative scalarizations.}
+Offline re-computation of reward under geometric mean, harmonic mean,
+weighted sum, weighted product, and Tchebycheff decomposition.
+
+% >>> PLACEHOLDER: sensitivity tables <<<
+% >>> END PLACEHOLDER <<<
+
+Where data are incomplete at the time of manuscript assembly, the gap is
+recorded explicitly rather than backfilled with extrapolations.

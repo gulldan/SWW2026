@@ -1,0 +1,55 @@
+version: 1
+
+# Central registry of built-in reward modes.
+# Notes:
+# - `kind` selects a built-in evaluator implemented in dualdocking.reward.selectivity.
+# - `requires_secondary_target=true` means target B normalization stats must exist.
+# - `requires_dual_docking=true` means both z_a and z_b are evaluated per call.
+# - `default_params` can be overridden at runtime (e.g. REWARD_PARAMS_JSON in FREED++).
+# - On-target is `A` (z_a), off-target is `B` (z_b).
+# - These defaults mirror hardcoded fallback defaults in
+#   dualdocking/reward/selectivity.py::_register_builtin_modes_fallback.
+modes:
+  single_a:
+    kind: single_a
+    requires_secondary_target: false
+    requires_dual_docking: false
+    default_params: {} # reward = z_a (no tunable params)
+
+  single_b:
+    kind: single_b
+    requires_secondary_target: true
+    requires_dual_docking: false
+    default_params: {} # reward = z_b (no tunable params)
+
+  double:
+    kind: double
+    requires_secondary_target: true
+    requires_dual_docking: true
+    default_params: {} # reward = max(z_a, z_b)
+
+  linear_equal:
+    kind: linear_equal
+    requires_secondary_target: true
+    requires_dual_docking: true
+    default_params: {} # reward = z_a + z_b (equal weights fixed in evaluator)
+
+  biased_a:
+    kind: biased_a
+    requires_secondary_target: true
+    requires_dual_docking: true
+    default_params:
+      weight_b: 0.3 # reward = z_a + weight_b * z_b
+
+  selective_a:
+    kind: selective_a
+    requires_secondary_target: true
+    requires_dual_docking: true
+    default_params: {} # reward = z_a - z_b (equivalent to selective_weighted with lambda_off=1.0)
+
+  selective_weighted:
+    kind: selective_weighted
+    requires_secondary_target: true
+    requires_dual_docking: true
+    default_params:
+      lambda_off: 1.0 # reward = z_a - lambda_off * z_b, must be > 0

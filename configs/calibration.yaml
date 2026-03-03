@@ -1,0 +1,43 @@
+selected: moses
+output_path: output/data/calibration/zinc_druglike_calibration_1000_v2024.smi
+sample:
+  n: 1000
+  seed: 137
+options:
+  download_all: true
+  canonicalize: false
+
+docking:
+  exhaustiveness: 8
+  num_modes: 9
+  energy_range: 3.0
+  timeout_seconds: 120
+  box_padding: 10.0
+  batch_mode: true
+  batch_size: 64
+
+sources:
+  moses:
+    type: huggingface
+    dataset: antoinebcx/smiles-molecules-moses
+    split: train
+    smiles_column: smiles
+    license: "Dataset card: MOSES (ZINC Clean Leads)"
+  chembl:
+    type: huggingface
+    dataset: antoinebcx/smiles-molecules-chembl
+    split: train
+    smiles_column: smiles
+    license: "Dataset card: ChEMBL"
+  guacamol:
+    type: huggingface
+    dataset: haydn-jones/Guacamol
+    split: train
+    smiles_column: SMILES
+    license: "Dataset card: GuacaMol"
+  zinc15:
+    type: url
+    enabled: false
+    url: ""
+    smiles_column: 0
+    note: "ZINC has redistribution restrictions; provide your own URL."

@@ -1,0 +1,61 @@
+{
+  "generated_at_utc": "2026-02-14T10:03:55.336257Z",
+  "root": "/mnt/data/SWW2026",
+  "params": {
+    "include_tests": false,
+    "min_lines": 12,
+    "token_k": 5,
+    "near_threshold": 0.85,
+    "line_delta": 12
+  },
+  "stats": {
+    "files_scanned": 130,
+    "functions_scanned": 423,
+    "exact_clone_groups": 0,
+    "structural_clone_groups": 0,
+    "token_near_pairs": 1,
+    "token_near_clusters": 1
+  },
+  "exact_clone_groups": [],
+  "structural_clone_groups": [],
+  "token_near_pairs": [
+    {
+      "similarity": 1.0,
+      "a": {
+        "path": "dualdocking/pipeline/checks.py",
+        "name": "check_fetch_outputs",
+        "start": 44,
+        "end": 58,
+        "n_lines": 15
+      },
+      "b": {
+        "path": "dualdocking/pipeline/checks.py",
+        "name": "check_calibration_outputs",
+        "start": 61,
+        "end": 75,
+        "n_lines": 15
+      }
+    }
+  ],
+  "token_near_clusters": [
+    {
+      "size": 2,
+      "functions": [
+        {
+          "path": "dualdocking/pipeline/checks.py",
+          "name": "check_fetch_outputs",
+          "start": 44,
+          "end": 58,
+          "n_lines": 15
+        },
+        {
+          "path": "dualdocking/pipeline/checks.py",
+          "name": "check_calibration_outputs",
+          "start": 61,
+          "end": 75,
+          "n_lines": 15
+        }
+      ]
+    }
+  ]
+}

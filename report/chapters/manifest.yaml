@@ -1,0 +1,38 @@
+title: "Dual-Target Docking for Multi-Target Hit Discovery: A Reproducible Empirical Study"
+author: "SWW2026 Workshop Team"
+abstract_file: "00_abstract.tex"
+keywords:
+  - dual-target docking
+  - molecular generation
+  - FREED++
+  - Boltz-2
+  - reproducibility
+sections:
+  - id: introduction
+    title: "Introduction"
+    file: "01_introduction.tex"
+    required: true
+  - id: related_work
+    title: "Related Work"
+    file: "02_related_work.tex"
+    required: true
+  - id: methods
+    title: "Methods"
+    file: "03_methods_notes.tex"
+    required: true
+  - id: protocol
+    title: "Experimental Protocol and Fairness Controls"
+    file: "04_experimental_protocol.tex"
+    required: true
+  - id: results_scope
+    title: "Result Scope and Decision Criteria"
+    file: "05_results_scope.tex"
+    required: true
+  - id: limitations
+    title: "Limitations"
+    file: "06_limitations.tex"
+    required: true
+  - id: conclusion
+    title: "Conclusion and Next Steps"
+    file: "07_conclusion.tex"
+    required: true

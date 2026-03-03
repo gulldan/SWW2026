@@ -1,0 +1,96 @@
+# Experimental budget and reproducibility settings.
+#
+# All single-target and double-target runs use the SAME budget
+# to ensure a fair comparison.
+#
+# For smoke tests: FREEDPP_EPOCHS=10 uv run python cli/pipeline/run_full_experiment.py ...
+
+budget:
+  n_molecules: 1000          # molecules per generation run
+  n_scoring_calls: 2000      # max Boltz-2 calls per run (1000 * 2 targets)
+
+# Fixed seeds for reproducibility
+seeds: [42, 137, 256, 512, 1024]
+
+# Number of independent runs per (pair, mode) combination
+n_runs: 5
+
+# Modes for comparison.
+# Pre-registered (primary): single_a, single_b, double.
+# Exploratory (not pre-registered): linear_equal, biased_a, selective_a.
+modes:
+  - single_a       # optimize for target A only, then evaluate on both        [pre-registered]
+  - single_b       # optimize for target B only, then evaluate on both        [pre-registered]
+  - double         # optimize for combined(A, B) simultaneously               [pre-registered]
+  # - linear_equal   # z_a + z_b — equally weighted linear combination          [exploratory]
+  # - biased_a       # z_a + 0.3*z_b — target A priority                       [exploratory]
+  # - selective_a    # z_a - z_b — maximize selectivity for A                   [exploratory]
+
+# Objective functions for double-target mode
+# Baseline + alternatives for sensitivity analysis
+objectives:
+  baseline: "min"               # worst-case — primary hypothesis
+  alternatives:
+    - kind: "geometric"         # geometric mean
+    - kind: "harmonic"          # harmonic mean
+    - kind: "weighted_sum"      # linear scalarization
+      weight_a: 0.5
+    - kind: "weighted_product"  # multiplicative scalarization
+      weight_a: 0.5
+    - kind: "tchebycheff"       # Tchebycheff decomposition (non-convex Pareto front)
+      weight_a: 0.5
+      utopia_a: -3.0            # ideal log10(IC50, μM): 1 nM -> -3
+      utopia_b: -3.0            # ideal log10(IC50, μM)
+
+# Pareto analysis (post-processing, not used as reward)
+pareto_analysis:
+  enabled: true
+  ref_point_a: 2.0              # reference point (worse): 100 μM -> 2.0 (= T + 2)
+  ref_point_b: 2.0
+
+# Generator settings
+# Set generator.name to "FREED++" or "REINVENT4" to switch backends.
+generator:
+  name: "FREED++"
+  freedpp:
+    epochs: 100
+    num_sub_proc: 0            # 0 = auto-detect: 12 for 4090/24GB, 24 for H100/80GB
+    starting_smile: "c1([*:1])c([*:2])ccc([*:3])c1"
+    docker_image: "dualdocking/freedpp:latest"
+    use_model_cache: true
+    training_timeout: 86400  # 24h
+    box_padding: 10.0        # Å
+    vina_program: unidock_gpu    # "qvina02" for CPU fallback
+    pass_reward_modes_to_container: true    # set false for model images with internal reward config
+    reward_modes_path_in_container: /opt/reward_modes.yaml
+    early_stopping_patience: 15    # 0 = disabled; stop training when reward plateaus for N epochs
+    early_stopping_min_epochs: 20  # minimum epochs before early stopping can trigger
+    early_stopping_threshold: 0.01 # relative range threshold for plateau detection
+  reinvent4:
+    algorithm: dap             # DAP learning strategy (recommended by REINVENT4 authors)
+    generator_type: reinvent   # cache key only; architecture follows the prior model
+    batch_size: 128
+    n_steps: 50
+    use_cache: true
+    use_diversity_filter: true
+    prior_model: ""            # empty = built-in ChEMBL prior
+    box_padding: 10.0          # Å
+    vina_program: /home/qwerty/bin/unidock
+    training_timeout: 86400    # 24h
+
+# Reward run quality threshold (quality gate)
+quality_gate:
+  max_invalid_fraction: 0.10
+  max_timeout_fraction: 0.05
+
+# Scorer settings (Boltz-2)
+scorer:
+  name: "Boltz-2"
+  backend: nim                    # "cli" (subprocess boltz predict) or "nim" (REST API, faster)
+  cache_enabled: true
+  timeout_seconds: 300
+  nim:
+    # One NIM instance per GPU for parallel scoring.
+    # URLs are auto-generated: localhost:{base_port + gpu_idx} for each detected GPU.
+    # E.g. 1 GPU → [localhost:8000], 2 GPUs → [localhost:8000, localhost:8001].
+    base_port: 8000

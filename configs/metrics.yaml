@@ -1,0 +1,91 @@
+# Metrics configuration for dual-target evaluation.
+#
+# Hit definition: a molecule is a "hit" if Boltz-2 affinity <= threshold.
+# Scores a_A, a_B: Boltz-2 affinity_pred_value, log10(IC50-like, μM), lower = better.
+# NB: Boltz-2 trained on mixed Ki/Kd/IC50/EC50; values are ranking surrogates, not calibrated IC50.
+# Thresholds T_A, T_B: fixed, 0.0 = 1 μM for all pairs.
+# Examples: 1 μM -> 0.0, 100 nM -> -1.0, 10 μM -> 1.0
+
+hit_definition:
+  convention: "lower_is_better"
+  rule: "a_A <= T_A AND a_B <= T_B"
+
+thresholds:
+  # --- Core (5 pairs) ---
+  CDK2_ERK2:           # Non-AD, Homo
+    target_a: 0.0    # 1 μM
+    target_b: 0.0
+  AChE_BChE:           # AD, Homo
+    target_a: 0.0
+    target_b: 0.0
+  BACE1_GSK3B:         # AD, Hetero
+    target_a: 0.0
+    target_b: 0.0
+  AChE_BACE1:          # AD, Hetero
+    target_a: 0.0
+    target_b: 0.0
+  GSK3B_CDK5:          # AD, Hetero
+    target_a: 0.0
+    target_b: 0.0
+  # --- Auxiliary (3 pairs) ---
+  EGFR_HER2:           # Non-AD, Homo
+    target_a: 0.0
+    target_b: 0.0
+  BACE1_CDK5:          # AD, Hetero
+    target_a: 0.0
+    target_b: 0.0
+  AChE_MAOB:           # AD, Hetero, cofactor-sensitive
+    target_a: 0.0
+    target_b: 0.0
+  # --- Oncology kinase & epigenetic (4 pairs) ---
+  MEK1_MEK2:
+    target_a: 0.0
+    target_b: 0.0
+  FGFR1_FGFR2:
+    target_a: 0.0
+    target_b: 0.0
+  EZH2_EZH1:
+    target_a: 0.0
+    target_b: 0.0
+  BRD4_BRD2:
+    target_a: 0.0
+    target_b: 0.0
+  # --- Blocked ---
+  COX1_COX2:           # non-human PDB
+    target_a: 0.0
+    target_b: 0.0
+
+# Enrichment factor - top-K molecules for evaluation
+enrichment:
+  k_values: [10, 50, 100, 500]
+
+# Docking enrichment quality thresholds (SCI-05: enrichment benchmark).
+# Used by cli/validation/enrichment_benchmark.py to flag targets where UniDock
+# cannot separate ChEMBL actives from MOSES druglike decoys.
+#
+# Threshold rationale (project-specific — no literature consensus):
+#   AUROC > 0.6:  modestly above random (0.5); conservative for druglike decoys
+#   BEDROC(alpha=20) > 0.3: meaningful early enrichment; standard alpha per Truchon & Bayly 2007
+#   EF@1%: reported but NOT used as pass/fail criterion (too variable with small n)
+enrichment_quality:
+  auroc_threshold: 0.6
+  bedroc_alpha20_threshold: 0.3
+  ef_1pct_threshold: 2.0
+  alpha: 20.0
+  max_actives_per_target: 200
+  active_sampling_seed: 137
+
+# Pre-registered sensitivity thresholds (SCI-06 / KVA-270).
+# Used by cli/analysis/threshold_sensitivity.py to sweep T_A = T_B = T.
+# Values: log10(IC50-like, μM).  -1.0 = 100 nM, 0.0 = 1 μM, 1.0 = 10 μM.
+sensitivity_thresholds: [-1.0, 0.0, 1.0]
+
+# Metrics computed for each run
+computed_metrics:
+  - dual_hit_rate
+  - hit_rate_a
+  - hit_rate_b
+  - enrichment_at_k
+  - ks_test
+  - mannwhitney_u
+  - rank_biserial_r
