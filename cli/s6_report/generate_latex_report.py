@@ -351,7 +351,7 @@ def main(
 
     Assembles experiment data (metrics, statistics, chapters) into a Jinja2
     template context, renders the ``.tex`` file, copies the bibliography,
-    and runs ``latexmk`` if in ``full`` mode.
+    and runs ``pdflatex``/``bibtex`` if in ``full`` mode.
 
     Args:
         mode: ``"draft"`` (TeX only) or ``"full"`` (TeX + PDF compilation).

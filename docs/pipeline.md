@@ -615,6 +615,21 @@ uv run python cli/s6_report/generate_latex_report.py --mode full
 
 Output: `report/manuscript.tex`, `report/manuscript.pdf`.
 
+If `pdflatex`/`bibtex` is not installed on the host, compile the generated
+`report/manuscript.tex` in Docker:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD/report:/work" \
+  -w /work \
+  blang/latex:ctanfull \
+  bash -lc "pdflatex -interaction=nonstopmode manuscript.tex; \
+            bibtex manuscript; \
+            pdflatex -interaction=nonstopmode manuscript.tex; \
+            pdflatex -interaction=nonstopmode manuscript.tex"
+```
+
 ## Logs
 
 - Stage 3+4: `report/experiment_<run_id>_<utc>.log`

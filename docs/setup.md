@@ -412,8 +412,30 @@ memory limits).
 
 ## LaTeX (optional)
 
-For PDF report generation. On Arch Linux:
+For PDF report generation.
+
+Arch Linux:
 
 ```bash
 sudo pacman -S --needed texlive-core texlive-latexextra texlive-bibtexextra
+```
+
+Rocky Linux / RHEL 9:
+
+```bash
+sudo dnf install -y texlive texlive-pdftex texlive-bibtex
+```
+
+If your distro repositories do not provide a complete TeX setup, compile via Docker:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD/report:/work" \
+  -w /work \
+  blang/latex:ctanfull \
+  bash -lc "pdflatex -interaction=nonstopmode manuscript.tex; \
+            bibtex manuscript; \
+            pdflatex -interaction=nonstopmode manuscript.tex; \
+            pdflatex -interaction=nonstopmode manuscript.tex"
 ```

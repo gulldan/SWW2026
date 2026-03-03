@@ -6,6 +6,7 @@ via ``pdflatex`` + ``bibtex``.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -58,6 +59,7 @@ def compile_latex_pdf(tex_path: str | Path, mode: str = "draft") -> Path | None:
 
     Raises:
         ValueError: If *mode* is not ``"draft"`` or ``"full"``.
+        FileNotFoundError: If ``pdflatex`` or ``bibtex`` is missing.
         subprocess.CalledProcessError: If any LaTeX compilation step fails.
     """
     tex_path = Path(tex_path)
@@ -69,8 +71,14 @@ def compile_latex_pdf(tex_path: str | Path, mode: str = "draft") -> Path | None:
     workdir = tex_path.parent
     name = tex_path.stem
 
+    for exe in ("pdflatex", "bibtex"):
+        if shutil.which(exe) is None:
+            raise FileNotFoundError(
+                f"Missing required executable: {exe}. Install a LaTeX toolchain (pdflatex + bibtex) or run with mode='draft'."
+            )
+
     def _run(cmd: list[str]) -> None:
-        subprocess.run(cmd, cwd=workdir, check=True, capture_output=True)  # noqa: S603
+        subprocess.run(cmd, cwd=workdir, check=True)  # noqa: S603
 
     _run(["pdflatex", "-interaction=nonstopmode", tex_path.name])
     _run(["bibtex", name])

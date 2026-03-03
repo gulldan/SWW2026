@@ -122,8 +122,8 @@ No statistical table available. Run \texttt{cli/s5\_analyze/compute\_metrics.py}
 {% for fig in figures[:6] %}
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.88\linewidth]{ {{ fig }} }
-\caption{Auto-generated figure: \texttt{ {{ fig }} }}
+\includegraphics[width=0.88\linewidth]{ {{- fig -}} }
+\caption{Auto-generated figure: \texttt{ {{- fig -}} }}
 \end{figure}
 {% endfor %}
 {% else %}
