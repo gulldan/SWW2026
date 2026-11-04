@@ -8,7 +8,7 @@ Single-target vs dual-target RL molecule generation using **FREED++** or **REINV
 
 ## Data Flow
 
-![SWW2026 dual-target pipeline: 8 stages across 5 engine lanes](docs/diagrams/sww2026_pipeline.svg)
+![SWW2026 dual-target pipeline: 8 stages across 5 engine lanes](docs/diagrams/sww2026_pipeline.png)
 
 <sub>Diagram source: [`docs/diagrams/sww2026_pipeline.html`](docs/diagrams/sww2026_pipeline.html) — self-contained, opens in a browser.</sub>
 
