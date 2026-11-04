@@ -25,7 +25,7 @@ SWW2026/
 ├── configs/         YAML configuration (pairs, metrics, experiment, reward modes)
 ├── docker/          Container images (freedpp, gnina, boltz2, md)
 ├── tests/           pytest suite (~1160 tests)
-├── docs/            Documentation (15 files — see Documentation Map)
+├── docs/            Documentation (12 files — see Documentation Map)
 ├── scripts/         Standalone runnable scripts
 ├── report/          LaTeX manuscript
 └── output/          Runtime data (gitignored)
@@ -102,7 +102,7 @@ uv run dd-smoke
 | Notation | `d` = UniDock docking (RL reward); `a` = Boltz-2 affinity (evaluation) — never mixed | [Goal](docs/goal.md) |
 | Score convention | lower_is_better throughout; utility = −score | [Architecture](docs/architecture.md) |
 | Generation modes | single_a, single_b, double (primary); 4 exploratory modes | [Reward Modes](docs/reward_modes.md) |
-| Target pairs | 5 core + 7 auxiliary + 1 blocked — defined in `configs/pairs.yaml` | [Selection Criteria](docs/selection_criteria.md) |
+| Target pairs | 10 core pairs, 20 targets — defined in `configs/pairs.yaml` | [Selection Criteria](docs/selection_criteria.md) |
 | Hit definition | Boltz-2 affinity ≤ 0.0 (1 µM); dual hit = both targets | [Goal](docs/goal.md) |
 | Success criteria | Cliff's δ > −0.47 on ≥ 3/5 core pairs (double vs best single) | [Goal](docs/goal.md) |
 | Backend config | Generator (freedpp/reinvent4) and scorer (boltz2) set in `configs/experiment.yaml` | [Architecture](docs/architecture.md), [Pipeline](docs/pipeline.md) |
@@ -181,13 +181,10 @@ Read in the order shown for fastest onboarding.
 | 5 | [Selection Criteria](docs/selection_criteria.md) | Reference | Target pair rationale, factorial design, core/auxiliary split |
 | 6 | [Pre-registration](docs/preregistration.md) | Frozen (v1.1) | Frozen hypotheses and decision rules |
 | 7 | [Statistical Analysis Plan](docs/statistical_analysis_plan.md) | Frozen (v1.1) | Inference procedures, claim rules, code mapping |
-| 8 | [Receptor QC](docs/receptor_qc.md) | Reference | Per-target structural quality control |
-| 9 | [NIM Benchmark](docs/nim_benchmark.md) | Reference | Boltz-2 NIM backend benchmarks |
-| 10 | [Reward Modes](docs/reward_modes.md) | Reference | Declarative reward registry, YAML schema, plugin extension |
-| 11 | [I/O Contracts](docs/io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages |
-| 12 | [Novelty Report](docs/novelty_report.md) | Reference | Gap analysis vs prior work, novelty assessment |
-| 13 | [Pipeline Granularity](docs/tasks_pipeline_granularity.md) | Living | Pipeline stage refactoring plan (9→17 stages) |
-| 14 | [Doc Index](docs/README.md) | Living | Source priority and conflict resolution rules |
+| 8 | [Reward Modes](docs/reward_modes.md) | Reference | Declarative reward registry, YAML schema, plugin extension |
+| 9 | [I/O Contracts](docs/io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages |
+| 10 | [Pipeline Granularity](docs/tasks_pipeline_granularity.md) | Living | Pipeline stage refactoring plan (9→17 stages) |
+| 11 | [Doc Index](docs/README.md) | Living | Source priority and conflict resolution rules |
 
 **Source priority** (higher wins in conflicts): goal.md > configs/*.yaml > dualdocking/ > selection_criteria.md > report/ > README.md.
 

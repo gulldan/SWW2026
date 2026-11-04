@@ -2,7 +2,7 @@
 
 Navigation hub for the DualDocking project documentation.
 
-Updated: 2026-02-15
+Updated: 2026-11-04
 
 ---
 
@@ -28,8 +28,6 @@ Updated: 2026-02-15
 2. [`pipeline.md`](pipeline.md) -- Stage 0 fetch through analysis
 3. [`pipeline.md` (SLURM section)](pipeline.md#slurm-cluster-execution) -- HPC cluster execution (monolithic / array jobs)
 4. [`architecture.md`](architecture.md) -- Troubleshooting, backend architecture, score conventions
-5. [`receptor_qc.md`](receptor_qc.md) -- Per-target structural quality checks
-6. [`nim_benchmark.md`](nim_benchmark.md) -- CLI vs NIM performance comparison
 
 ### "I'm developing code"
 
@@ -50,13 +48,10 @@ Updated: 2026-02-15
 | 5 | [`setup.md`](setup.md) | Canonical | Installation: Python/uv, Docker/FREED++, scorer setup, calibration, baseline. |
 | 6 | [`pipeline.md`](pipeline.md) | Canonical | Full pipeline: fetch (Stage 0) through run, scoring, and analysis. |
 | 7 | [`architecture.md`](architecture.md) | Reference | Technical internals: pluggable generator/scorer backends, Boltz-2 CLI/NIM, FREED++ Docker, caching, troubleshooting. |
-| 8 | [`receptor_qc.md`](receptor_qc.md) | Reference | Per-target structural QC: resolution, chain, ligand, mutations, coverage. |
-| 9 | [`nim_benchmark.md`](nim_benchmark.md) | Reference | Boltz-2 CLI vs NIM backend: latency, score agreement, TensorRT notes. |
-| 10 | [`reward_modes.md`](reward_modes.md) | Reference | Declarative reward registry (`configs/reward_modes.yaml`), runtime resolution, plugin extension. |
-| 11 | [`io_contracts.md`](io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages. |
-| 12 | [`novelty_report.md`](novelty_report.md) | Reference | Gap analysis vs prior work, novelty assessment. |
-| 13 | [`tasks_pipeline_granularity.md`](tasks_pipeline_granularity.md) | Living log | Pipeline stage refactoring plan (9→17 stages). |
-| 14 | [`md.md`](md.md) | Reference | MD validation protocol: force field, equilibration, analyses (SASA, PCA), literature comparison. |
+| 8 | [`reward_modes.md`](reward_modes.md) | Reference | Declarative reward registry (`configs/reward_modes.yaml`), runtime resolution, plugin extension. |
+| 9 | [`io_contracts.md`](io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages. |
+| 10 | [`tasks_pipeline_granularity.md`](tasks_pipeline_granularity.md) | Living log | Pipeline stage refactoring plan (9→17 stages). |
+| 11 | [`md.md`](md.md) | Reference | MD validation protocol: force field, equilibration, analyses (SASA, PCA), literature comparison. |
 
 **Status definitions:**
 - **Operational spec** -- single source of truth; changes require explicit approval
@@ -140,14 +135,12 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 | Binding box coordinates, grid sizes | `architecture.md` (Binding Box section) + `configs/pairs.yaml` |
 | Affinity thresholds (T_A, T_B) | `configs/metrics.yaml` (fixed at 0.0 = 1 uM) |
 | Boltz-2 cache format, context hashing | `architecture.md` (Caching section) |
-| Boltz-2 NIM setup and Docker launch | `architecture.md` + `nim_benchmark.md` |
 | Bootstrap procedure, claim rules | `statistical_analysis_plan.md` (Sections 3-5) |
 | ChEMBL target IDs | `dualdocking/data/chembl_validation.py` (lookup by UniProt ID from `configs/pairs.yaml`) |
 | Cofactor handling and caveats | `selection_criteria.md` (Cofactor section) |
 | Docker image builds (`freedpp`, `gnina`, `md`) | `setup.md` (Docker sections) + `pipeline.md` (Stage 0 + MD section) |
 | Factor design (Disease/Structure/Cofactor) | `selection_criteria.md` (Factor Design section) |
 | FREED++ dual-target patch | `architecture.md` (Generation section) |
-| Per-target PDB, resolution, mutations | `receptor_qc.md` (Summary Table) |
 | Score validation and corruption handling | `architecture.md` (UniDock GPU section) |
 | Sign convention, utility conversion | `architecture.md` (Score Conventions) + `goal.md` (Notation) |
 

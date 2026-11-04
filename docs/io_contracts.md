@@ -436,41 +436,9 @@ or via Docker image.
 | Top-N molecules per mode (from `scored_joined.parquet`) | Parquet | Stage 3 |
 | `output/data/targets/{pair_id}/{A,B}/{pdb_id}.pdb` | PDB | Stage 0 |
 
-### GROMACS Pipeline (24 commands)
+### MD protocol
 
-**Setup (14 commands):**
-pdb2gmx (`-ff amber14sb`) → editconf → solvate → grompp ions → genion (`stdin: SOL`) →
-grompp EM → mdrun EM → make_ndx (`stdin: q`; script adds `Protein_LIG` and `Water_and_ions`) →
-grompp NVT → mdrun NVT → grompp NPT → mdrun NPT → grompp prod → mdrun prod
-
-**Trajectory preprocessing (3 commands):**
-trjconv `-pbc whole` (`stdin: System`) →
-trjconv `-center -pbc mol` (`stdin: Protein / System`) →
-trjconv `-fit rot+trans` (`stdin: Backbone / System`)
-
-**Analysis (7 commands):**
-`gmx rms` backbone (`stdin: Backbone/Backbone`) →
-`gmx rms` ligand (`stdin: LIG/LIG`) →
-`gmx rmsf` per-residue (`stdin: Backbone`) →
-`gmx gyrate` (`stdin: Protein`) →
-`gmx hbond-legacy` (`stdin: Protein/LIG`, falls back to `gmx hbond`) →
-`gmx sasa` (`stdin: Protein`) →
-`gmx covar` (`stdin: Backbone/Backbone`)
-
-### MDP Protocol (Modern: amber14sb + C-rescale)
-
-Force field: **amber14sb** (Maier et al. 2015, built into GROMACS 2026).
-All MDPs include: `cutoff-scheme=Verlet`, `rcoulomb=1.0`, `rvdw=1.0`
-(AMBER standard), `DispCorr=EnerPres`, `fourierspacing=0.12`, `pme_order=4`,
-`vdw-modifier=Potential-shift`, `constraint-algorithm=LINCS`, `lincs_order=4`.
-Thermostat coupling groups: `Protein_LIG` / `Water_and_ions`.
-
-| Phase | Duration | Barostat | Thermostat τ | Notes |
-|-------|----------|----------|--------------|-------|
-| EM | 50k steps | — | — | Steepest descent, emtol=1000 |
-| NVT | 200 ps (configurable) | none | V-rescale 0.1 ps | Position restraints (`-DPOSRES -DPOSRES_LIG`), velocity generation |
-| NPT | 200 ps (configurable) | **C-rescale** τ=1.0 ps | V-rescale 0.1 ps | Position restraints, correct NPT ensemble (Bernetti & Bussi 2020) |
-| Production | 50 ns (configurable) | **Parrinello-Rahman** τ=2.0 ps | V-rescale 1.0 ps | No position restraints, no energygrps |
+The GROMACS command chain, the MDP protocol and the analysis set are specified in [`md.md`](md.md) -- the canonical MD document. This file covers only the paths and schemas those runs read and write (see *Inputs*, *Outputs* and the `md_summary.parquet` schema below).
 
 ### GPU Acceleration
 
