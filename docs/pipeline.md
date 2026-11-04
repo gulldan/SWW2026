@@ -238,9 +238,8 @@ Quick end-to-end check (1 pair x 3 modes x 2 seeds) before committing to full ma
 
 ```bash
 uv run python cli/pipeline/run_pilot.py --pair AChE_BChE --seeds 42,137
-uv run python cli/pipeline/run_pilot.py --pair AChE_BChE       # Custom pair
-uv run python cli/pipeline/run_pilot.py --dry-run              # Dry run
-uv run python cli/pipeline/run_pilot.py --verify-only          # Check existing artifacts
+uv run python cli/pipeline/run_pilot.py --pair AChE_BChE --dry-run       # Dry run
+uv run python cli/pipeline/run_pilot.py --pair AChE_BChE --verify-only   # Check existing artifacts
 ```
 
 ## Manual Step-by-Step (single pair)
