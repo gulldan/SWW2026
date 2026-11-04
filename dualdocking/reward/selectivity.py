@@ -308,7 +308,7 @@ def load_reward_modes_from_yaml(
         return None
 
     try:
-        import yaml  # type: ignore[import-untyped]
+        import yaml
     except ImportError as exc:
         raise ImportError("PyYAML is required to load reward modes config") from exc
 

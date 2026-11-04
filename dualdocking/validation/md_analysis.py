@@ -111,7 +111,7 @@ def _parse_xvg(path: Path, columns: list[str]) -> pd.DataFrame:
 
 
 def _assess_convergence(
-    rmsd_series: pd.Series,  # type: ignore[type-arg]
+    rmsd_series: pd.Series,
     *,
     alpha: float = 0.05,
     mean_diff_threshold: float = 0.5,

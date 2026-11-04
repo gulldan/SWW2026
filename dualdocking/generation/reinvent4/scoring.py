@@ -31,7 +31,7 @@ try:
     from reinvent_plugins.components.component_results import ComponentResults
 except ImportError:
 
-    def add_tag(label: str, text: str = "True") -> Callable:  # type: ignore[misc]
+    def add_tag(label: str, text: str = "True") -> Callable:
         """Fallback decorator matching REINVENT4's ``add_tag`` API."""
 
         def _wrapper(cls: type) -> type:
@@ -41,7 +41,7 @@ except ImportError:
         return _wrapper
 
     @dataclass
-    class ComponentResults:  # type: ignore[no-redef]
+    class ComponentResults:
         """Fallback when reinvent4 not installed."""
 
         scores: list[np.ndarray]

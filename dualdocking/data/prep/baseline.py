@@ -133,7 +133,7 @@ def _open_input(path: Path, member: str | None = None) -> Iterator[io.BufferedRe
             fileobj = tf.extractfile(selected)
             if fileobj is None:
                 raise RuntimeError(f"Failed to extract {selected.name} from {path}")
-            yield fileobj  # type: ignore[misc]
+            yield fileobj
         return
 
     with path.open("rb") as f:

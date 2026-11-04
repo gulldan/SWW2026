@@ -68,7 +68,7 @@ def load_smiles_from_hf(dataset_name: str, split: str, smiles_column: str) -> It
         KeyError: If *smiles_column* is not found in the dataset.
     """
     try:
-        from datasets import load_dataset  # type: ignore[import-untyped]
+        from datasets import load_dataset
     except ImportError as exc:
         raise ImportError("Install datasets: uv pip install datasets") from exc
 
