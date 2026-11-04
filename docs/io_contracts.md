@@ -616,7 +616,7 @@ Boltz CLI model weights: controlled by `BOLTZ_CACHE` env var
 
 | Placeholder | Values |
 |-------------|--------|
-| `{pair_id}` | e.g. `CDK2_ERK2`, `BACE1_GSK3B`, `AChE_BChE` |
+| `{pair_id}` | e.g. `EGFR_HER2`, `AChE_BChE`, `PPARa_PPARg` |
 | `{target_id}` | e.g. `CDK2`, `ERK2`, `BACE1`, `GSK3B` |
 | `{mode}` | `single_a`, `single_b`, `double`, `linear_equal`, `biased_a`, `selective_a`, `selective_weighted` (or plugin-defined mode names) |
 | `{seed}` | `42`, `137`, `256`, `512`, `1024` (from experiment.yaml) |

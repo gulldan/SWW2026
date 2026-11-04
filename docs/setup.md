@@ -134,7 +134,7 @@ docker build -f docker/gnina/Dockerfile -t dualdocking/gnina:latest .
 
 # Use the custom image in docker-based GNINA scoring
 uv run python cli/s8_gnina/score_gnina.py \
-  --pair CDK2_ERK2 --mode double --seed 42 \
+  --pair AChE_BChE --mode double --seed 42 \
   --docker-image dualdocking/gnina:latest
 ```
 
@@ -198,20 +198,20 @@ in a reproducible environment. No host installation required beyond Docker itsel
 docker build -f docker/md/Dockerfile -t dualdocking/md:latest .
 
 # Run MD via Docker (auto-builds image if missing)
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker
 
 # Dry-run (no build needed)
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --dry-run
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker --dry-run
 
 # Custom image tag
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --docker-image myrepo/md:v2
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker --docker-image myrepo/md:v2
 
 # Override simulation time, single mode
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker \
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker \
   --mode single_a --top-n 1 --simulation-time 10
 
 # With MM-GBSA
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --mmpbsa
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker --mmpbsa
 ```
 
 The `--docker` flag bind-mounts the project directories into the container:
@@ -359,19 +359,19 @@ gmx_MMPBSA --help      # MM-GBSA (only needed with --mmpbsa flag)
 
 ```bash
 # Docker mode (recommended — no local tools needed):
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker
 
 # Local mode (requires all tools in PATH):
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2
+uv run python cli/s9_md/run_md.py --pair AChE_BChE
 
 # Dry-run (works in both modes)
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --dry-run
 
 # Custom simulation time, disable GPU
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --simulation-time 100 --no-gpu
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --simulation-time 100 --no-gpu
 
 # With MM-GBSA binding free energy
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --mmpbsa
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --mmpbsa
 ```
 
 See [io_contracts.md](io_contracts.md) (Stage 5c) for complete output specification.

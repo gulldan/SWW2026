@@ -129,7 +129,7 @@ post-processing (aggregate, metrics, sensitivity, correlation, summarize).
 
 ```bash
 # Single pair, subset of seeds
-uv run python cli/pipeline/run_full_experiment.py --pair CDK2_ERK2 --seeds 42,137 --resume --with-post
+uv run python cli/pipeline/run_full_experiment.py --pair AChE_BChE --seeds 42,137 --resume --with-post
 
 # Multiple pairs, single seed, smoke test epochs
 FREEDPP_EPOCHS=10 uv run python cli/pipeline/run_full_experiment.py \
@@ -165,7 +165,7 @@ uv run python cli/pipeline/run_stages.py --list-stages
 uv run python cli/pipeline/run_stages.py --stages analyze,report
 
 # Run scoring for a specific pair
-uv run python cli/pipeline/run_stages.py --stages score --pair CDK2_ERK2 --seeds 42
+uv run python cli/pipeline/run_stages.py --stages score --pair AChE_BChE --seeds 42
 
 # Run everything
 uv run python cli/pipeline/run_stages.py --stages all
@@ -227,7 +227,7 @@ from Python, without shell CLI wrappers:
 ```python
 from dualdocking.api import run_full_experiment, run_post_pipeline, run_stages
 
-run_full_experiment(dry_run=True, pairs=["CDK2_ERK2"], seeds=[42], with_post=False)
+run_full_experiment(dry_run=True, pairs=["AChE_BChE"], seeds=[42], with_post=False)
 run_stages(stages="analyze,report", dry_run=True, skip_preflight=True)
 run_post_pipeline(dry_run=True, latex_mode="off")
 ```
@@ -237,7 +237,7 @@ run_post_pipeline(dry_run=True, latex_mode="off")
 Quick end-to-end check (1 pair x 3 modes x 2 seeds) before committing to full matrix:
 
 ```bash
-uv run python cli/pipeline/run_pilot.py                       # CDK2_ERK2, seeds 42+137
+uv run python cli/pipeline/run_pilot.py --pair AChE_BChE --seeds 42,137
 uv run python cli/pipeline/run_pilot.py --pair AChE_BChE       # Custom pair
 uv run python cli/pipeline/run_pilot.py --dry-run              # Dry run
 uv run python cli/pipeline/run_pilot.py --verify-only          # Check existing artifacts
@@ -249,31 +249,31 @@ For debugging or understanding the pipeline:
 
 ```bash
 # Generate (3 modes)
-uv run python cli/s3_generate/generate.py --pair CDK2_ERK2 --mode single_a
-uv run python cli/s3_generate/generate.py --pair CDK2_ERK2 --mode single_b
-uv run python cli/s3_generate/generate.py --pair CDK2_ERK2 --mode double
+uv run python cli/s3_generate/generate.py --pair AChE_BChE --mode single_a
+uv run python cli/s3_generate/generate.py --pair AChE_BChE --mode single_b
+uv run python cli/s3_generate/generate.py --pair AChE_BChE --mode double
 
 # Score
-uv run python cli/s4_score/score.py --pair CDK2_ERK2 --mode single_a
-uv run python cli/s4_score/score.py --pair CDK2_ERK2 --mode single_b
-uv run python cli/s4_score/score.py --pair CDK2_ERK2 --mode double
+uv run python cli/s4_score/score.py --pair AChE_BChE --mode single_a
+uv run python cli/s4_score/score.py --pair AChE_BChE --mode single_b
+uv run python cli/s4_score/score.py --pair AChE_BChE --mode double
 
 # Score custom molecules (skip generation)
-uv run python cli/s4_score/score.py --pair CDK2_ERK2 --mode double \
+uv run python cli/s4_score/score.py --pair AChE_BChE --mode double \
   --molecules my_compounds.csv
 
 # Analyze (filter to same pair)
-uv run python cli/s5_analyze/aggregate.py --pair CDK2_ERK2
-uv run python cli/s5_analyze/compute_metrics.py --pair CDK2_ERK2
+uv run python cli/s5_analyze/aggregate.py --pair AChE_BChE
+uv run python cli/s5_analyze/compute_metrics.py --pair AChE_BChE
 uv run python cli/s6_report/plot_results.py
 uv run python cli/s6_report/render_molecules.py
-uv run python cli/s5_analyze/summarize.py --pair CDK2_ERK2
+uv run python cli/s5_analyze/summarize.py --pair AChE_BChE
 ```
 
 ## Full Matrix (all pairs)
 
 ```bash
-for pair in CDK2_ERK2 AChE_BChE BACE1_GSK3B AChE_BACE1 GSK3B_CDK5 EGFR_HER2 BACE1_CDK5 AChE_MAOB MEK1_MEK2 FGFR1_FGFR2 EZH2_EZH1 BRD4_BRD2; do
+for pair in AChE_BChE AChE_BChE BACE1_GSK3B AChE_BACE1 GSK3B_CDK5 EGFR_HER2 BACE1_CDK5 AChE_MAOB MEK1_MEK2 FGFR1_FGFR2 EZH2_EZH1 BRD4_BRD2; do
   for mode in single_a single_b double linear_equal biased_a selective_a; do
     uv run python cli/s3_generate/generate.py --pair $pair --mode $mode
     uv run python cli/s4_score/score.py --pair $pair --mode $mode
@@ -417,7 +417,7 @@ from dualdocking.validation.domain_identity import select_domains_for_pair
 ## MD Validation (Optional, Post-Hoc)
 
 > **Status: VERIFIED** (2026-02-17). Smoke test passed end-to-end on
-> CDK2_ERK2/single_a with 1 ns simulation time (~15 min on RTX 4090).
+> AChE_BChE/single_a with 1 ns simulation time (~15 min on RTX 4090).
 > Produces `md_result.json`, per-frame CSVs, and `trajectory.xtc`.
 
 Molecular dynamics validation for top candidate molecules. Not part of the
@@ -445,28 +445,28 @@ See [setup.md](setup.md) for full installation options.
 
 ```bash
 # 1. Check what molecules would be selected (no Docker needed)
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --dry-run
 
 # 2. Quick smoke test: 1 molecule, 1 target mode, 1 ns simulation
 #    (~5-10 min on RTX 4090 with GPU acceleration)
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker \
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker \
   --mode single_a --top-n 1 --simulation-time 1
 
 # 3. Full run: top-3 molecules, all modes, default 50 ns
 #    (~2-4 hours per molecule×target on RTX 4090)
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker
 
 # 4. Shorter simulation (10 ns) for faster turnaround
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --simulation-time 10
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker --simulation-time 10
 
 # 5. With MM-GBSA binding free energy (requires gmx_MMPBSA in image)
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --mmpbsa
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker --mmpbsa
 
 # 6. Disable GPU (CPU-only GROMACS)
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --docker --no-gpu
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --docker --no-gpu
 
 # 7. Local mode (requires all tools in PATH — see setup.md Option B)
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2
+uv run python cli/s9_md/run_md.py --pair AChE_BChE
 ```
 
 ### What `--docker` Does Under the Hood
@@ -496,7 +496,7 @@ docker run --rm --gpus all \
   -v /mnt/data/SWW2026/cli:/workspace/cli:ro \
   -v /mnt/data/SWW2026/pyproject.toml:/workspace/pyproject.toml:ro \
   dualdocking/md:latest \
-  --pair CDK2_ERK2 --top-n 3 \
+  --pair AChE_BChE --top-n 3 \
   --config configs/pairs.yaml --experiment-config configs/experiment.yaml
 ```
 
@@ -522,11 +522,11 @@ obabel --version
 python -c "from dualdocking.validation.md_config import MDConfig; print('OK')"
 
 # Run MD manually (see full output/errors):
-python /workspace/cli/s9_md/run_md.py --pair CDK2_ERK2 \
+python /workspace/cli/s9_md/run_md.py --pair AChE_BChE \
   --mode single_a --top-n 1 --simulation-time 1
 
 # Or run with --dry-run to check molecule selection:
-python /workspace/cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run
+python /workspace/cli/s9_md/run_md.py --pair AChE_BChE --dry-run
 ```
 
 ### Pipeline Per Molecule×Target
@@ -570,7 +570,7 @@ skipped. To re-run, delete the specific `target_{A,B}/` directory.
 
 ### Timing Estimates (RTX 4090)
 
-Measured on CDK2_ERK2/single_a (2026-02-17):
+Measured on AChE_BChE/single_a (2026-02-17):
 
 | Phase | 1 ns measured |
 |-------|--------------|

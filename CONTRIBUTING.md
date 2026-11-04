@@ -88,7 +88,7 @@ Naming:
 | `T_A`, `T_B` | Hit thresholds (log10 IC50 uM); 0.0 = 1 uM |
 | `z_A`, `z_B` | Per-target z-scores from calibration |
 
-Target pairs are named `{TARGET_A}_{TARGET_B}`, e.g., `CDK2_ERK2`. Pairs belong to a `set`: `core` (5 pairs, primary analysis), `auxiliary` (7 pairs, robustness), or `blocked` (excluded).
+Target pairs are named `{TARGET_A}_{TARGET_B}`, e.g., `AChE_BChE`. Pairs belong to a `set`: `core` (5 pairs, primary analysis), `auxiliary` (7 pairs, robustness), or `blocked` (excluded).
 
 ### Files You Should Never Commit
 
@@ -255,7 +255,7 @@ Set environment variables: `BOLTZ_BACKEND=nim` and `BOLTZ_NIM_URL=http://localho
 | Validate redocking | `uv run python cli/s2_calibrate/validate_redocking.py --pair PAIR_NAME` |
 | Run a smoke test | `uv run python cli/smoke/boltz_smoke.py` |
 | Run the full experiment | `uv run python cli/pipeline/run_full_experiment.py` |
-| Score molecules with Boltz-2 | `uv run dd-score --pair CDK2_ERK2 --input generated.csv` |
+| Score molecules with Boltz-2 | `uv run dd-score --pair AChE_BChE --input generated.csv` |
 | Compute metrics | `uv run dd-metrics` |
 | Generate plots | `uv run dd-plot` |
 | Generate summary report | `uv run dd-summarize` |

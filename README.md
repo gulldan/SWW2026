@@ -75,8 +75,8 @@ Results land in `output/results/` and `report/`. See [Pipeline](docs/pipeline.md
 Post-hoc molecular dynamics validation of top candidates — see [Setup](docs/setup.md) for dependencies.
 
 ```bash
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2 --dry-run   # preview
-uv run python cli/s9_md/run_md.py --pair CDK2_ERK2              # run (50 ns, auto-GPU)
+uv run python cli/s9_md/run_md.py --pair AChE_BChE --dry-run   # preview
+uv run python cli/s9_md/run_md.py --pair AChE_BChE              # run (50 ns, auto-GPU)
 ```
 
 ### Smoke Test
@@ -84,10 +84,10 @@ uv run python cli/s9_md/run_md.py --pair CDK2_ERK2              # run (50 ns, au
 ```bash
 # Quick smoke test: 10 epochs, 1 seed, 1 pair (~15-20 min with GPU)
 FREEDPP_EPOCHS=10 EXPERIMENT_RUN_ID=smoke uv run python cli/pipeline/run_full_experiment.py \
-  --pair CDK2_ERK2 --seeds 42 --resume --parallel 1 --with-post --latex-mode draft
+  --pair AChE_BChE --seeds 42 --resume --parallel 1 --with-post --latex-mode draft
 
 # Generate 10 molecules for one pair, 2 epochs (~2 minutes with GPU)
-uv run python cli/s3_generate/generate.py --pair CDK2_ERK2 --mode single_a --epochs 2 --n-molecules 10
+uv run python cli/s3_generate/generate.py --pair AChE_BChE --mode single_a --epochs 2 --n-molecules 10
 
 # Boltz-2 health check
 uv run dd-smoke
@@ -136,7 +136,7 @@ You can run workflows directly from Python (not only from shell CLI):
 from dualdocking.api import run_full_experiment, run_post_pipeline, run_stages
 
 # Full pipeline dry-run for one pair/seed
-run_full_experiment(dry_run=True, pairs=["CDK2_ERK2"], seeds=[42], with_post=False)
+run_full_experiment(dry_run=True, pairs=["AChE_BChE"], seeds=[42], with_post=False)
 
 # Run selected stages
 run_stages(stages="analyze,report", dry_run=True, skip_preflight=True)
