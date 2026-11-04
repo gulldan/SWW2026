@@ -256,7 +256,7 @@ Stage 0 (fetch) → Generation (FREED++ or REINVENT4, 3 modes × 5 core pairs ×
 - `d_A`, `d_B` — UniDock docking scores (kcal/mol, RL reward signal)
 - `a_A`, `a_B` — Boltz-2 affinity predictions (log10 IC50-like μM, evaluation surrogate)
 - Target pairs: `EGFR_HER2`, `AChE_BChE`, etc. — see `configs/pairs.yaml` (10 pairs, all `core`)
-- Sets: `core` (5 pairs, primary analysis), `auxiliary` (7), `blocked` (1, COX1_COX2)
+- Sets: `core` (all 10 pairs, primary analysis) and `blocked` (excluded; none at present)
 
 ### Cache System
 

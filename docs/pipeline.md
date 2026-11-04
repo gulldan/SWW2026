@@ -133,7 +133,7 @@ uv run python cli/pipeline/run_full_experiment.py --pair AChE_BChE --seeds 42,13
 
 # Multiple pairs, single seed, smoke test epochs
 FREEDPP_EPOCHS=10 uv run python cli/pipeline/run_full_experiment.py \
-  --pair EGFR_HER2 --pair MEK1_MEK2 --pair BRD4_BRD2 \
+  --pair EGFR_HER2 --pair CDK4_CDK6 --pair ALK_ROS1 \
   --seeds 42 --parallel 2 --resume --with-post --latex-mode draft
 ```
 
@@ -272,7 +272,7 @@ uv run python cli/s5_analyze/summarize.py --pair AChE_BChE
 ## Full Matrix (all pairs)
 
 ```bash
-for pair in AChE_BChE AChE_BChE BACE1_GSK3B AChE_BACE1 GSK3B_CDK5 EGFR_HER2 BACE1_CDK5 AChE_MAOB MEK1_MEK2 FGFR1_FGFR2 EZH2_EZH1 BRD4_BRD2; do
+for pair in AChE_BChE ALK_ROS1 CDK4_CDK6 EGFR_HER2 ERa_ERb FGFR1_FGFR2 IDH1_IDH2 JAK1_JAK3 MAOA_MAOB PPARa_PPARg; do
   for mode in single_a single_b double linear_equal biased_a selective_a; do
     uv run python cli/s3_generate/generate.py --pair $pair --mode $mode
     uv run python cli/s4_score/score.py --pair $pair --mode $mode
@@ -615,19 +615,8 @@ uv run python cli/s6_report/generate_latex_report.py --mode full
 Output: `report/manuscript.tex`, `report/manuscript.pdf`.
 
 If `pdflatex`/`bibtex` is not installed on the host, compile the generated
-`report/manuscript.tex` in Docker:
+`report/manuscript.tex` in Docker -- the recipe is in [`setup.md`](setup.md#latex-optional).
 
-```bash
-docker run --rm \
-  -u $(id -u):$(id -g) \
-  -v "$PWD/report:/work" \
-  -w /work \
-  blang/latex:ctanfull \
-  bash -lc "pdflatex -interaction=nonstopmode manuscript.tex; \
-            bibtex manuscript; \
-            pdflatex -interaction=nonstopmode manuscript.tex; \
-            pdflatex -interaction=nonstopmode manuscript.tex"
-```
 
 ## Logs
 

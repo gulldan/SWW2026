@@ -6,6 +6,9 @@
 | **Status** | FROZEN (amended v1.1 — see Section 11) |
 | **Freeze commit** | `f2eceb2` |
 
+<!-- lint: historical-record -->
+> This document records the panel and design as pre-registered on 2026-02-07. The panel in `configs/pairs.yaml` has since been replaced; see the Target Panel table in `README.md` for what actually runs. Nothing below is rewritten to match.
+
 ---
 
 ## 1. Research Question & Hypothesis

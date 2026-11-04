@@ -277,7 +277,7 @@ Parmchk2 → Acpype (AMBER→GROMACS) → `gmx genrestr` (ligand position restra
 ## Organism Gate
 
 `load_pairs()` blocks non-human targets (`organism != "Homo sapiens"`).
-COX1_COX2 is blocked (COX1 = Ovis aries, COX2 = Mus musculus).
+No pair in `configs/pairs.yaml` currently carries `set: blocked`.
 Bypass: `DUALDOCKING_ALLOW_NON_HUMAN=true`.
 
 ## SLURM Integration

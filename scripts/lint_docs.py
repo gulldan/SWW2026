@@ -207,19 +207,55 @@ def check_paths(doc: Path, text: str, root: Path, rel: str) -> list[Finding]:
     return out
 
 
+def github_anchor(heading: str) -> str:
+    """GitHub's heading-to-anchor rule: lowercase, drop punctuation, spaces to hyphens."""
+    s = heading.strip().lower()
+    s = re.sub(r"[`*_~]", "", s)                 # inline markup never reaches the anchor
+    s = re.sub(r"[^\w\s-]", "", s, flags=re.U)  # punctuation is dropped
+    return re.sub(r"\s+", "-", s.strip())
+
+
+def heading_anchors(path: Path) -> set[str]:
+    """Every anchor a markdown file exposes, including duplicate-suffixed ones."""
+    if not path.is_file():
+        return set()
+    anchors: set[str] = set()
+    for h in re.findall(r"^#{1,6}\s+(.+?)\s*$",
+                        path.read_text(encoding="utf-8", errors="replace"), re.M):
+        base = github_anchor(h)
+        if base in anchors:
+            n = 1
+            while f"{base}-{n}" in anchors:
+                n += 1
+            anchors.add(f"{base}-{n}")
+        else:
+            anchors.add(base)
+    return anchors
+
+
 def check_links(doc: Path, text: str, root: Path, rel: str) -> list[Finding]:
-    """Relative markdown links whose target file is absent."""
+    """Relative markdown links whose target file -- or heading anchor -- is absent."""
     out = []
-    link_re = re.compile(r"\[[^\]]*\]\(([^)#\s]+)(#[^)\s]*)?\)")
+    link_re = re.compile(r"\[[^\]]*\]\(([^)#\s]*)(#[^)\s]*)?\)")
+    anchor_cache: dict[Path, set[str]] = {}
     for lineno, line in iter_lines(text):
         for m in link_re.finditer(line):
-            target = m.group(1)
+            target, frag = m.group(1), (m.group(2) or "")[1:]
             if target.startswith(("http://", "https://", "mailto:")):
                 continue
-            resolved = (doc.parent / target).resolve()
+            resolved = (doc.parent / target).resolve() if target else doc
             if not resolved.exists():
                 out.append(Finding("LINK-BROKEN", rel, lineno,
                                    f"link target `{target}` not found"))
+                continue
+            # A fragment must match a heading in the file it points at.
+            if frag and resolved.suffix == ".md":
+                if resolved not in anchor_cache:
+                    anchor_cache[resolved] = heading_anchors(resolved)
+                if frag not in anchor_cache[resolved]:
+                    where = target or resolved.name
+                    out.append(Finding("ANCHOR-BROKEN", rel, lineno,
+                                       f"`{where}#{frag}` has no matching heading"))
     return out
 
 
