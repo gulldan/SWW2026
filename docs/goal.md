@@ -117,7 +117,7 @@ Reward для FREED++ строится на **docking-скорах** `d_A, d_B` 
   Альтернативный baseline с удвоенным бюджетом single-режимов рассматривается
   как sensitivity analysis, но **не является primary comparison**.
 
-Primary metric: `hr_both(double) − hr_both(single_x)` на core-парах (см. `selection_criteria.md`).
+Primary metric: `hr_both(double) − hr_both(single_x)` на core-парах (заданы в `configs/pairs.yaml`).
 
 ### Secondary endpoints
 

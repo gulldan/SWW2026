@@ -16,6 +16,29 @@ Single-target vs dual-target RL molecule generation using **FREED++** or **REINV
 
 ---
 
+## Target Panel
+
+10 core pairs, 20 targets -- all of them homologous paralogs. `configs/pairs.yaml` is the only source of truth; the table below is generated from it.
+
+| Pair | Targets (PDB) | Binding-site similarity | Reference drug |
+|------|---------------|-------------------------|----------------|
+| `EGFR_HER2` | EGFR (1XKK) / HER2 (3PP0) | Very high | Lapatinib |
+| `CDK4_CDK6` | CDK4 (2W96) / CDK6 (6OQO) | High | Palbociclib |
+| `ALK_ROS1` | ALK (2XP2) / ROS1 (3ZBF) | High | Crizotinib |
+| `FGFR1_FGFR2` | FGFR1 (5EW8) / FGFR2 (3RI1) | Very high | Erdafitinib |
+| `IDH1_IDH2` | IDH1 (4UMX) / IDH2 (5I96) | High | Vorasidenib |
+| `AChE_BChE` | AChE (4EY7) / BChE (4BDS) | High | Rivastigmine |
+| `MAOA_MAOB` | MAOA (2Z5X) / MAOB (2V5Z) | High | Safinamide |
+| `JAK1_JAK3` | JAK1 (6N7B) / JAK3 (3LXK) | Very high | Tofacitinib |
+| `PPARa_PPARg` | PPARa (2P54) / PPARg (1FM9) | High | Saroglitazar |
+| `ERa_ERb` | ERa (3ERT) / ERb (1X7B) | Mod-High | Tamoxifen |
+
+Selection criteria: binding-site similarity >= 53%, an approved selective drug as ground truth, and a co-crystallised PDB structure. Similarity spans 53% (ERa/ERb) to 90% (FGFR1/FGFR2); selectivity spans 1.2x (lapatinib) to ~4600x (saroglitazar).
+
+> Reward calibration (`configs/normalization.yaml`) currently covers 7 of these 20 targets.
+
+---
+
 ## Project Structure
 
 ```
@@ -25,7 +48,7 @@ SWW2026/
 ├── configs/         YAML configuration (pairs, metrics, experiment, reward modes)
 ├── docker/          Container images (freedpp, gnina, boltz2, md)
 ├── tests/           pytest suite (~1160 tests)
-├── docs/            Documentation (12 files — see Documentation Map)
+├── docs/            Documentation (11 files — see Documentation Map)
 ├── scripts/         Standalone runnable scripts
 ├── report/          LaTeX manuscript
 └── output/          Runtime data (gitignored)
@@ -102,7 +125,7 @@ uv run dd-smoke
 | Notation | `d` = UniDock docking (RL reward); `a` = Boltz-2 affinity (evaluation) — never mixed | [Goal](docs/goal.md) |
 | Score convention | lower_is_better throughout; utility = −score | [Architecture](docs/architecture.md) |
 | Generation modes | single_a, single_b, double (primary); 4 exploratory modes | [Reward Modes](docs/reward_modes.md) |
-| Target pairs | 10 core pairs, 20 targets — defined in `configs/pairs.yaml` | [Selection Criteria](docs/selection_criteria.md) |
+| Target pairs | 10 core pairs, 20 targets — defined in `configs/pairs.yaml` | [Target Panel](#target-panel) |
 | Hit definition | Boltz-2 affinity ≤ 0.0 (1 µM); dual hit = both targets | [Goal](docs/goal.md) |
 | Success criteria | Cliff's δ > −0.47 on ≥ 3/5 core pairs (double vs best single) | [Goal](docs/goal.md) |
 | Backend config | Generator (freedpp/reinvent4) and scorer (boltz2) set in `configs/experiment.yaml` | [Architecture](docs/architecture.md), [Pipeline](docs/pipeline.md) |
@@ -178,15 +201,14 @@ Read in the order shown for fastest onboarding.
 | 2 | [Setup](docs/setup.md) | Canonical | Installation, Docker build, calibration, baseline preparation |
 | 3 | [Pipeline](docs/pipeline.md) | Canonical | Full experiment pipeline: Stage 0 through report generation |
 | 4 | [Architecture](docs/architecture.md) | Reference | Backend architecture (generator/scorer), Boltz-2, FREED++, caching, score conventions, troubleshooting |
-| 5 | [Selection Criteria](docs/selection_criteria.md) | Reference | Target pair rationale, factorial design, core/auxiliary split |
-| 6 | [Pre-registration](docs/preregistration.md) | Frozen (v1.1) | Frozen hypotheses and decision rules |
-| 7 | [Statistical Analysis Plan](docs/statistical_analysis_plan.md) | Frozen (v1.1) | Inference procedures, claim rules, code mapping |
-| 8 | [Reward Modes](docs/reward_modes.md) | Reference | Declarative reward registry, YAML schema, plugin extension |
-| 9 | [I/O Contracts](docs/io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages |
-| 10 | [Pipeline Granularity](docs/tasks_pipeline_granularity.md) | Living | Pipeline stage refactoring plan (9→17 stages) |
-| 11 | [Doc Index](docs/README.md) | Living | Source priority and conflict resolution rules |
+| 5 | [Pre-registration](docs/preregistration.md) | Frozen (v1.1) | Frozen hypotheses and decision rules |
+| 6 | [Statistical Analysis Plan](docs/statistical_analysis_plan.md) | Frozen (v1.1) | Inference procedures, claim rules, code mapping |
+| 7 | [Reward Modes](docs/reward_modes.md) | Reference | Declarative reward registry, YAML schema, plugin extension |
+| 8 | [I/O Contracts](docs/io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages |
+| 9 | [Pipeline Granularity](docs/tasks_pipeline_granularity.md) | Living | Pipeline stage refactoring plan (9→17 stages) |
+| 10 | [Doc Index](docs/README.md) | Living | Source priority and conflict resolution rules |
 
-**Source priority** (higher wins in conflicts): goal.md > configs/*.yaml > dualdocking/ > selection_criteria.md > report/ > README.md.
+**Source priority** (higher wins in conflicts): goal.md > configs/*.yaml > dualdocking/ > report/ > README.md.
 
 ---
 

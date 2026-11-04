@@ -127,7 +127,7 @@ Target pairs are named `{TARGET_A}_{TARGET_B}`, e.g., `AChE_BChE`. Pairs belong 
 
 6. **Add thresholds to `configs/metrics.yaml`** under `thresholds:`. Default: `target_a: 0.0` / `target_b: 0.0` (1 uM).
 
-7. **Update documentation.** If the pair is `core`, update `docs/selection_criteria.md` and `report/chapters/04_experimental_protocol.tex`.
+7. **Update documentation.** If the pair is `core`, update the Target Panel table in `README.md` and `report/chapters/04_experimental_protocol.tex`.
 
 ## How to Add a New Objective Function
 
@@ -285,8 +285,7 @@ When documents or code disagree, higher-numbered sources override lower ones:
 1. `docs/goal.md` -- supreme authority (read-only without user approval)
 2. `configs/*.yaml` -- runtime parameters (must agree with goal.md)
 3. `dualdocking/` -- computation logic
-4. `docs/selection_criteria.md` -- pair selection rationale
-5. `report/chapters/*.tex` -- narrative
-6. `README.md` -- operational guide
+4. `report/chapters/*.tex` -- narrative
+5. `README.md` -- operational guide
 
 If you change a parameter in one place, check the synchronization table in `AGENTS.md` to update all related files.

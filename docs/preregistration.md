@@ -32,7 +32,7 @@
 | 8 | AChE_MAOB | Auxiliary | Hetero | Present (FAD) | 4EY7 / 2V5Z |
 | 9 | COX1_COX2 | Blocked | Homo | Present (heme) | 1EQG / 3LN1 |
 
-Source: `configs/pairs.yaml`, `docs/selection_criteria.md`
+Source: `configs/pairs.yaml`
 
 ### 2.2 Modes
 
@@ -179,7 +179,6 @@ Source: `configs/experiment.yaml: objectives.alternatives`, `docs/goal.md` lines
 | `configs/metrics.yaml` | Hit thresholds (T=0.0), enrichment K values, computed metrics |
 | `configs/experiment.yaml` | Budget (n=1000), seeds, epochs, objectives, quality gate |
 | `docs/goal.md` | Full hypothesis, notation, endpoint hierarchy, success criteria |
-| `docs/selection_criteria.md` | Pair rationale, factorial design, core vs auxiliary split |
 | `dualdocking/analysis/statistical.py` | Bootstrap test, FDR correction, Cliff's delta, Cohen's d |
 
 ## 11. Amendment Log

@@ -14,7 +14,7 @@ This is a **scientific research repository** (computational chemistry / drug dis
 ### Citation Requirement
 
 - **Every empirical claim must be backed by a peer-reviewed source** (journal article, peer-reviewed conference, or well-established preprint with >50 citations).
-- When adding or modifying claims in `report/`, `docs/goal.md`, or `docs/selection_criteria.md`, verify the citation exists in `report/references.bib` and the stated facts match the source.
+- When adding or modifying claims in `report/` or `docs/goal.md`, verify the citation exists in `report/references.bib` and the stated facts match the source.
 - Use MCP tools (PubMed, bioRxiv, ChEMBL, HuggingFace papers) to **verify facts at the source** — do not rely on memory or parametric knowledge for numbers, author lists, or conclusions.
 - If a claim cannot be substantiated, flag it with `% TODO: citation needed` in LaTeX or `<!-- TODO: citation needed -->` in Markdown.
 - Distinguish clearly between: (a) established facts with citations, (b) methodological choices with justification, and (c) assumptions that remain unvalidated.
@@ -25,7 +25,7 @@ All documents describe the **same experiment** and must stay consistent. When ch
 
 | Change in...            | Must also update...                                                              |
 |-------------------------|----------------------------------------------------------------------------------|
-| `configs/pairs.yaml`    | `docs/selection_criteria.md`, `report/chapters/04_experimental_protocol.tex`     |
+| `configs/pairs.yaml`    | `report/chapters/04_experimental_protocol.tex`, `README.md` (Target Panel)        |
 | `configs/metrics.yaml`  | `docs/goal.md` (thresholds), `report/chapters/04_experimental_protocol.tex`      |
 | `configs/experiment.yaml` | `docs/goal.md`, `report/chapters/03_methods_notes.tex`                         |
 | `configs/reward_modes.yaml` | `docs/reward_modes.md`, `docs/architecture.md`, `README.md`                 |
@@ -51,16 +51,15 @@ All documents describe the **same experiment** and must stay consistent. When ch
 
 **This file is READ-ONLY without explicit user permission.** Do not edit, rewrite, or reformat `docs/goal.md` — even to fix typos or formatting. If you find an inconsistency between `docs/goal.md` and another document, the other document is wrong. Ask the user before proposing changes to `goal.md`.
 
-All other documents (`report/`, `docs/selection_criteria.md`, `README.md`, `configs/`) must conform to `docs/goal.md`, not the other way around.
+All other documents (`report/`, `README.md`, `configs/`) must conform to `docs/goal.md`, not the other way around.
 
 ### Source Priority (conflicts → higher wins)
 
 1. **`docs/goal.md`** — supreme authority: hypothesis, endpoints, success criteria, notation. **Read-only without user approval.**
 2. `configs/*.yaml` — ground truth for runtime parameters (must agree with goal.md)
 3. `dualdocking/` (all subpackages) — ground truth for computation logic (must implement what goal.md specifies)
-4. `docs/selection_criteria.md` — ground truth for pair selection rationale
-5. `report/chapters/*.tex` — narrative must reflect the above, never contradict
-6. `README.md` — operational guide, may simplify but must not misrepresent
+4. `report/chapters/*.tex` — narrative must reflect the above, never contradict
+5. `README.md` — operational guide, may simplify but must not misrepresent
 
 ---
 

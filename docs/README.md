@@ -20,7 +20,6 @@ Updated: 2026-11-04
 1. [`goal.md`](goal.md) -- Hypothesis, notation, success criteria
 2. [`preregistration.md`](preregistration.md) -- Frozen hypotheses, endpoints, decision rules
 3. [`statistical_analysis_plan.md`](statistical_analysis_plan.md) -- Frozen inference procedures, claim rules, code mapping
-4. [`selection_criteria.md`](selection_criteria.md) -- Why these target pairs, factor design, cofactor caveats
 
 ### "I'm running the experiment"
 
@@ -44,14 +43,13 @@ Updated: 2026-11-04
 | 1 | [`goal.md`](goal.md) | Operational spec | Supreme authority. Hypothesis, notation, endpoints, success criteria. Read-only without user approval. |
 | 2 | [`preregistration.md`](preregistration.md) | Frozen (v1.1) | Pre-registered hypotheses, study design, decision rules. Amendments tracked in Section 11. |
 | 3 | [`statistical_analysis_plan.md`](statistical_analysis_plan.md) | Frozen (v1.1) | Inference procedures: bootstrap, effect sizes, claim thresholds, code mapping. |
-| 4 | [`selection_criteria.md`](selection_criteria.md) | Reference | Pair selection rationale: factor design (Disease/Structure/Cofactor), core vs auxiliary split, Boltz-2 compatibility. |
-| 5 | [`setup.md`](setup.md) | Canonical | Installation: Python/uv, Docker/FREED++, scorer setup, calibration, baseline. |
-| 6 | [`pipeline.md`](pipeline.md) | Canonical | Full pipeline: fetch (Stage 0) through run, scoring, and analysis. |
-| 7 | [`architecture.md`](architecture.md) | Reference | Technical internals: pluggable generator/scorer backends, Boltz-2 CLI/NIM, FREED++ Docker, caching, troubleshooting. |
-| 8 | [`reward_modes.md`](reward_modes.md) | Reference | Declarative reward registry (`configs/reward_modes.yaml`), runtime resolution, plugin extension. |
-| 9 | [`io_contracts.md`](io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages. |
-| 10 | [`tasks_pipeline_granularity.md`](tasks_pipeline_granularity.md) | Living log | Pipeline stage refactoring plan (9→17 stages). |
-| 11 | [`md.md`](md.md) | Reference | MD validation protocol: force field, equilibration, analyses (SASA, PCA), literature comparison. |
+| 4 | [`setup.md`](setup.md) | Canonical | Installation: Python/uv, Docker/FREED++, scorer setup, calibration, baseline. |
+| 5 | [`pipeline.md`](pipeline.md) | Canonical | Full pipeline: fetch (Stage 0) through run, scoring, and analysis. |
+| 6 | [`architecture.md`](architecture.md) | Reference | Technical internals: pluggable generator/scorer backends, Boltz-2 CLI/NIM, FREED++ Docker, caching, troubleshooting. |
+| 7 | [`reward_modes.md`](reward_modes.md) | Reference | Declarative reward registry (`configs/reward_modes.yaml`), runtime resolution, plugin extension. |
+| 8 | [`io_contracts.md`](io_contracts.md) | Reference | File paths, Parquet schemas, data flow between stages. |
+| 9 | [`tasks_pipeline_granularity.md`](tasks_pipeline_granularity.md) | Living log | Pipeline stage refactoring plan (9→17 stages). |
+| 10 | [`md.md`](md.md) | Reference | MD validation protocol: force field, equilibration, analyses (SASA, PCA), literature comparison. |
 
 **Status definitions:**
 - **Operational spec** -- single source of truth; changes require explicit approval
@@ -108,9 +106,8 @@ Higher rank wins when documents conflict. Each level serves a distinct role.
 | 1 | `docs/goal.md` | Defines the hypothesis, endpoints, and success criteria that everything else implements. Changes here cascade to all downstream documents. |
 | 2 | `configs/*.yaml` + `dualdocking/` | Runtime truth -- what actually executes. Code and config are the ground truth for parameters and logic. |
 | 3 | `docs/preregistration.md`, `docs/statistical_analysis_plan.md` | Frozen analysis contracts that lock down inference before data collection. Amendments are versioned in-document. |
-| 4 | `docs/selection_criteria.md` | Pair rationale -- justifies experimental choices but does not define endpoints or analysis. |
-| 5 | `report/chapters/*.tex` | Narrative reporting -- must faithfully reflect the sources above, not introduce new claims. |
-| 6 | `docs/README.md` (this file) | Navigation guide -- may simplify for readability but must not misrepresent. |
+| 4 | `report/chapters/*.tex` | Narrative reporting -- must faithfully reflect the sources above, not introduce new claims. |
+| 5 | `docs/README.md` (this file) | Navigation guide -- may simplify for readability but must not misrepresent. |
 
 ## Conflict Resolution
 
@@ -137,9 +134,7 @@ If a command, parameter, or threshold in a document conflicts with code or confi
 | Boltz-2 cache format, context hashing | `architecture.md` (Caching section) |
 | Bootstrap procedure, claim rules | `statistical_analysis_plan.md` (Sections 3-5) |
 | ChEMBL target IDs | `dualdocking/data/chembl_validation.py` (lookup by UniProt ID from `configs/pairs.yaml`) |
-| Cofactor handling and caveats | `selection_criteria.md` (Cofactor section) |
 | Docker image builds (`freedpp`, `gnina`, `md`) | `setup.md` (Docker sections) + `pipeline.md` (Stage 0 + MD section) |
-| Factor design (Disease/Structure/Cofactor) | `selection_criteria.md` (Factor Design section) |
 | FREED++ dual-target patch | `architecture.md` (Generation section) |
 | Score validation and corruption handling | `architecture.md` (UniDock GPU section) |
 | Sign convention, utility conversion | `architecture.md` (Score Conventions) + `goal.md` (Notation) |
