@@ -8,16 +8,11 @@ Single-target vs dual-target RL molecule generation using **FREED++** or **REINV
 
 ## Data Flow
 
-```mermaid
-flowchart TB
-  A["Stage 0 · Fetch<br/>PDB · FASTA · ZINC · ChEMBL"] --> 
-  B["Generation (FREED++ / REINVENT4)<br/>5 core pairs · 3 modes × 5 seeds<br/>reward: f(dA) | f(dB) | f(max)"] --> 
-  C["UniDock GPU docking<br/>(dA, dB in kcal/mol)"] --> 
-  D["Boltz-2 scoring<br/>aA, aB (log10 IC50-like μM)"] --> 
-  E["Analysis & Report<br/>hit-rate · bootstrap CI (m=5) · Cliff's delta<br/>LaTeX + figures"]
-```
+![SWW2026 dual-target pipeline: 8 stages across 5 engine lanes](docs/diagrams/sww2026_pipeline.svg)
 
-**75 runs total** (core): 5 core pairs x 3 modes x 5 seeds. Auxiliary pairs (7) for robustness checks.
+<sub>Diagram source: [`docs/diagrams/sww2026_pipeline.html`](docs/diagrams/sww2026_pipeline.html) — self-contained, opens in a browser.</sub>
+
+**150 runs total**: 10 core pairs x 3 modes x 5 seeds. Every pair in `configs/pairs.yaml` is `set: core`.
 
 ---
 
@@ -30,7 +25,7 @@ SWW2026/
 ├── configs/         YAML configuration (pairs, metrics, experiment, reward modes)
 ├── docker/          Container images (freedpp, gnina, boltz2, md)
 ├── tests/           pytest suite (~1160 tests)
-├── docs/            Documentation (14 files — see Documentation Map)
+├── docs/            Documentation (15 files — see Documentation Map)
 ├── scripts/         Standalone runnable scripts
 ├── report/          LaTeX manuscript
 └── output/          Runtime data (gitignored)
