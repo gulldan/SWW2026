@@ -139,10 +139,7 @@ def _build_doi_cell_inner(pdb_a: str, pdb_b: str, doi_cache: dict[str, str]) -> 
 
 
 def _format_pocket_similarity_cell(report: PocketSimilarityReport) -> str:
-    return (
-        f"{float(report.identity_pct):.1f}% computed pocket "
-        f"(5A; {int(report.pocket_len_a)}/{int(report.pocket_len_b)} res)"
-    )
+    return f"{float(report.identity_pct):.1f}% computed pocket (5A; {int(report.pocket_len_a)}/{int(report.pocket_len_b)} res)"
 
 
 def _format_pocket_failure_cell(pdb_a: str, pdb_b: str, exc: Exception) -> str | None:
@@ -186,10 +183,7 @@ def _format_domain_cell(rec: dict[str, Any]) -> str | None:
         domain_type = str(di.get("domain_type", "")).strip()
         if seq_matches is not None and seq_aligned not in (None, 0):
             if domain_type:
-                return (
-                    f"{float(seq_pct):.1f}% full-seq fallback"
-                    f" ({domain_type}; {int(seq_matches)}/{int(seq_aligned)})"
-                )
+                return f"{float(seq_pct):.1f}% full-seq fallback ({domain_type}; {int(seq_matches)}/{int(seq_aligned)})"
             return f"{float(seq_pct):.1f}% full-seq fallback ({int(seq_matches)}/{int(seq_aligned)})"
         if domain_type:
             return f"{float(seq_pct):.1f}% full-seq fallback ({domain_type})"

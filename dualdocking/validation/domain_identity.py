@@ -47,16 +47,18 @@ _DOMAIN_RANGE_OVERRIDES: dict[str, tuple[str, int, int]] = {
     "P0DTC1": ("PLpro (nsp3 catalytic)", 1634, 1898),  # SARS-CoV-2 pp1a
 }
 
-_GREEK_TO_ASCII = str.maketrans({
-    "α": "a",
-    "β": "b",
-    "γ": "g",
-    "δ": "d",
-    "Α": "A",
-    "Β": "B",
-    "Γ": "G",
-    "Δ": "D",
-})
+_GREEK_TO_ASCII = str.maketrans(
+    {
+        "α": "a",
+        "β": "b",
+        "γ": "g",
+        "δ": "d",
+        "Α": "A",
+        "Β": "B",
+        "Γ": "G",
+        "Δ": "D",
+    }
+)
 
 
 def _norm_target_symbol(value: str) -> str:

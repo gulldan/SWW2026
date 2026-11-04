@@ -155,16 +155,18 @@ _UNIPROT_JSON_URL = "https://rest.uniprot.org/uniprotkb/{uniprot_id}.json"
 # Manual UniProt corrections for known problematic PDB auto-resolutions.
 # Matched by pair identity/PDB rather than catalog number so reordering does
 # not silently apply incorrect overrides.
-_GREEK_TO_ASCII = str.maketrans({
-    "α": "a",
-    "β": "b",
-    "γ": "g",
-    "δ": "d",
-    "Α": "A",
-    "Β": "B",
-    "Γ": "G",
-    "Δ": "D",
-})
+_GREEK_TO_ASCII = str.maketrans(
+    {
+        "α": "a",
+        "β": "b",
+        "γ": "g",
+        "δ": "d",
+        "Α": "A",
+        "Β": "B",
+        "Γ": "G",
+        "Δ": "D",
+    }
+)
 
 
 def _norm_target_symbol(value: str) -> str:

@@ -280,4 +280,3 @@ def compute_pocket_similarity(
         cache_file.write_text(json.dumps(asdict(report), ensure_ascii=False, indent=2), encoding="utf-8")
 
     return report
-

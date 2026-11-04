@@ -122,9 +122,7 @@ def main(  # noqa: PLR0913
         query = pair.lower().replace("/", "").replace(" ", "").replace("_", "").replace("-", "")
         for p in pairs:
             key = f"{p.target_a}{p.target_b}".lower().replace("/", "").replace(" ", "").replace("_", "").replace("-", "")
-            key_rev = (
-                f"{p.target_b}{p.target_a}".lower().replace("/", "").replace(" ", "").replace("_", "").replace("-", "")
-            )
+            key_rev = f"{p.target_b}{p.target_a}".lower().replace("/", "").replace(" ", "").replace("_", "").replace("-", "")
             family = p.target_family.lower().replace("/", "").replace(" ", "").replace("_", "").replace("-", "")
             if query in (key, key_rev, family):
                 selected.append(p)

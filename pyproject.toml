@@ -121,6 +121,15 @@ exclude = [
 # Assume Python 3.12.
 target-version = "py312"
 
+[tool.ruff.lint.per-file-ignores]
+# Example notebooks keep commented-out variants on purpose -- they document
+# alternatives rather than leaving dead code behind.
+"*.ipynb" = ["ERA001", "N813", "PERF401"]
+# `import MDAnalysis as mda` is the alias the library documents, and an explicit
+# loop often reads clearer than a comprehension inside a cell.
+# lint_docs.py is a CLI reporter: stdout is its interface.
+"scripts/lint_docs.py" = ["T201"]
+
 [tool.ruff.lint.mccabe]
 # Flag errors (`C901`) whenever the complexity level exceeds 5.
 max-complexity = 50

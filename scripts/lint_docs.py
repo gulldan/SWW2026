@@ -24,7 +24,8 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
-from dataclasses import dataclass, asdict
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 HISTORICAL_MARKER = "<!-- lint: historical-record -->"
@@ -36,6 +37,8 @@ PATH_PREFIXES = ("cli/", "dualdocking/", "configs/", "scripts/", "tests/", "dock
 
 @dataclass(frozen=True)
 class Finding:
+    """One linter finding: which check fired, where, and what is wrong."""
+
     check: str
     path: str
     line: int
@@ -44,8 +47,13 @@ class Finding:
 
 def _run_git(root: Path, *args: str) -> str:
     try:
-        out = subprocess.run(
-            ["git", *args], cwd=root, capture_output=True, text=True, timeout=30, check=False
+        out = subprocess.run(  # noqa: S603  -- fixed argv, no shell, no caller input
+            ["git", *args],  # noqa: S607  -- git is resolved from PATH on purpose
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
         return out.stdout.strip()
     except (OSError, subprocess.SubprocessError):
@@ -56,13 +64,13 @@ def _load_yaml(path: Path) -> dict:
     """Load YAML, preferring PyYAML and falling back to a flat-key scan."""
     text = path.read_text(encoding="utf-8")
     try:
-        import yaml  # type: ignore
+        import yaml  # type: ignore[import-untyped]
 
         return yaml.safe_load(text) or {}
     except ImportError:
         # Fallback: collect top-level-ish ``key:`` names so the linter still
         # runs without PyYAML. Nested values are not reconstructed.
-        return {"__keys__": re.findall(r"^\s{0,4}([A-Za-z][\w-]*):", text, re.M)}
+        return {"__keys__": re.findall(r"^\s{0,4}([A-Za-z][\w-]*):", text, re.MULTILINE)}
 
 
 def collect_docs(root: Path) -> list[Path]:
@@ -112,9 +120,8 @@ def build_vocabulary(root: Path) -> dict:
     }
 
 
-def iter_lines(text: str):
-    for i, line in enumerate(text.split("\n"), start=1):
-        yield i, line
+def iter_lines(text: str) -> Iterator[tuple[int, str]]:
+    yield from enumerate(text.split("\n"), start=1)
 
 
 def fenced_spans(text: str) -> set[int]:
@@ -130,7 +137,7 @@ def fenced_spans(text: str) -> set[int]:
     return spans
 
 
-def check_pairs(doc: Path, text: str, vocab: dict, rel: str) -> list[Finding]:
+def check_pairs(text: str, vocab: dict, rel: str) -> list[Finding]:
     """Pair-shaped tokens that configs/pairs.yaml no longer defines."""
     out = []
     token = re.compile(r"\b([A-Za-z][A-Za-z0-9]{1,9})_([A-Za-z][A-Za-z0-9]{1,9})\b")
@@ -149,12 +156,11 @@ def check_pairs(doc: Path, text: str, vocab: dict, rel: str) -> list[Finding]:
             if (whole, lineno) in seen:
                 continue
             seen.add((whole, lineno))
-            out.append(Finding("PAIR-STALE", rel, lineno,
-                               f"`{whole}` is not a pair in configs/pairs.yaml"))
+            out.append(Finding("PAIR-STALE", rel, lineno, f"`{whole}` is not a pair in configs/pairs.yaml"))
     return out
 
 
-def check_pdb(doc: Path, text: str, vocab: dict, rel: str) -> list[Finding]:
+def check_pdb(text: str, vocab: dict, rel: str) -> list[Finding]:
     """A PDB id named next to a target that pairs.yaml maps elsewhere.
 
     A candidate must be written the way the PDB writes them -- a leading digit
@@ -168,28 +174,21 @@ def check_pdb(doc: Path, text: str, vocab: dict, rel: str) -> list[Finding]:
     window = 24  # characters after a target name that still count as "next to"
 
     for lineno, line in iter_lines(text):
-        candidates = [
-            (m.start(), m.group(1))
-            for m in pdb_re.finditer(line)
-            if re.search(r"[A-Z]", m.group(1))
-        ]
+        candidates = [(m.start(), m.group(1)) for m in pdb_re.finditer(line) if re.search(r"[A-Z]", m.group(1))]
         if not candidates:
             continue
         for target, expected in vocab["pdb_of"].items():
             for tm in re.finditer(rf"\b{re.escape(target)}\b", line):
-                near = [
-                    pid for pos, pid in candidates
-                    if 0 <= pos - tm.end() <= window
-                ]
+                near = [pid for pos, pid in candidates if 0 <= pos - tm.end() <= window]
                 if near and expected not in near:
-                    out.append(Finding(
-                        "PDB-MISMATCH", rel, lineno,
-                        f"{target} shown with {near[0]} but pairs.yaml specifies {expected}"))
+                    out.append(
+                        Finding("PDB-MISMATCH", rel, lineno, f"{target} shown with {near[0]} but pairs.yaml specifies {expected}")
+                    )
                     break
     return out
 
 
-def check_paths(doc: Path, text: str, root: Path, rel: str) -> list[Finding]:
+def check_paths(text: str, root: Path, rel: str) -> list[Finding]:
     """Repo paths quoted in prose that do not exist on disk."""
     out, seen = [], set()
     path_re = re.compile(r"[`\(]([A-Za-z0-9_\-./]+\.(?:py|yaml|yml|sh|toml|tex|json))[`\)]")
@@ -202,16 +201,15 @@ def check_paths(doc: Path, text: str, root: Path, rel: str) -> list[Finding]:
                 continue
             if not (root / cand).exists():
                 seen.add(cand)
-                out.append(Finding("PATH-MISSING", rel, lineno,
-                                   f"`{cand}` does not exist"))
+                out.append(Finding("PATH-MISSING", rel, lineno, f"`{cand}` does not exist"))
     return out
 
 
 def github_anchor(heading: str) -> str:
     """GitHub's heading-to-anchor rule: lowercase, drop punctuation, spaces to hyphens."""
     s = heading.strip().lower()
-    s = re.sub(r"[`*_~]", "", s)                 # inline markup never reaches the anchor
-    s = re.sub(r"[^\w\s-]", "", s, flags=re.U)  # punctuation is dropped
+    s = re.sub(r"[`*_~]", "", s)  # inline markup never reaches the anchor
+    s = re.sub(r"[^\w\s-]", "", s)  # punctuation is dropped
     return re.sub(r"\s+", "-", s.strip())
 
 
@@ -220,8 +218,7 @@ def heading_anchors(path: Path) -> set[str]:
     if not path.is_file():
         return set()
     anchors: set[str] = set()
-    for h in re.findall(r"^#{1,6}\s+(.+?)\s*$",
-                        path.read_text(encoding="utf-8", errors="replace"), re.M):
+    for h in re.findall(r"^#{1,6}\s+(.+?)\s*$", path.read_text(encoding="utf-8", errors="replace"), re.MULTILINE):
         base = github_anchor(h)
         if base in anchors:
             n = 1
@@ -233,7 +230,7 @@ def heading_anchors(path: Path) -> set[str]:
     return anchors
 
 
-def check_links(doc: Path, text: str, root: Path, rel: str) -> list[Finding]:
+def check_links(doc: Path, text: str, rel: str) -> list[Finding]:
     """Relative markdown links whose target file -- or heading anchor -- is absent."""
     out = []
     link_re = re.compile(r"\[[^\]]*\]\(([^)#\s]*)(#[^)\s]*)?\)")
@@ -245,8 +242,7 @@ def check_links(doc: Path, text: str, root: Path, rel: str) -> list[Finding]:
                 continue
             resolved = (doc.parent / target).resolve() if target else doc
             if not resolved.exists():
-                out.append(Finding("LINK-BROKEN", rel, lineno,
-                                   f"link target `{target}` not found"))
+                out.append(Finding("LINK-BROKEN", rel, lineno, f"link target `{target}` not found"))
                 continue
             # A fragment must match a heading in the file it points at.
             if frag and resolved.suffix == ".md":
@@ -254,8 +250,7 @@ def check_links(doc: Path, text: str, root: Path, rel: str) -> list[Finding]:
                     anchor_cache[resolved] = heading_anchors(resolved)
                 if frag not in anchor_cache[resolved]:
                     where = target or resolved.name
-                    out.append(Finding("ANCHOR-BROKEN", rel, lineno,
-                                       f"`{where}#{frag}` has no matching heading"))
+                    out.append(Finding("ANCHOR-BROKEN", rel, lineno, f"`{where}#{frag}` has no matching heading"))
     return out
 
 
@@ -267,23 +262,23 @@ def check_counts(root: Path, docs: list[Path]) -> list[Finding]:
     tests_dir = root / "tests"
     if tests_dir.is_dir():
         for p in tests_dir.rglob("test_*.py"):
-            n_tests += len(re.findall(r"^\s*def test_", p.read_text(encoding="utf-8", errors="replace"), re.M))
+            n_tests += len(re.findall(r"^\s*def test_", p.read_text(encoding="utf-8", errors="replace"), re.MULTILINE))
 
     doc_claim = re.compile(r"Documentation \((\d+) files?")
-    test_claim = re.compile(r"~?([\d,]+)\+?\s+tests\b", re.I)
+    test_claim = re.compile(r"~?([\d,]+)\+?\s+tests\b", re.IGNORECASE)
     for doc in docs:
         rel = str(doc.relative_to(root))
         text = doc.read_text(encoding="utf-8", errors="replace")
         for lineno, line in iter_lines(text):
-            for m in doc_claim.finditer(line):
-                if int(m.group(1)) != n_docs:
-                    out.append(Finding("COUNT-CLAIM", rel, lineno,
-                                       f"claims {m.group(1)} doc files, docs/ holds {n_docs}"))
+            out.extend(
+                Finding("COUNT-CLAIM", rel, lineno, f"claims {m.group(1)} doc files, docs/ holds {n_docs}")
+                for m in doc_claim.finditer(line)
+                if int(m.group(1)) != n_docs
+            )
             for m in test_claim.finditer(line):
                 claimed = int(m.group(1).replace(",", ""))
                 if n_tests and abs(claimed - n_tests) > max(50, 0.15 * n_tests):
-                    out.append(Finding("COUNT-CLAIM", rel, lineno,
-                                       f"claims {claimed} tests, found {n_tests} test functions"))
+                    out.append(Finding("COUNT-CLAIM", rel, lineno, f"claims {claimed} tests, found {n_tests} test functions"))
     return out
 
 
@@ -300,8 +295,7 @@ def check_dates(root: Path, docs: list[Path]) -> list[Finding]:
         committed = _run_git(root, "log", "-1", "--format=%cs", "--", rel)
         if committed and committed > m.group(1):
             lineno = text[: m.start()].count("\n") + 1
-            out.append(Finding("STALE-DATE", rel, lineno,
-                               f"stamped {m.group(1)} but last commit is {committed}"))
+            out.append(Finding("STALE-DATE", rel, lineno, f"stamped {m.group(1)} but last commit is {committed}"))
     return out
 
 
@@ -316,12 +310,11 @@ def check_map(root: Path, docs: list[Path]) -> list[Finding]:
         if doc.parent.name != "docs" or doc.name == "README.md":
             continue
         if f"({doc.name})" not in index_text and f"`{doc.name}`" not in index_text:
-            out.append(Finding("ORPHAN-DOC", "docs/README.md", 0,
-                               f"`{doc.name}` is not linked from the documentation map"))
+            out.append(Finding("ORPHAN-DOC", "docs/README.md", 0, f"`{doc.name}` is not linked from the documentation map"))
     return out
 
 
-def check_mermaid(doc: Path, text: str, rel: str) -> list[Finding]:
+def check_mermaid(text: str, rel: str) -> list[Finding]:
     """Mermaid blocks whose edges dangle at end of line (GitHub renders nothing)."""
     out = []
     lines = text.split("\n")
@@ -335,8 +328,7 @@ def check_mermaid(doc: Path, text: str, rel: str) -> list[Finding]:
             inside = False
             continue
         if inside and re.search(r"(-->|---|==>)\s*$", s):
-            out.append(Finding("MERMAID-BROKEN", rel, i,
-                               "edge arrow ends the line; mermaid needs source and target together"))
+            out.append(Finding("MERMAID-BROKEN", rel, i, "edge arrow ends the line; mermaid needs source and target together"))
     return out
 
 
@@ -367,9 +359,14 @@ def check_duplication(root: Path, docs: list[Path], min_lines: int = 3) -> list[
             continue
         head = body.split("\n")[0][:60]
         where = ", ".join(f"{rel}:{ln}" for rel, ln in sorted(places))
-        out.append(Finding("DUPLICATE-BLOCK", sorted(files)[0], places[0][1],
-                           f"{len(body.splitlines())} identical lines in {len(files)} files "
-                           f"({where}) starting \"{head}\""))
+        out.append(
+            Finding(
+                "DUPLICATE-BLOCK",
+                sorted(files)[0],
+                places[0][1],
+                f'{len(body.splitlines())} identical lines in {len(files)} files ({where}) starting "{head}"',
+            )
+        )
     return out
 
 
@@ -383,11 +380,11 @@ def lint(root: Path) -> list[Finding]:
         text = doc.read_text(encoding="utf-8", errors="replace")
         historical = HISTORICAL_MARKER in text
         per_file = [
-            *check_pairs(doc, text, vocab, rel),
-            *check_pdb(doc, text, vocab, rel),
-            *check_paths(doc, text, root, rel),
-            *check_links(doc, text, root, rel),
-            *check_mermaid(doc, text, rel),
+            *check_pairs(text, vocab, rel),
+            *check_pdb(text, vocab, rel),
+            *check_paths(text, root, rel),
+            *check_links(doc, text, rel),
+            *check_mermaid(text, rel),
         ]
         if historical:
             per_file = [f for f in per_file if f.check not in HISTORICAL_CHECKS]
@@ -401,10 +398,14 @@ def lint(root: Path) -> list[Finding]:
     # Repo-level: reward calibration coverage for the configured panel.
     missing = sorted(vocab["targets"] - vocab["calibrated"])
     if missing:
-        findings.append(Finding(
-            "TARGET-UNCALIBRATED", "configs/normalization.yaml", 0,
-            f"{len(missing)} of {len(vocab['targets'])} configured targets have no "
-            f"z-score entry: {', '.join(missing)}"))
+        findings.append(
+            Finding(
+                "TARGET-UNCALIBRATED",
+                "configs/normalization.yaml",
+                0,
+                f"{len(missing)} of {len(vocab['targets'])} configured targets have no z-score entry: {', '.join(missing)}",
+            )
+        )
 
     return sorted(findings, key=lambda f: (f.check, f.path, f.line))
 
