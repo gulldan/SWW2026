@@ -8,9 +8,9 @@ Single-target vs dual-target RL molecule generation using **FREED++** or **REINV
 
 ## Data Flow
 
-![SWW2026 dual-target pipeline: 8 stages across 5 engine lanes](docs/diagrams/sww2026_pipeline.png)
+![SWW2026 dual-target pipeline: the 8-stage main chain across 5 engine lanes](docs/diagrams/sww2026_pipeline.png)
 
-<sub>Diagram source: [`docs/diagrams/sww2026_pipeline.html`](docs/diagrams/sww2026_pipeline.html) — self-contained, opens in a browser.</sub>
+<sub>The diagram shows the main chain. Two optional validation stages branch off `score` and are not drawn: `gnina` (CNN cross-scoring) and `md` (GROMACS 50 ns). `STAGE_ORDER` lists all ten.</sub>
 
 **150 runs total**: 10 core pairs x 3 modes x 5 seeds. Every pair in `configs/pairs.yaml` is `set: core`.
 
